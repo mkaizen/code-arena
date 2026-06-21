@@ -1,0 +1,174 @@
+// Code Arena — relational system of record (FR-1..FR-26 backing store).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  SETTER
+  ADMIN
+}
+
+enum Difficulty {
+  easy
+  med
+  hard
+}
+
+enum ScoringModel {
+  ICPC
+  POINTS
+}
+
+enum Verdict {
+  ACCEPTED
+  WRONG_ANSWER
+  TIME_LIMIT_EXCEEDED
+  MEMORY_LIMIT_EXCEEDED
+  RUNTIME_ERROR
+  COMPILATION_ERROR
+  INTERNAL_ERROR
+  PENDING
+  JUDGING
+}
+
+model User {
+  id            String   @id @default(cuid())
+  handle        String   @unique
+  email         String   @unique
+  passwordHash  String?  // null when OAuth-only (FR-1)
+  role          Role     @default(USER)
+  rating        Int      @default(1500)
+  defaultLang   String   @default("cpp") // FR-3
+  editorPrefs   Json?    // FR-3
+  createdAt     DateTime @default(now())
+
+  oauthAccounts OAuthAccount[]
+  submissions   Submission[]
+  registrations Registration[]
+  ratingChanges RatingChange[]
+
+  @@index([rating])
+}
+
+model OAuthAccount {
+  id         String @id @default(cuid())
+  provider   String // "github" | "google"
+  providerId String
+  user       User   @relation(fields: [userId], references: [id])
+  userId     String
+
+  @@unique([provider, providerId])
+}
+
+model Problem {
+  id          String     @id @default(cuid())
+  slug        String     @unique
+  title       String
+  statement   String     // markdown/HTML
+  difficulty  Difficulty
+  ratingValue Int        // numeric difficulty (FR-5)
+  tags        String[]   // FR-5
+  timeMs      Int        // FR-6
+  memoryKb    Int        // FR-6
+  // Hidden judge data lives in object storage; we keep a pointer (FR-4).
+  testsKey    String     // e.g. "problems/<id>/tests.tar"
+  testCount   Int        @default(0)
+  version     Int        @default(1) // FR-7
+  createdAt   DateTime   @default(now())
+
+  samples     Sample[]
+  contestProblems ContestProblem[]
+  submissions Submission[]
+}
+
+model Sample {
+  id        String  @id @default(cuid())
+  problem   Problem @relation(fields: [problemId], references: [id])
+  problemId String
+  input     String
+  output    String
+  ordinal   Int
+}
+
+model Contest {
+  id           String       @id @default(cuid())
+  name         String
+  startsAt     DateTime     // FR-8 (server clock authoritative — NFR-4)
+  durationSec  Int          // FR-8
+  scoring      ScoringModel @default(ICPC) // FR-11
+  rated        Boolean      @default(true)
+  freezeSec    Int          @default(1800) // FR-12: freeze window before end
+  createdAt    DateTime     @default(now())
+
+  problems      ContestProblem[]
+  registrations Registration[]
+  submissions   Submission[]
+  ratingChanges RatingChange[]
+
+  @@index([startsAt])
+}
+
+model ContestProblem {
+  contest   Contest @relation(fields: [contestId], references: [id])
+  contestId String
+  problem   Problem @relation(fields: [problemId], references: [id])
+  problemId String
+  label     String  // "A", "B", ...
+  points    Int     @default(100) // used by POINTS scoring (FR-11)
+
+  @@id([contestId, problemId])
+}
+
+model Registration {
+  contest   Contest @relation(fields: [contestId], references: [id])
+  contestId String
+  user      User    @relation(fields: [userId], references: [id])
+  userId    String
+  remindAt  DateTime? // FR-26
+  createdAt DateTime  @default(now())
+
+  @@id([contestId, userId])
+}
+
+model Submission {
+  id          String   @id @default(cuid())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+  problem     Problem  @relation(fields: [problemId], references: [id])
+  problemId   String
+  contest     Contest? @relation(fields: [contestId], references: [id])
+  contestId   String?
+  language    String
+  source      String
+  verdict     Verdict  @default(PENDING)
+  failedCase  Int?
+  timeMs      Int?
+  memoryKb    Int?
+  // FR-4/FR-25: practice submissions are judged identically but unrated.
+  rated       Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  judgedAt    DateTime?
+
+  @@index([userId, createdAt])
+  @@index([contestId, problemId])
+}
+
+model RatingChange {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  contest   Contest  @relation(fields: [contestId], references: [id])
+  contestId String
+  before    Int
+  after     Int
+  rank      Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, contestId]) // FR-21/FR-22, deterministic & reproducible (NFR-6)
+}
