@@ -1,0 +1,29 @@
+# Base sandbox layer. Build per-language tags from this, e.g.:
+#   docker build -f Dockerfile.sandbox --target cpp  -t arena-sandbox:cpp  .
+#   docker build -f Dockerfile.sandbox --target py   -t arena-sandbox:py   .
+# Containers are launched with --network=none --read-only --cap-drop=ALL (NFR-3).
+
+FROM gcc:13 AS cpp
+RUN useradd -m -u 10001 runner
+USER runner
+
+FROM python:3.12-slim AS py
+RUN useradd -m -u 10001 runner
+USER runner
+
+FROM eclipse-temurin:17-jdk AS java
+RUN useradd -m -u 10001 runner
+USER runner
+
+FROM node:20-slim AS node
+RUN useradd -m -u 10001 runner
+USER runner
+
+FROM golang:1.22 AS go
+ENV GOCACHE=/tmp/gocache GOFLAGS=-mod=mod
+RUN useradd -m -u 10001 runner
+USER runner
+
+FROM rust:1.79-slim AS rust
+RUN useradd -m -u 10001 runner
+USER runner
