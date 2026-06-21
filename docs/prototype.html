@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Code Arena — Live Contest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0E1116;
+    --panel:#161B22;
+    --panel-2:#1C222B;
+    --line:#262C36;
+    --line-soft:#1F2530;
+    --txt:#E6EDF3;
+    --txt-2:#8B949E;
+    --txt-3:#5C6571;
+
+    /* rating tiers — the meaningful accent system */
+    --t-newbie:#9AA4AE;
+    --t-pupil:#3FB950;
+    --t-spec:#39C5CF;
+    --t-expert:#4C8DFF;
+    --t-cm:#A371F7;
+    --t-master:#F0883E;
+    --t-gm:#FF5C5C;
+
+    /* verdicts */
+    --v-ac:#3FB950;
+    --v-wa:#FF5C5C;
+    --v-tle:#D29922;
+    --v-ce:#F0883E;
+    --v-judge:#4C8DFF;
+
+    --mono:"JetBrains Mono", ui-monospace, monospace;
+    --disp:"Space Grotesk", system-ui, sans-serif;
+    --body:"Inter", system-ui, sans-serif;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--ink);
+    color:var(--txt);
+    font-family:var(--body);
+    font-size:14px;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+  button:focus-visible, .plink:focus-visible{outline:2px solid var(--t-expert);outline-offset:2px;border-radius:4px;}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex;align-items:center;gap:18px;
+    padding:0 18px;height:56px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#12161C,#0E1116);
+  }
+  .brand{display:flex;align-items:baseline;gap:8px;font-family:var(--disp);font-weight:700;letter-spacing:-0.02em;}
+  .brand .a{color:var(--txt);font-size:18px;}
+  .brand .b{color:var(--t-gm);font-size:18px;}
+  .brand .dot{width:7px;height:7px;border-radius:50%;background:var(--v-ac);box-shadow:0 0 8px var(--v-ac);align-self:center;margin-left:2px;animation:beat 1.6s ease-in-out infinite;}
+  @keyframes beat{0%,100%{transform:scale(1);opacity:.9;}50%{transform:scale(1.5);opacity:.4;}}
+
+  .contest-meta{display:flex;flex-direction:column;line-height:1.2;margin-right:auto;}
+  .contest-meta .name{font-family:var(--disp);font-weight:600;font-size:14px;}
+  .contest-meta .sub{font-size:11px;color:var(--txt-2);font-family:var(--mono);}
+
+  .clock{
+    display:flex;flex-direction:column;align-items:flex-end;line-height:1;
+  }
+  .clock .label{font-size:9px;letter-spacing:.18em;color:var(--txt-3);text-transform:uppercase;margin-bottom:4px;font-family:var(--mono);}
+  .clock .time{font-family:var(--mono);font-weight:700;font-size:22px;letter-spacing:.02em;font-variant-numeric:tabular-nums;}
+  .clock.warn .time{color:var(--v-tle);}
+  .clock.crit .time{color:var(--v-wa);animation:flash 1s steps(2,end) infinite;}
+  @keyframes flash{50%{opacity:.45;}}
+
+  .me{display:flex;align-items:center;gap:9px;padding-left:18px;border-left:1px solid var(--line);}
+  .me .handle{font-family:var(--mono);font-weight:700;font-size:13px;}
+  .me .rank{font-size:11px;color:var(--txt-2);font-family:var(--mono);}
+  .avatar{width:30px;height:30px;border-radius:7px;display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:13px;color:var(--ink);}
+
+  /* ---------- arena grid ---------- */
+  .arena{
+    display:grid;
+    grid-template-columns:188px minmax(0,1fr) 296px;
+    height:calc(100vh - 56px);
+    min-height:0;
+  }
+  .col{min-height:0;display:flex;flex-direction:column;overflow:hidden;}
+  .col.left{border-right:1px solid var(--line);background:#10141A;}
+  .col.right{border-left:1px solid var(--line);background:#10141A;}
+  .col-head{
+    padding:13px 16px;font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--txt-3);border-bottom:1px solid var(--line-soft);
+    display:flex;justify-content:space-between;align-items:center;flex:none;
+  }
+
+  /* ---------- problem list ---------- */
+  .plist{overflow-y:auto;padding:8px;}
+  .plink{
+    display:flex;align-items:center;gap:11px;width:100%;text-align:left;
+    padding:11px 11px;border-radius:8px;margin-bottom:3px;transition:background .12s;
+  }
+  .plink:hover{background:var(--line-soft);}
+  .plink.active{background:#1B2129;box-shadow:inset 2px 0 0 var(--t-expert);}
+  .plink .pid{
+    width:26px;height:26px;border-radius:7px;flex:none;display:grid;place-items:center;
+    font-family:var(--mono);font-weight:700;font-size:13px;border:1px solid var(--line);
+    color:var(--txt-2);
+  }
+  .plink.solved .pid{background:rgba(63,185,80,.13);border-color:rgba(63,185,80,.5);color:var(--v-ac);}
+  .plink.tried .pid{background:rgba(255,92,92,.10);border-color:rgba(255,92,92,.4);color:var(--v-wa);}
+  .plink .pmeta{display:flex;flex-direction:column;min-width:0;line-height:1.25;}
+  .plink .ptitle{font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .plink .pdiff{font-size:10px;font-family:var(--mono);}
+  .pdiff.easy{color:var(--t-pupil);}
+  .pdiff.med{color:var(--t-master);}
+  .pdiff.hard{color:var(--t-gm);}
+  .plink .stat{margin-left:auto;font-size:11px;flex:none;}
+
+  /* ---------- center: statement + editor ---------- */
+  .center{display:flex;flex-direction:column;min-height:0;background:var(--ink);}
+  .statement{
+    overflow-y:auto;padding:24px 30px;flex:0 0 42%;border-bottom:1px solid var(--line);
+  }
+  .statement::-webkit-scrollbar,.plist::-webkit-scrollbar,.lb-body::-webkit-scrollbar,.gutter::-webkit-scrollbar,.editor::-webkit-scrollbar{width:9px;height:9px;}
+  .statement::-webkit-scrollbar-thumb,.plist::-webkit-scrollbar-thumb,.lb-body::-webkit-scrollbar-thumb,.editor::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;}
+
+  .st-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:4px;}
+  .st-head h1{font-family:var(--disp);font-size:23px;font-weight:600;letter-spacing:-0.02em;margin:0;}
+  .st-head .badge{font-family:var(--mono);font-size:11px;}
+  .limits{display:flex;gap:18px;margin:10px 0 20px;flex-wrap:wrap;}
+  .limit{display:flex;flex-direction:column;}
+  .limit .k{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--txt-3);}
+  .limit .v{font-family:var(--mono);font-size:13px;color:var(--txt);}
+  .statement p{color:#C9D1D9;margin:0 0 13px;}
+  .statement h3{font-family:var(--disp);font-size:13px;letter-spacing:.02em;color:var(--txt);margin:22px 0 9px;text-transform:uppercase;font-weight:600;}
+  .statement code{font-family:var(--mono);background:var(--panel-2);padding:1px 6px;border-radius:4px;font-size:12.5px;color:#79C0FF;}
+  .samples{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-top:6px;}
+  .sample{background:var(--panel);padding:12px 14px;}
+  .sample .lbl{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--txt-3);margin-bottom:6px;}
+  .sample pre{margin:0;font-family:var(--mono);font-size:12.5px;color:var(--txt);white-space:pre-wrap;}
+
+  /* editor region */
+  .workshop{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;background:#0B0E13;}
+  .ws-bar{
+    display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--line);
+    background:var(--panel);flex:none;
+  }
+  .lang-sel{position:relative;}
+  .lang-sel select{
+    appearance:none;background:var(--panel-2);border:1px solid var(--line);color:var(--txt);
+    font-family:var(--mono);font-size:12px;padding:6px 28px 6px 11px;border-radius:7px;cursor:pointer;
+  }
+  .lang-sel::after{content:"▾";position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--txt-2);pointer-events:none;font-size:11px;}
+  .ws-spacer{margin-left:auto;}
+  .btn{
+    font-family:var(--mono);font-size:12px;font-weight:500;padding:8px 16px;border-radius:7px;
+    transition:transform .08s, background .14s, opacity .14s;
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn-run{border:1px solid var(--line);color:var(--txt);background:var(--panel-2);}
+  .btn-run:hover{background:#222932;}
+  .btn-submit{background:var(--v-ac);color:#06210C;font-weight:700;}
+  .btn-submit:hover{background:#4ad15d;}
+  .btn[disabled]{opacity:.5;cursor:not-allowed;}
+
+  .editor-wrap{flex:1 1 auto;display:flex;min-height:0;position:relative;overflow:hidden;}
+  .gutter{
+    flex:none;padding:14px 0;text-align:right;font-family:var(--mono);font-size:13px;line-height:1.6;
+    color:var(--txt-3);background:#0B0E13;user-select:none;overflow:hidden;width:46px;
+  }
+  .gutter div{padding:0 12px 0 0;}
+  .editor{
+    flex:1 1 auto;border:none;outline:none;resize:none;background:#0B0E13;color:#E6EDF3;
+    font-family:var(--mono);font-size:13px;line-height:1.6;padding:14px 16px 14px 4px;
+    tab-size:4;white-space:pre;overflow:auto;
+  }
+  .editor::selection{background:rgba(76,141,255,.28);}
+
+  /* console / verdict */
+  .console{
+    flex:none;border-top:1px solid var(--line);background:var(--panel);
+    max-height:40%;overflow-y:auto;
+  }
+  .console:empty{display:none;}
+  .verdict{
+    display:flex;align-items:center;gap:13px;padding:13px 16px;border-bottom:1px solid var(--line-soft);
+  }
+  .verdict .dot-v{width:9px;height:9px;border-radius:50%;flex:none;}
+  .verdict .vname{font-family:var(--mono);font-weight:700;font-size:13px;}
+  .verdict .vdetail{font-family:var(--mono);font-size:11.5px;color:var(--txt-2);margin-left:auto;}
+  .v-ac .vname{color:var(--v-ac);} .v-ac .dot-v{background:var(--v-ac);box-shadow:0 0 10px var(--v-ac);}
+  .v-wa .vname{color:var(--v-wa);} .v-wa .dot-v{background:var(--v-wa);}
+  .v-tle .vname{color:var(--v-tle);} .v-tle .dot-v{background:var(--v-tle);}
+  .v-ce .vname{color:var(--v-ce);} .v-ce .dot-v{background:var(--v-ce);}
+  .v-judge .vname{color:var(--v-judge);} .v-judge .dot-v{background:var(--v-judge);animation:pulse .8s infinite;}
+  @keyframes pulse{50%{opacity:.3;}}
+  .case-row{display:flex;gap:12px;padding:8px 16px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--line-soft);}
+  .case-row:last-child{border-bottom:none;}
+  .case-row .ci{color:var(--txt-2);}
+  .case-row .cs.pass{color:var(--v-ac);}
+  .case-row .cs.fail{color:var(--v-wa);}
+  .case-row .ct{margin-left:auto;color:var(--txt-3);}
+
+  /* ---------- leaderboard ---------- */
+  .freeze-tag{font-family:var(--mono);font-size:9px;color:var(--t-expert);border:1px solid rgba(76,141,255,.4);padding:2px 6px;border-radius:4px;}
+  .lb-body{overflow-y:auto;padding:6px;position:relative;}
+  .lb-row{
+    display:grid;grid-template-columns:26px 1fr auto;align-items:center;gap:9px;
+    padding:9px 10px;border-radius:8px;margin-bottom:2px;transition:background .2s;
+  }
+  .lb-row.you{background:rgba(76,141,255,.10);box-shadow:inset 0 0 0 1px rgba(76,141,255,.3);}
+  .lb-row .rk{font-family:var(--mono);font-size:12px;color:var(--txt-3);text-align:center;font-weight:500;}
+  .lb-row.top1 .rk{color:#F0C040;font-weight:700;}
+  .lb-id{display:flex;flex-direction:column;line-height:1.25;min-width:0;}
+  .lb-id .h{font-family:var(--mono);font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .lb-id .pen{font-family:var(--mono);font-size:10px;color:var(--txt-3);}
+  .lb-score{display:flex;align-items:center;gap:5px;}
+  .lb-pill{
+    width:18px;height:18px;border-radius:4px;display:grid;place-items:center;
+    font-family:var(--mono);font-size:9px;font-weight:700;border:1px solid var(--line);color:var(--txt-3);
+  }
+  .lb-pill.ok{background:rgba(63,185,80,.18);border-color:rgba(63,185,80,.5);color:var(--v-ac);}
+  .lb-pill.bad{background:rgba(255,92,92,.10);border-color:rgba(255,92,92,.35);color:var(--v-wa);}
+  .lb-solved{font-family:var(--mono);font-weight:700;font-size:13px;margin-left:5px;min-width:14px;text-align:right;}
+  @keyframes climb{0%{background:rgba(63,185,80,.30);}100%{background:transparent;}}
+  .lb-row.climbed{animation:climb 1.4s ease-out;}
+
+  /* footer note */
+  .protonote{
+    position:fixed;bottom:12px;left:50%;transform:translateX(-50%);
+    background:rgba(22,27,34,.92);border:1px solid var(--line);backdrop-filter:blur(6px);
+    font-family:var(--mono);font-size:10.5px;color:var(--txt-2);padding:7px 14px;border-radius:20px;
+    z-index:20;white-space:nowrap;
+  }
+  .protonote b{color:var(--t-expert);font-weight:700;}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation:none !important;transition:none !important;}
+  }
+  @media (max-width:880px){
+    .arena{grid-template-columns:1fr;height:auto;}
+    .col.left,.col.right{border:none;border-top:1px solid var(--line);}
+    .statement{flex-basis:auto;}
+    .center{order:-1;}
+    .samples{grid-template-columns:1fr;}
+    .protonote{display:none;}
+  }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="a">Code</span><span class="b">Arena</span><span class="dot"></span></div>
+    <div class="contest-meta">
+      <span class="name" id="contestName">Saturday Sprint #142</span>
+      <span class="sub">ICPC scoring · rated · 4 problems</span>
+    </div>
+    <div class="clock" id="clock">
+      <span class="label">Time remaining</span>
+      <span class="time" id="clockTime">02:00:00</span>
+    </div>
+    <div class="me">
+      <div class="avatar" id="meAvatar">y</div>
+      <div>
+        <div class="handle" id="meHandle">you</div>
+        <div class="rank" id="meRank">1500 · Specialist</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="arena">
+    <!-- LEFT: problems -->
+    <section class="col left">
+      <div class="col-head">Problems</div>
+      <nav class="plist" id="plist"></nav>
+    </section>
+
+    <!-- CENTER: statement + editor -->
+    <section class="col center">
+      <div class="statement" id="statement"></div>
+      <div class="workshop">
+        <div class="ws-bar">
+          <div class="lang-sel">
+            <select id="langSel">
+              <option value="cpp">C++17</option>
+              <option value="py">Python 3</option>
+              <option value="java">Java 17</option>
+              <option value="js">JavaScript</option>
+              <option value="go">Go</option>
+              <option value="rs">Rust</option>
+            </select>
+          </div>
+          <span class="ws-spacer"></span>
+          <button class="btn btn-run" id="btnRun">Run samples</button>
+          <button class="btn btn-submit" id="btnSubmit">Submit</button>
+        </div>
+        <div class="editor-wrap">
+          <div class="gutter" id="gutter"><div>1</div></div>
+          <textarea class="editor" id="editor" spellcheck="false" autocomplete="off"></textarea>
+        </div>
+        <div class="console" id="console"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT: leaderboard -->
+    <section class="col right">
+      <div class="col-head">
+        <span>Live standings</span>
+        <span class="freeze-tag" id="freezeTag" style="display:none">FROZEN</span>
+      </div>
+      <div class="lb-body" id="lbBody"></div>
+    </section>
+  </main>
+
+  <div class="protonote">Interactive prototype · the judge is <b>simulated</b> — verdicts &amp; rankings are mocked to demo the live-contest loop</div>
+
+<script>
+/* ============================================================
+   Code Arena — front-end prototype
+   The judge is SIMULATED. This demonstrates the contest loop:
+   timer → write code → run samples → submit → verdict →
+   leaderboard climbs in real time.
+   ============================================================ */
+
+// ---- rating tiers -> color (the meaningful accent system) ----
+function tierOf(r){
+  if(r<1200) return {n:'Newbie',  c:'var(--t-newbie)'};
+  if(r<1400) return {n:'Pupil',   c:'var(--t-pupil)'};
+  if(r<1600) return {n:'Specialist',c:'var(--t-spec)'};
+  if(r<1900) return {n:'Expert',  c:'var(--t-expert)'};
+  if(r<2100) return {n:'Cand. Master',c:'var(--t-cm)'};
+  if(r<2400) return {n:'Master',  c:'var(--t-master)'};
+  return {n:'Grandmaster', c:'var(--t-gm)'};
+}
+
+// ---- problem bank (mock) ----
+const PROBLEMS = [
+  { id:'A', title:'Coin Stacks', diff:'easy', rating:800, tl:'1.0 s', ml:'256 MB',
+    body:`<p>You have <code>n</code> coins arranged in stacks. In one move you may take the top coin from any non-empty stack. Output the minimum number of moves to empty every stack.</p>
+    <h3>Input</h3><p>The first line contains <code>n</code>. The second line contains <code>n</code> integers — the height of each stack.</p>
+    <h3>Output</h3><p>One integer: the total number of moves.</p>`,
+    samples:[{in:'3\n2 1 3', out:'6'}] },
+
+  { id:'B', title:'Palindrome Window', diff:'easy', rating:1100, tl:'1.0 s', ml:'256 MB',
+    body:`<p>Given a string <code>s</code>, count the number of substrings of length exactly <code>k</code> that are palindromes.</p>
+    <h3>Input</h3><p>Line 1: <code>s</code> and <code>k</code>.</p>
+    <h3>Output</h3><p>The count of palindromic windows.</p>`,
+    samples:[{in:'ababa 3', out:'3'}] },
+
+  { id:'C', title:'Shortest Relay', diff:'med', rating:1600, tl:'2.0 s', ml:'256 MB',
+    body:`<p>A network has <code>n</code> nodes and <code>m</code> bidirectional links, each with a latency. Find the minimum total latency to send a packet from node <code>1</code> to node <code>n</code>.</p>
+    <h3>Input</h3><p>Line 1: <code>n m</code>. Next <code>m</code> lines: <code>u v w</code>.</p>
+    <h3>Output</h3><p>The minimum latency, or <code>-1</code> if unreachable.</p>`,
+    samples:[{in:'4 4\n1 2 3\n2 4 2\n1 3 10\n3 4 1', out:'5'}] },
+
+  { id:'D', title:'Tiling DP', diff:'hard', rating:2000, tl:'2.0 s', ml:'512 MB',
+    body:`<p>Count the number of ways to tile a <code>2 × n</code> board with <code>1×2</code> dominoes and <code>L</code>-shaped trominoes, modulo <code>10^9+7</code>.</p>
+    <h3>Input</h3><p>A single integer <code>n</code>.</p>
+    <h3>Output</h3><p>The number of tilings mod <code>10^9+7</code>.</p>`,
+    samples:[{in:'3', out:'5'}] },
+];
+
+const STARTERS = {
+  cpp:`#include <bits/stdc++.h>\nusing namespace std;\n\nint main(){\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // read input, solve, print answer\n    \n    return 0;\n}`,
+  py:`import sys\ninput = sys.stdin.readline\n\ndef solve():\n    # read input, solve, print answer\n    pass\n\nsolve()`,
+  java:`import java.util.*;\nimport java.io.*;\n\npublic class Main {\n    public static void main(String[] args) throws IOException {\n        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));\n        // read input, solve, print answer\n    }\n}`,
+  js:`const data = require('fs').readFileSync(0,'utf8').split('\\n');\n// read input, solve, print answer\n`,
+  go:`package main\n\nimport (\n    "bufio"\n    "fmt"\n    "os"\n)\n\nfunc main(){\n    r := bufio.NewReader(os.Stdin)\n    _ = r\n    // read input, solve, print answer\n    fmt.Println()\n}`,
+  rs:`use std::io::{self, Read, Write};\n\nfn main(){\n    let mut s = String::new();\n    io::stdin().read_to_string(&mut s).unwrap();\n    // read input, solve, print answer\n}`,
+};
+
+// ---- competitors (mock) ----
+let board = [
+  { handle:'you',        rating:1500, you:true,  results:{}, penalty:0 },
+  { handle:'tourist_jr', rating:2480, results:{A:{ok:1,t:6,tries:1},B:{ok:1,t:14,tries:1},C:{ok:1,t:31,tries:2}}, penalty:0 },
+  { handle:'segfault',   rating:1980, results:{A:{ok:1,t:9,tries:1},B:{ok:1,t:22,tries:1}}, penalty:0 },
+  { handle:'np_hard',    rating:2120, results:{A:{ok:1,t:5,tries:1},C:{ok:1,t:40,tries:3}}, penalty:0 },
+  { handle:'binary_owl', rating:1320, results:{A:{ok:1,t:12,tries:2}}, penalty:0 },
+  { handle:'lazy_eval',  rating:1660, results:{A:{ok:1,t:8,tries:1},B:{ok:1,t:25,tries:1}}, penalty:0 },
+  { handle:'off_by_one', rating:1180, results:{}, penalty:0 },
+  { handle:'mod_p',      rating:1740, results:{A:{ok:1,t:11,tries:1}}, penalty:0 },
+  { handle:'heapify',    rating:1450, results:{A:{ok:1,t:18,tries:2}}, penalty:0 },
+  { handle:'greedy_kid', rating:1290, results:{}, penalty:0 },
+];
+
+const DURATION = 2*60*60*1000;          // 2 hours
+const endTime  = Date.now() + DURATION;
+let current = PROBLEMS[0];
+const code = {};                         // per-problem code buffers
+let busy = false;
+
+// ============ render: top user ============
+function paintMe(){
+  const me = board.find(b=>b.you);
+  const t = tierOf(me.rating);
+  meHandle.textContent = me.handle;
+  meHandle.style.color = t.c;
+  meRank.textContent = me.rating + ' · ' + t.n;
+  meAvatar.style.background = t.c;
+  meAvatar.textContent = me.handle[0];
+}
+
+// ============ render: problem list ============
+function paintList(){
+  const me = board.find(b=>b.you);
+  plist.innerHTML = '';
+  PROBLEMS.forEach(p=>{
+    const r = me.results[p.id];
+    const state = r && r.ok ? 'solved' : (r ? 'tried' : '');
+    const b = document.createElement('button');
+    b.className = 'plink ' + (p===current?'active ':'') + state;
+    b.innerHTML = `
+      <span class="pid">${p.id}</span>
+      <span class="pmeta">
+        <span class="ptitle">${p.title}</span>
+        <span class="pdiff ${p.diff}">${p.diff.toUpperCase()} · ${p.rating}</span>
+      </span>
+      <span class="stat">${r&&r.ok?'✓':(r?'✕':'')}</span>`;
+    b.onclick = ()=>{ selectProblem(p); };
+    plist.appendChild(b);
+  });
+}
+
+// ============ render: statement ============
+function paintStatement(){
+  const t = tierOf(current.rating);
+  const samples = current.samples.map((s,i)=>`
+    <div class="samples">
+      <div class="sample"><div class="lbl">Input ${current.samples.length>1?i+1:''}</div><pre>${s.in}</pre></div>
+      <div class="sample"><div class="lbl">Output ${current.samples.length>1?i+1:''}</div><pre>${s.out}</pre></div>
+    </div>`).join('');
+  statement.innerHTML = `
+    <div class="st-head">
+      <h1>${current.id}. ${current.title}</h1>
+      <span class="badge" style="color:${t.c}">rating ${current.rating}</span>
+    </div>
+    <div class="limits">
+      <div class="limit"><span class="k">Time limit</span><span class="v">${current.tl}</span></div>
+      <div class="limit"><span class="k">Memory limit</span><span class="v">${current.ml}</span></div>
+    </div>
+    ${current.body}
+    <h3>Sample</h3>
+    ${samples}`;
+}
+
+// ============ editor ============
+function loadEditor(){
+  const lang = langSel.value;
+  editor.value = (code[current.id] && code[current.id][lang]) ?? STARTERS[lang];
+  syncGutter();
+}
+function syncGutter(){
+  const lines = editor.value.split('\n').length;
+  let h='';
+  for(let i=1;i<=Math.max(lines,1);i++) h+=`<div>${i}</div>`;
+  gutter.innerHTML = h;
+  gutter.scrollTop = editor.scrollTop;
+}
+editor.addEventListener('input', ()=>{
+  if(!code[current.id]) code[current.id]={};
+  code[current.id][langSel.value] = editor.value;
+  syncGutter();
+});
+editor.addEventListener('scroll', ()=>{ gutter.scrollTop = editor.scrollTop; });
+editor.addEventListener('keydown', e=>{
+  if(e.key==='Tab'){ e.preventDefault();
+    const s=editor.selectionStart, en=editor.selectionEnd;
+    editor.value = editor.value.slice(0,s)+'    '+editor.value.slice(en);
+    editor.selectionStart=editor.selectionEnd=s+4;
+    syncGutter();
+  }
+});
+langSel.addEventListener('change', loadEditor);
+
+function selectProblem(p){
+  current = p;
+  paintList(); paintStatement(); loadEditor();
+  console_.innerHTML='';
+}
+
+// ============ simulated judge ============
+function elapsedMin(){ return Math.floor((DURATION - (endTime-Date.now()))/60000); }
+
+function quality(){
+  // crude "does this look like a real attempt" heuristic for the demo
+  const v = editor.value;
+  const base = STARTERS[langSel.value];
+  const extra = v.replace(base,'').trim();
+  return extra.length;                 // more original code -> more likely AC
+}
+
+function runSamples(){
+  if(busy) return;
+  const q = quality();
+  console_.innerHTML = `<div class="verdict v-judge"><span class="dot-v"></span><span class="vname">Running</span><span class="vdetail">samples · ${langSel.options[langSel.selectedIndex].text}</span></div>`;
+  busy=true; btnRun.disabled=btnSubmit.disabled=true;
+  setTimeout(()=>{
+    let html='';
+    current.samples.forEach((s,i)=>{
+      const pass = q>40 ? true : Math.random()>0.5;
+      html += `<div class="case-row"><span class="ci">sample ${i+1}</span><span class="cs ${pass?'pass':'fail'}">${pass?'passed':'failed'}</span><span class="ct">${(Math.random()*0.4+0.02).toFixed(2)} s</span></div>`;
+    });
+    console_.innerHTML = `<div class="verdict v-judge"><span class="dot-v" style="animation:none"></span><span class="vname" style="color:var(--txt)">Sample run</span><span class="vdetail">not scored</span></div>` + html;
+    busy=false; btnRun.disabled=btnSubmit.disabled=false;
+  }, 1100);
+}
+
+function submit(){
+  if(busy) return;
+  const me = board.find(b=>b.you);
+  if(me.results[current.id] && me.results[current.id].ok){
+    flashVerdict('v-ac','Already solved','no penalty added'); return;
+  }
+  const q = quality();
+  console_.innerHTML = `<div class="verdict v-judge"><span class="dot-v"></span><span class="vname">In queue → Judging…</span><span class="vdetail">${current.id} · ${langSel.options[langSel.selectedIndex].text}</span></div>`;
+  busy=true; btnRun.disabled=btnSubmit.disabled=true;
+
+  setTimeout(()=>{
+    // weighted outcome for the demo
+    let verdict;
+    const roll = Math.random();
+    if(q<40)              verdict = roll<0.5?'CE':'WA';
+    else if(q<120)        verdict = roll<0.55?'AC':(roll<0.8?'WA':'TLE');
+    else                  verdict = roll<0.8?'AC':(roll<0.92?'WA':'TLE');
+
+    const rt = (Math.random()*Number(parseFloat(current.tl))*0.6+0.05).toFixed(2);
+    if(!me.results[current.id]) me.results[current.id]={ok:0,tries:0,t:0};
+    me.results[current.id].tries++;
+
+    if(verdict==='AC'){
+      me.results[current.id].ok=1;
+      me.results[current.id].t=elapsedMin();
+      flashVerdict('v-ac','Accepted', rt+' s · '+(Math.floor(Math.random()*40)+8)+' MB');
+      reorderBoard(true);
+      paintList();
+    } else {
+      const map={WA:['v-wa','Wrong Answer','failed on test '+(Math.floor(Math.random()*30)+2)],
+                 TLE:['v-tle','Time Limit Exceeded','>'+current.tl+' on test '+(Math.floor(Math.random()*20)+2)],
+                 CE:['v-ce','Compilation Error','see compiler log']};
+      flashVerdict(...map[verdict]);
+      paintList();
+    }
+    busy=false; btnRun.disabled=btnSubmit.disabled=false;
+  }, 1600);
+}
+
+function flashVerdict(cls,name,detail){
+  console_.innerHTML = `<div class="verdict ${cls}"><span class="dot-v"></span><span class="vname">${name}</span><span class="vdetail">${detail}</span></div>`;
+}
+
+// ============ leaderboard ============
+function scoreOf(b){
+  let solved=0, pen=0;
+  for(const k in b.results){ const r=b.results[k];
+    if(r.ok){ solved++; pen += r.t + (r.tries-1)*20; } }   // ICPC: 20 min per wrong try
+  return {solved, pen};
+}
+function reorderBoard(climbed){
+  board.forEach(b=>{const s=scoreOf(b); b._s=s.solved; b._p=s.pen;});
+  board.sort((a,b)=> b._s-a._s || a._p-b._p || a.handle.localeCompare(b.handle));
+  paintBoard(climbed);
+}
+function paintBoard(climbed){
+  lbBody.innerHTML='';
+  board.forEach((b,idx)=>{
+    const t=tierOf(b.rating);
+    const pills = PROBLEMS.map(p=>{
+      const r=b.results[p.id];
+      const cls = r&&r.ok?'ok':(r?'bad':'');
+      return `<span class="lb-pill ${cls}">${p.id}</span>`;
+    }).join('');
+    const row=document.createElement('div');
+    row.className='lb-row '+(b.you?'you ':'')+(idx===0?'top1 ':'')+(climbed&&b.you?'climbed':'');
+    row.innerHTML=`
+      <span class="rk">${idx+1}</span>
+      <span class="lb-id">
+        <span class="h" style="color:${t.c}">${b.handle}</span>
+        <span class="pen">${b._s||0} soln · ${b._p||0} pen</span>
+      </span>
+      <span class="lb-score">${pills}<span class="lb-solved" style="color:${t.c}">${b._s||0}</span></span>`;
+    lbBody.appendChild(row);
+  });
+}
+
+// rival bots occasionally solve a problem -> board feels alive
+function botTick(){
+  const candidates = board.filter(b=>!b.you && Object.keys(b.results).length<4);
+  if(candidates.length && Math.random()<0.6){
+    const bot = candidates[Math.floor(Math.random()*candidates.length)];
+    const unsolved = PROBLEMS.filter(p=>!bot.results[p.id] || !bot.results[p.id].ok);
+    if(unsolved.length){
+      const p = unsolved[Math.floor(Math.random()*unsolved.length)];
+      // stronger ratings solve harder problems more reliably
+      const odds = Math.min(0.9, (bot.rating - p.rating + 600)/1200);
+      if(Math.random()<odds){
+        bot.results[p.id]={ok:1, t:elapsedMin(), tries:Math.random()<0.7?1:2};
+        reorderBoard(false);
+      }
+    }
+  }
+  setTimeout(botTick, 6000 + Math.random()*9000);
+}
+
+// ============ clock ============
+function tickClock(){
+  const left = Math.max(0, endTime - Date.now());
+  const h=Math.floor(left/3600000), m=Math.floor(left%3600000/60000), s=Math.floor(left%60000/1000);
+  clockTime.textContent = [h,m,s].map(x=>String(x).padStart(2,'0')).join(':');
+  clock.classList.toggle('warn', left<=15*60000 && left>5*60000);
+  clock.classList.toggle('crit', left<=5*60000 && left>0);
+  // freeze the public board in the final 30 min (FR-12)
+  const frozen = left <= 30*60000 && left>0;
+  freezeTag.style.display = frozen?'inline-block':'none';
+}
+
+// ============ boot ============
+btnRun.addEventListener('click', runSamples);
+btnSubmit.addEventListener('click', submit);
+const console_ = document.getElementById('console');
+
+paintMe();
+paintList();
+paintStatement();
+loadEditor();
+reorderBoard(false);
+tickClock();
+setInterval(tickClock, 1000);
+setTimeout(botTick, 5000);
+</script>
+</body>
+</html>

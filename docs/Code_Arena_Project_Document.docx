@@ -1,0 +1,164 @@
+Code Arena — Project Document & Requirements
+
+**Code Arena**
+
+Project Document & Requirements Specification
+
+*A competitive coding contest platform for developers and students*
+
+| **Version** | 1.0 (Draft) |
+| --- | --- |
+| **Date** | June 20, 2026 |
+| **Status** | For review |
+| **Product type** | Competitive coding contest platform (timed contests, leaderboards) |
+| **Primary audience** | Individual developers and students |
+
+**Table of Contents**
+
+# 1. Overview & Vision
+
+Code Arena is a web-based platform where developers and students compete in timed coding contests, solve algorithmic problems against the clock, and climb global and contest-specific leaderboards. The experience centers on the thrill of competition: a contest starts, the clock runs, submissions are judged in real time, and rankings shift live as participants solve problems.
+
+The vision is to be the place where individual coders sharpen their skills through regular, well-run competition — combining the rigor of a serious online judge with a motivating progression system (ratings, ranks, streaks) that keeps people coming back. Unlike pure practice sites, the heartbeat of Code Arena is the live contest.
+
+# 2. Goals & Objectives
+
+The product aims to run reliable, low-latency timed contests where verdicts return in seconds; keep participants engaged through a transparent rating system and persistent leaderboards; lower the barrier for newcomers with a clear difficulty ladder and a practice mode; and build a self-sustaining content pipeline of quality problems. Early success looks like recurring contests with strong return participation and a judging system trusted to be fast and fair.
+
+# 3. Target Users & Personas
+
+The platform serves three closely related personas:
+
+- Competitive Climber — an experienced developer chasing a higher rating and a strong leaderboard finish; cares about speed, fairness, and accurate ratings.
+
+- Learning Student — a newer coder, often a CS student or bootcamp attendee, who wants structured practice and gentle on-ramps before competing seriously.
+
+- Casual Returner — drops in for the occasional weekend contest and wants a frictionless join-and-go experience without heavy setup.
+
+# 4. Scope
+
+## 4.1 In Scope (v1)
+
+User accounts and profiles; a problem bank with difficulty tiers; scheduled timed contests; a real-time code execution and judging engine; multi-language support; live and historical leaderboards; a rating system; submission history; and a practice/archive mode for past problems.
+
+## 4.2 Out of Scope (v1)
+
+Team/squad contests; real-time 1v1 head-to-head battles; in-platform interview or hiring tooling; payments and paid tiers; mobile native apps; and a community forum or discussion system. These are candidates for later phases.
+
+# 5. Functional Requirements
+
+## 5.1 Accounts & Profiles
+
+| **ID** | **Requirement** |
+| --- | --- |
+| **FR-1** | Users can register and authenticate via email/password and at least one OAuth provider (e.g., GitHub, Google). |
+| **FR-2** | Each user has a public profile showing handle, current rating, rank tier, contest history, and solved-problem count. |
+| **FR-3** | Users can set a preferred default programming language and editor preferences. |
+
+## 5.2 Problem Bank
+
+| **ID** | **Requirement** |
+| --- | --- |
+| **FR-4** | Problems include a statement, constraints, input/output format, sample cases, and hidden judge test cases. |
+| **FR-5** | Each problem is tagged with difficulty (Easy/Medium/Hard or a numeric rating) and topic tags (arrays, graphs, DP, etc.). |
+| **FR-6** | Problems support per-problem time and memory limits enforced by the judge. |
+| **FR-7** | The system stores multiple solutions/test sets per problem and supports problem versioning for setters. |
+
+## 5.3 Contests
+
+| **ID** | **Requirement** |
+| --- | --- |
+| **FR-8** | Admins/problem setters can schedule contests with a start time, fixed duration, and a defined problem set. |
+| **FR-9** | Users can register for upcoming contests; the contest page shows a countdown and, once live, a running timer. |
+| **FR-10** | During a live contest, problems unlock at start and submissions are accepted only within the contest window. |
+| **FR-11** | The system supports common scoring models — at minimum ICPC-style (problems solved + penalty time) and points-based scoring; configurable per contest. |
+| **FR-12** | Contests support a configurable post-start “freeze” period during which the public leaderboard stops updating to preserve final-standings suspense. |
+
+## 5.4 Code Execution & Judging
+
+| **ID** | **Requirement** |
+| --- | --- |
+| **FR-13** | Users write and submit code in an in-browser editor with syntax highlighting for all supported languages. |
+| **FR-14** | Submissions are compiled and executed in a sandboxed, resource-limited environment isolated from other users and the host. |
+| **FR-15** | The judge returns standard verdicts: Accepted, Wrong Answer, Time Limit Exceeded, Memory Limit Exceeded, Runtime Error, Compilation Error — with a failing-test indicator where appropriate. |
+| **FR-16** | Verdicts for typical submissions return within a few seconds under normal contest load. |
+| **FR-17** | Users can run their code against sample cases before submitting (a non-scored test run). |
+| **FR-18** | The system maintains a full submission history per user with timestamps, verdict, language, and runtime/memory used. |
+
+## 5.5 Leaderboards & Ratings
+
+| **ID** | **Requirement** |
+| --- | --- |
+| **FR-19** | Each contest has a live leaderboard ranking participants per the contest’s scoring model, updating in near real time (subject to freeze rules). |
+| **FR-20** | A global all-time leaderboard ranks users by rating. |
+| **FR-21** | After a rated contest concludes, the system recomputes participant ratings using an Elo/Glicko-style algorithm and updates rank tiers. |
+| **FR-22** | Users can view historical leaderboards and their own contest-by-contest rating changes. |
+
+## 5.6 Practice / Archive
+
+| **ID** | **Requirement** |
+| --- | --- |
+| **FR-23** | After a contest, its problems move to a searchable archive available for untimed practice. |
+| **FR-24** | Users can filter the archive by difficulty, topic tag, and solved/unsolved status. |
+| **FR-25** | Practice submissions are judged identically to contest submissions but do not affect rating. |
+
+## 5.7 Notifications
+
+| **ID** | **Requirement** |
+| --- | --- |
+| **FR-26** | Users receive reminders for contests they’ve registered for (in-app and/or email). |
+
+# 6. Non-Functional Requirements
+
+| **ID** | **Requirement** |
+| --- | --- |
+| **NFR-1** | Performance — Judging latency stays within a few seconds at the 95th percentile during peak contest load; pages load quickly even with large leaderboards. |
+| **NFR-2** | Scalability — The judging layer scales horizontally to absorb the submission spike at contest start, when many participants submit within a short window. |
+| **NFR-3** | Security & Isolation — Submitted code runs in a strict sandbox with no network access, capped CPU/memory/time, and no access to the host or other submissions. |
+| **NFR-4** | Fairness & Integrity — Server clocks are authoritative for contest timing; basic plagiarism/duplicate-detection signals are captured for review. |
+| **NFR-5** | Availability — Target high availability during scheduled contest windows, with graceful handling of judge backpressure (queue + status feedback rather than dropped submissions). |
+| **NFR-6** | Consistency — Leaderboard and rating computations are deterministic and reproducible from the submission log. |
+| **NFR-7** | Accessibility & Compatibility — Works on current major desktop browsers; the editor and contest UI meet baseline accessibility standards. |
+| **NFR-8** | Observability — Submission throughput, judge queue depth, and verdict latency are monitored with alerting during contests. |
+
+# 7. Representative User Stories
+
+- As a competitor, I register for the Saturday contest, get a reminder, join at start, and watch my rank move as I solve problems — so I feel the live competition.
+
+- As a student, I filter the archive for Easy graph problems and practice untimed with full judge feedback — so I can build up before competing.
+
+- As any user, I submit code and get a clear verdict within seconds, including which sample failed — so I can iterate quickly under time pressure.
+
+- As a competitor, I review my rating change after a contest and see the math behind it — so I trust the ranking system.
+
+# 8. High-Level Technical Architecture
+
+A typical shape for this system includes a web frontend (SPA) for the contest UI and editor; an application/API service handling accounts, contests, problems, and leaderboards; a dedicated judge service consisting of a submission queue and a pool of isolated execution workers (containerized sandboxes with enforced resource limits); a primary relational database for users, problems, contests, and submissions; a fast cache/store for live leaderboard state; and object storage for problem test data. The submission queue decouples the spike of contest-start submissions from the worker pool so the system degrades gracefully under load rather than failing.
+
+# 9. Success Metrics
+
+Track contest participation (registered vs. actually competing), return rate across consecutive contests, judge verdict latency (p50/p95), problem-solve rates by difficulty, new-user activation (first contest entered, first problem solved), and rating distribution health. The single most important reliability metric is verdict latency under peak load — it underpins trust in the whole platform.
+
+# 10. Suggested Phasing
+
+- Phase 1 (MVP) — Accounts, the problem bank, the judging engine with core languages, a single scheduled contest type with a live leaderboard, and the archive.
+
+- Phase 2 — The rating/rank-tier system, the leaderboard freeze, notifications, and richer profiles.
+
+- Phase 3 — Deferred items: team contests, real-time 1v1 battles, and community features, based on traction.
+
+# 11. Risks & Mitigations
+
+The central risk is the judging engine: sandbox escapes (mitigated with hardened, network-isolated containers and strict resource caps) and the contest-start submission spike (mitigated with a queue and horizontally scalable workers). Rating fairness is a trust risk — mitigated by choosing a well-understood algorithm and making changes transparent. Content supply is a sustainability risk — a thin problem bank kills competitive value, so a setter pipeline and quality bar matter early. Cheating and plagiarism threaten leaderboard integrity and need at least basic detection from the start.
+
+# 12. Open Questions
+
+- Which programming languages to support at launch?
+
+- Are v1 contests rated from day one, or do they start unrated?
+
+- Which rating algorithm — Elo, Glicko, or a Codeforces-style variant?
+
+- How are problems sourced and vetted — in-house setters, invited contributors, or both?
+
+	v1.0 (Draft) — Confidential	Page  of
