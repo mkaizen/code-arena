@@ -32,8 +32,9 @@ pnpm install
 cp .env.example .env            # fill OAuth secrets if you want social login
 
 pnpm infra:up                   # postgres + redis + minio (+ bucket)
-pnpm db:migrate                 # create schema
+pnpm db:deploy                  # apply migrations (prod-safe; use db:migrate in dev)
 pnpm db:generate                # prisma client
+pnpm db:seed                    # admin user + demo problems + a live contest
 
 # build the sandbox images (one per language you support)
 docker build -f services/judge/Dockerfile.sandbox --target cpp  -t arena-sandbox:cpp  services/judge
@@ -44,6 +45,13 @@ pnpm dev                        # api + judge + web in parallel
 ```
 
 API on `:8080`, web on `:5173`, MinIO console on `:9001`.
+
+The seed creates an admin login (`admin@codearena.dev` / `password123`), two
+solvable problems with hidden test bundles uploaded to object storage, and a
+live **Code Arena Round 1** contest wiring them together — enough to log in,
+open the arena, and submit end-to-end. `db:deploy` applies the committed
+migration in `services/api/prisma/migrations`; use `db:migrate` when changing
+the schema during development.
 
 ## Requirement traceability
 
@@ -68,9 +76,13 @@ All five scaffold TODOs are now implemented:
 
 Still open before MVP:
 
+- [x] Seed script for an admin user, demo problems, and a live contest
+- [x] Admin routes for problems/contests + post-contest rating finalization
+- [x] Judge→API verdict push via Redis pub/sub (live verdict + leaderboard)
 - [ ] cgroup-based memory accounting in the sandbox (currently time/exit-code based)
-- [ ] Redis pub/sub fan-out for multi-node WebSocket push
-- [ ] Seed script + a setter UI for the problem bank (FR-7 versioning)
+- [ ] Multi-node WebSocket fan-out (single-process pub/sub today)
+- [ ] A setter UI for the problem bank (FR-7 versioning) — API exists, no UI yet
+- [ ] OAuth callback page in the web app (`/auth/callback/:provider`)
 - [ ] Notification delivery (email/in-app reminders, FR-26)
 - [ ] Plagiarism/duplicate-detection signals (NFR-4)
 
