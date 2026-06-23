@@ -1,0 +1,22 @@
+# Public edge for Code Arena. Caddy auto-provisions a TLS cert for $DOMAIN
+# (Let's Encrypt) — point the domain's A record at this host and open 80/443.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip zstd
+
+	# API + WebSocket. handle_path strips the /api prefix, so the API (and the
+	# /ws upgrade) see root paths. reverse_proxy upgrades WebSockets natively.
+	handle_path /api/* {
+		reverse_proxy api:8080
+	}
+
+	# SPA: serve static assets, fall back to index.html for client-side routes.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

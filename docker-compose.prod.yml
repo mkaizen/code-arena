@@ -1,0 +1,156 @@
+# Production stack for a single VPS.
+#
+#   cp .env.prod.example .env.prod        # then edit secrets + DOMAIN
+#   mkdir -p /var/arena/work              # shared sandbox scratch (see judge)
+#   ./scripts/build-sandboxes.sh          # build per-language sandbox images
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+#
+# Seed demo data once (admin user, problems, a live contest):
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml --profile seed up seed
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-arena}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-arena}
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-arena}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    volumes: ["redisdata:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?set S3_SECRET_KEY}
+    volumes: ["miniodata:/data"]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  createbucket:
+    image: minio/mc:latest
+    depends_on:
+      minio: { condition: service_started }
+    entrypoint: >
+      /bin/sh -c "
+      until (mc alias set local http://minio:9000 ${S3_ACCESS_KEY} ${S3_SECRET_KEY}) do sleep 1; done;
+      mc mb --ignore-existing local/${S3_BUCKET:-arena-testcases};
+      exit 0;
+      "
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      API_PORT: 8080
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-arena}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-arena}?schema=public
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-arena-testcases}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_FORCE_PATH_STYLE: "true"
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      OAUTH_REDIRECT_BASE: https://${DOMAIN}/auth/callback
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+
+  judge:
+    build:
+      context: .
+      dockerfile: services/judge/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-arena}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-arena}?schema=public
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-arena-testcases}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_FORCE_PATH_STYLE: "true"
+      JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-2}
+    volumes:
+      # Drive the host Docker daemon to launch sandbox containers.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Scratch dir mounted at the SAME path on host + container so the host
+      # daemon can bind-mount per-run work dirs (-v <dir>:/work) correctly.
+      - /var/arena/work:/var/arena/work
+    depends_on:
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: https://${DOMAIN}/api
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api: { condition: service_started }
+
+  # One-shot: seed demo data. Reuses the API image (has tsx + the seed script).
+  #   docker compose ... --profile seed up seed
+  seed:
+    profiles: ["seed"]
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    command: ["pnpm", "seed"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-arena}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-arena}?schema=public
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-arena-testcases}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_FORCE_PATH_STYLE: "true"
+    depends_on:
+      postgres: { condition: service_healthy }
+      minio: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
+  caddy_data:
+  caddy_config:
