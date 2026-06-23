@@ -188,7 +188,7 @@ export async function adminRoutes(app: FastifyInstance) {
       where: { contestId: id, verdict: { not: "ACCEPTED" }, rated: true },
       _count: true,
     });
-    const wrongMap = new Map(wrongCounts.map((r) => [`${r.userId}:${r.problemId}`, r._count._all]));
+    const wrongMap = new Map(wrongCounts.map((r) => [`${r.userId}:${r.problemId}`, r._count as number]));
 
     const startMs = contest.startsAt.getTime();
     const perUser = new Map<string, { solved: number; penalty: number }>();
