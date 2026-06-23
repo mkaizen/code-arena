@@ -1,4 +1,5 @@
 import { Worker } from "bullmq";
+import IORedis from "ioredis";
 import { PrismaClient } from "@prisma/client";
 import { Verdict, type JudgeResult, type Language } from "@arena/shared";
 import { RECIPES } from "./recipes.js";
@@ -6,8 +7,10 @@ import { runInSandbox } from "./sandbox.js";
 import { loadTests } from "./storage.js";
 
 const prisma = new PrismaClient();
-const { hostname, port } = new URL(process.env.REDIS_URL ?? "redis://localhost:6379");
+const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
+const { hostname, port } = new URL(redisUrl);
 const connection = { host: hostname, port: Number(port) || 6379, maxRetriesPerRequest: null as null };
+const pub = new IORedis({ host: hostname, port: Number(port) || 6379 });
 
 function normalize(s: string): string {
   return s.replace(/\r\n/g, "\n").split("\n").map((l) => l.replace(/\s+$/, "")).join("\n").replace(/\n+$/, "");
@@ -66,6 +69,8 @@ const worker = new Worker(
         judgedAt: new Date(),
       },
     });
+
+    await pub.publish("arena:verdicts", JSON.stringify({ submissionId, result }));
     return result;
   },
   { connection, concurrency: Number(process.env.JUDGE_CONCURRENCY ?? 2) }, // NFR-2: scale via more workers
