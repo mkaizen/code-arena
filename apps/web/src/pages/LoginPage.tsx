@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../ctx/AuthContext.js";
+import { startOAuth, oauthEnabled, anyOAuthEnabled } from "../oauth.js";
 
 type Tab = "login" | "register";
 
@@ -203,7 +204,44 @@ export function LoginPage() {
             {loading ? "Loading…" : tab === "login" ? "Sign In" : "Create Account"}
           </button>
         </form>
+
+        {anyOAuthEnabled() && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "22px 0 16px" }}>
+              <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+              <span style={{ fontSize: 11, color: "var(--txt-3)", fontWeight: 600 }}>OR</span>
+              <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {oauthEnabled("github") && (
+                <button type="button" onClick={() => startOAuth("github")} style={oauthBtnStyle}>
+                  Continue with GitHub
+                </button>
+              )}
+              {oauthEnabled("google") && (
+                <button type="button" onClick={() => startOAuth("google")} style={oauthBtnStyle}>
+                  Continue with Google
+                </button>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
 }
+
+const oauthBtnStyle: React.CSSProperties = {
+  width: "100%",
+  background: "var(--panel-2)",
+  border: "1px solid var(--line)",
+  borderRadius: 8,
+  color: "var(--txt)",
+  fontSize: 14,
+  fontWeight: 600,
+  padding: "10px 0",
+  cursor: "pointer",
+  fontFamily: "var(--disp)",
+  transition: "border-color 0.15s",
+};

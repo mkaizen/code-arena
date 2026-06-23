@@ -22,6 +22,11 @@ COPY apps/web apps/web
 # by Caddy's handle_path before reaching the API.
 ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL
+# Public OAuth client IDs (optional — blank disables that provider's button).
+ARG VITE_GITHUB_CLIENT_ID=
+ARG VITE_GOOGLE_CLIENT_ID=
+ENV VITE_GITHUB_CLIENT_ID=$VITE_GITHUB_CLIENT_ID
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 RUN pnpm --filter @arena/shared build && pnpm --filter @arena/web build
 
 FROM caddy:2-alpine

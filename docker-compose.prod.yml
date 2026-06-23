@@ -115,6 +115,8 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         VITE_API_URL: https://${DOMAIN}/api
+        VITE_GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     restart: unless-stopped
     environment:
       DOMAIN: ${DOMAIN:?set DOMAIN}

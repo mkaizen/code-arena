@@ -7,6 +7,7 @@ import { ProblemsPage } from "./pages/ProblemsPage.js";
 import { ProblemPage } from "./pages/ProblemPage.js";
 import { ProfilePage } from "./pages/ProfilePage.js";
 import { GlobalLBPage } from "./pages/GlobalLBPage.js";
+import { OAuthCallbackPage } from "./pages/OAuthCallbackPage.js";
 import "./styles.css";
 
 export function App() {
@@ -16,6 +17,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/contests" replace />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth/callback/:provider" element={<OAuthCallbackPage />} />
           <Route path="/contests" element={<ContestsPage />} />
           <Route path="/contests/:id" element={<ContestPage />} />
           <Route path="/problems" element={<ProblemsPage />} />
