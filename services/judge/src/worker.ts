@@ -1,5 +1,4 @@
 import { Worker } from "bullmq";
-import IORedis from "ioredis";
 import { PrismaClient } from "@prisma/client";
 import { Verdict, type JudgeResult, type Language } from "@arena/shared";
 import { RECIPES } from "./recipes.js";
@@ -7,9 +6,8 @@ import { runInSandbox } from "./sandbox.js";
 import { loadTests } from "./storage.js";
 
 const prisma = new PrismaClient();
-const connection = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
-  maxRetriesPerRequest: null,
-});
+const { hostname, port } = new URL(process.env.REDIS_URL ?? "redis://localhost:6379");
+const connection = { host: hostname, port: Number(port) || 6379, maxRetriesPerRequest: null as null };
 
 function normalize(s: string): string {
   return s.replace(/\r\n/g, "\n").split("\n").map((l) => l.replace(/\s+$/, "")).join("\n").replace(/\n+$/, "");
@@ -55,7 +53,7 @@ const worker = new Worker(
       result = await judge(submissionId);
     } catch (err) {
       console.error("judge error", err);
-      result = { verdict: Verdict.INTERNAL_ERROR, maxTimeMs: 0, maxMemoryKb: 0, cases: [] };
+      result = { verdict: Verdict.IE, maxTimeMs: 0, maxMemoryKb: 0, cases: [] };
     }
 
     await prisma.submission.update({
