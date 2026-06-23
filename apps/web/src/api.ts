@@ -1,9 +1,39 @@
+import type { Language, LeaderboardRow } from "@arena/shared";
+
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
-let token: string | null = null;
-export function setToken(t: string) { token = t; }
+let token: string | null = localStorage.getItem("arena_token");
+export function setToken(t: string | null) {
+  token = t;
+  if (t) localStorage.setItem("arena_token", t);
+  else localStorage.removeItem("arena_token");
+}
+export function getToken() { return token; }
 
-async function req(path: string, init: RequestInit = {}) {
+export interface StoredUser {
+  token: string;
+  handle: string;
+  rating: number;
+}
+
+export function storeUser(u: StoredUser) {
+  localStorage.setItem("arena_user", JSON.stringify(u));
+  setToken(u.token);
+}
+
+export function clearUser() {
+  localStorage.removeItem("arena_user");
+  localStorage.removeItem("arena_token");
+  token = null;
+}
+
+export function getMe(): StoredUser | null {
+  const raw = localStorage.getItem("arena_user");
+  if (!raw) return null;
+  try { return JSON.parse(raw) as StoredUser; } catch { return null; }
+}
+
+async function req<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(BASE + path, {
     ...init,
     headers: {
@@ -12,16 +42,91 @@ async function req(path: string, init: RequestInit = {}) {
       ...(init.headers ?? {}),
     },
   });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? res.statusText);
-  return res.json();
+  if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? res.statusText);
+  return res.json() as Promise<T>;
+}
+
+export interface ProblemSummary {
+  id: string;
+  slug: string;
+  title: string;
+  difficulty: "easy" | "med" | "hard";
+  ratingValue: number;
+  tags: string[];
+}
+
+export interface Sample {
+  ordinal: number;
+  input: string;
+  output: string;
+}
+
+export interface Problem extends ProblemSummary {
+  statement: string;
+  timeMs: number;
+  memoryKb: number;
+  samples: Sample[];
+}
+
+export interface Contest {
+  id: string;
+  name: string;
+  startsAt: string;
+  durationSec: number;
+  scoring: "ICPC" | "POINTS";
+  rated: boolean;
+}
+
+export interface Submission {
+  id: string;
+  problemId: string;
+  contestId?: string;
+  language: Language;
+  verdict: string;
+  createdAt: string;
+}
+
+export interface GlobalLBRow {
+  handle: string;
+  rating: number;
+}
+
+export interface LeaderboardData {
+  frozen: boolean;
+  rows: LeaderboardRow[];
 }
 
 export const api = {
-  login: (email: string, password: string) =>
+  login: (email: string, password: string): Promise<StoredUser> =>
     req("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
-  problems: () => req("/problems"),
-  problem: (slug: string) => req(`/problems/${slug}`),
-  submit: (body: { problemId: string; contestId?: string; language: string; source: string }) =>
+
+  register: (handle: string, email: string, password: string): Promise<StoredUser> =>
+    req("/auth/register", { method: "POST", body: JSON.stringify({ handle, email, password }) }),
+
+  problems: (params?: { difficulty?: string; tag?: string }): Promise<ProblemSummary[]> => {
+    const qs = new URLSearchParams();
+    if (params?.difficulty) qs.set("difficulty", params.difficulty);
+    if (params?.tag) qs.set("tag", params.tag);
+    const q = qs.toString();
+    return req(`/problems${q ? `?${q}` : ""}`);
+  },
+
+  problem: (slug: string): Promise<Problem> => req(`/problems/${slug}`),
+
+  submit: (body: { problemId: string; contestId?: string; language: Language; source: string }): Promise<{ id: string; verdict: string }> =>
     req("/submissions", { method: "POST", body: JSON.stringify(body) }),
-  leaderboard: (contestId: string) => req(`/contests/${contestId}/leaderboard`),
+
+  submissions: (): Promise<Submission[]> => req("/submissions"),
+
+  contests: (): Promise<Contest[]> => req("/contests"),
+
+  contest: (id: string): Promise<Contest> => req(`/contests/${id}`),
+
+  registerContest: (id: string): Promise<{ ok: boolean }> =>
+    req(`/contests/${id}/register`, { method: "POST" }),
+
+  leaderboard: (contestId: string): Promise<LeaderboardData> =>
+    req(`/contests/${contestId}/leaderboard`),
+
+  globalLeaderboard: (): Promise<GlobalLBRow[]> => req("/leaderboard/global"),
 };

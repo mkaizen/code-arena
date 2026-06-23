@@ -1,0 +1,88 @@
+:root {
+  --ink: #0E1116;
+  --panel: #161B22;
+  --panel-2: #1C222B;
+  --line: #262C36;
+  --line-soft: #1F2530;
+  --txt: #E6EDF3;
+  --txt-2: #8B949E;
+  --txt-3: #5C6571;
+  --t-newbie: #9AA4AE;
+  --t-pupil: #3FB950;
+  --t-spec: #39C5CF;
+  --t-expert: #4C8DFF;
+  --t-cm: #A371F7;
+  --t-master: #F0883E;
+  --t-gm: #FF5C5C;
+  --v-ac: #3FB950;
+  --v-wa: #FF5C5C;
+  --v-tle: #D29922;
+  --v-ce: #F0883E;
+  --v-judge: #4C8DFF;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --disp: "Space Grotesk", system-ui, sans-serif;
+  --body: "Inter", system-ui, sans-serif;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  background: var(--ink);
+  color: var(--txt);
+  font-family: var(--body);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+input, select, textarea {
+  font-family: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--panel);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--txt-3);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
