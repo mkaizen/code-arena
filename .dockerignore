@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+dist
+**/dist
+.turbo
+**/.turbo
+*.tsbuildinfo
+.git
+.github
+.data
+*.log
+.DS_Store
+docs
+.env
+.env.*
+!.env.example

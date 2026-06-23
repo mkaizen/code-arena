@@ -53,6 +53,44 @@ open the arena, and submit end-to-end. `db:deploy` applies the committed
 migration in `services/api/prisma/migrations`; use `db:migrate` when changing
 the schema during development.
 
+## Production deploy (single VPS + your domain)
+
+`docker-compose.prod.yml` runs the whole stack behind Caddy, which terminates
+TLS (automatic Let's Encrypt) and serves the SPA + reverse-proxies `/api/*` and
+the `/api/ws` WebSocket to the API. The judge drives the **host** Docker daemon
+via a mounted socket to launch sandbox containers.
+
+**Prerequisites:** a VPS with Docker + Compose, your domain's A record pointed
+at it, and ports 80/443 open.
+
+```bash
+git clone <your-fork> code-arena && cd code-arena
+
+cp .env.prod.example .env.prod          # set DOMAIN, ACME_EMAIL, and secrets
+mkdir -p /var/arena/work                # shared sandbox scratch dir
+
+./scripts/build-sandboxes.sh            # build per-language sandbox images on the host
+
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+
+# seed an admin user + demo problems + a live contest (one-shot):
+docker compose --env-file .env.prod -f docker-compose.prod.yml --profile seed up seed
+```
+
+The API applies pending migrations on boot, so the schema is created
+automatically on first start. Your site is then live at `https://$DOMAIN`.
+
+A few notes:
+
+- **Secrets** — generate strong values (`openssl rand -hex 32`) for
+  `JWT_SECRET`, `POSTGRES_PASSWORD`, and the MinIO keys. `.env.prod` is
+  gitignored; never commit it.
+- **Scaling judging** — raise `JUDGE_CONCURRENCY`, or run more judge replicas
+  (`docker compose ... up -d --scale judge=3`).
+- **OAuth** — set the provider callback to
+  `https://$DOMAIN/auth/callback/<provider>` and fill the client id/secret in
+  `.env.prod` (leave blank to disable social login).
+
 ## Requirement traceability
 
 Code is annotated with the `FR-`/`NFR-` IDs it implements. Highlights:

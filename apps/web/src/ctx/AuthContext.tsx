@@ -5,6 +5,7 @@ interface AuthContextValue {
   user: StoredUser | null;
   login: (email: string, password: string) => Promise<void>;
   register: (handle: string, email: string, password: string) => Promise<void>;
+  loginWithOAuth: (provider: "github" | "google", code: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -25,13 +26,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(u);
   }, []);
 
+  const loginWithOAuth = useCallback(async (provider: "github" | "google", code: string) => {
+    const u = await api.oauth(provider, code);
+    storeUser(u);
+    setUser(u);
+  }, []);
+
   const logout = useCallback(() => {
     clearUser();
     setUser(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout }}>
+    <AuthContext.Provider value={{ user, login, register, loginWithOAuth, logout }}>
       {children}
     </AuthContext.Provider>
   );

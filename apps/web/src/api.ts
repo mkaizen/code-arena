@@ -103,6 +103,9 @@ export const api = {
   register: (handle: string, email: string, password: string): Promise<StoredUser> =>
     req("/auth/register", { method: "POST", body: JSON.stringify({ handle, email, password }) }),
 
+  oauth: (provider: "github" | "google", code: string): Promise<StoredUser> =>
+    req("/auth/oauth", { method: "POST", body: JSON.stringify({ provider, code }) }),
+
   problems: (params?: { difficulty?: string; tag?: string }): Promise<ProblemSummary[]> => {
     const qs = new URLSearchParams();
     if (params?.difficulty) qs.set("difficulty", params.difficulty);
