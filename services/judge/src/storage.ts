@@ -1,4 +1,5 @@
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import * as tar from "tar";
 
 const s3 = new S3Client({
   region: process.env.S3_REGION ?? "us-east-1",
@@ -20,7 +21,6 @@ export interface TestCase {
  * Bundle layout: NN.in / NN.out pairs inside a tar archive at `key`.
  */
 export async function loadTests(key: string): Promise<TestCase[]> {
-  const { default: tar } = await import("tar");
   const res = await s3.send(new GetObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key }));
   const body = res.Body as AsyncIterable<Uint8Array>;
 
