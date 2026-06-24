@@ -171,6 +171,8 @@ export function ContestPage() {
     const source = getSource();
     setConsole((c) => [...c, { type: "submit", verdict: "PENDING", message: "Submitting…" }]);
     try {
+      // Ensure registered (idempotent — server accepts duplicate registrations).
+      await api.registerContest(id).catch(() => {});
       const r = await api.submit({ problemId: activeProblem.id, contestId: id, language: lang, source });
       pendingSubmissions.current.set(r.id, activeProblem.id);
       setConsole((c) => [...c, { type: "submit", submissionId: r.id, verdict: "JUDGING", message: `Submission ${r.id} queued` }]);
