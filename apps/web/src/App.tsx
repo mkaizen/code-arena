@@ -8,6 +8,10 @@ import { ProblemPage } from "./pages/ProblemPage.js";
 import { ProfilePage } from "./pages/ProfilePage.js";
 import { GlobalLBPage } from "./pages/GlobalLBPage.js";
 import { OAuthCallbackPage } from "./pages/OAuthCallbackPage.js";
+import { AdminPage } from "./pages/AdminPage.js";
+import { AdminProblemNewPage } from "./pages/AdminProblemNewPage.js";
+import { AdminContestNewPage } from "./pages/AdminContestNewPage.js";
+import { AdminContestFinalizePage } from "./pages/AdminContestFinalizePage.js";
 import "./styles.css";
 
 export function App() {
@@ -24,6 +28,10 @@ export function App() {
           <Route path="/problems/:slug" element={<ProblemPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/leaderboard" element={<GlobalLBPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/problems/new" element={<AdminProblemNewPage />} />
+          <Route path="/admin/contests/new" element={<AdminContestNewPage />} />
+          <Route path="/admin/contests/finalize" element={<AdminContestFinalizePage />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

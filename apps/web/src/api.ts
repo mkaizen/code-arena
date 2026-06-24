@@ -14,6 +14,7 @@ export interface StoredUser {
   token: string;
   handle: string;
   rating: number;
+  role?: "USER" | "SETTER" | "ADMIN";
 }
 
 export function storeUser(u: StoredUser) {
@@ -132,4 +133,24 @@ export const api = {
     req(`/contests/${contestId}/leaderboard`),
 
   globalLeaderboard: (): Promise<GlobalLBRow[]> => req("/leaderboard/global"),
+
+  // Admin routes
+  adminCreateProblem: (body: {
+    slug: string; title: string; statement: string;
+    difficulty: "easy" | "med" | "hard"; ratingValue: number; tags: string[];
+    timeMs: number; memoryKb: number;
+    samples: { input: string; output: string }[];
+    tests: { input: string; output: string }[];
+  }): Promise<{ id: string; slug: string }> =>
+    req("/admin/problems", { method: "POST", body: JSON.stringify(body) }),
+
+  adminCreateContest: (body: {
+    name: string; startsAt: string; durationSec: number;
+    scoring: "ICPC" | "POINTS"; rated: boolean; freezeSec: number;
+    problems: { problemId: string; label: string; points: number }[];
+  }): Promise<{ id: string }> =>
+    req("/admin/contests", { method: "POST", body: JSON.stringify(body) }),
+
+  adminFinalizeContest: (id: string): Promise<{ finalized: number; changes: { userId: string; before: number; after: number }[] }> =>
+    req(`/admin/contests/${id}/finalize`, { method: "POST" }),
 };

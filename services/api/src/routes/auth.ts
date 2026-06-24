@@ -28,7 +28,7 @@ export async function authRoutes(app: FastifyInstance) {
     const user = await prisma.user.create({
       data: { handle: b.handle, email: b.email, passwordHash },
     });
-    return reply.send({ token: app.jwt.sign({ sub: user.id }), handle: user.handle, rating: user.rating });
+    return reply.send({ token: app.jwt.sign({ sub: user.id }), handle: user.handle, rating: user.rating, role: user.role });
   });
 
   app.post("/auth/login", async (req, reply) => {
@@ -37,7 +37,7 @@ export async function authRoutes(app: FastifyInstance) {
     if (!user?.passwordHash || !(await verifyPassword(user.passwordHash, b.password))) {
       return reply.code(401).send({ error: "invalid credentials" });
     }
-    return reply.send({ token: app.jwt.sign({ sub: user.id }), handle: user.handle, rating: user.rating });
+    return reply.send({ token: app.jwt.sign({ sub: user.id }), handle: user.handle, rating: user.rating, role: user.role });
   });
 
   // FR-1: OAuth login — exchange code, upsert identity, mint our own JWT.
@@ -61,7 +61,7 @@ export async function authRoutes(app: FastifyInstance) {
         data: { provider: id.provider, providerId: id.providerId, userId: user.id },
       });
     }
-    return reply.send({ token: app.jwt.sign({ sub: user.id }), handle: user.handle, rating: user.rating });
+    return reply.send({ token: app.jwt.sign({ sub: user.id }), handle: user.handle, rating: user.rating, role: user.role });
   });
 }
 
