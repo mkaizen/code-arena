@@ -68,16 +68,29 @@ export function ContestsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const [registered, setRegistered] = useState<Set<string>>(new Set());
+
   async function handleRegister(id: string) {
     if (!user) { navigate("/login"); return; }
     setRegistering(id);
     try {
       await api.registerContest(id);
+      setRegistered((s) => new Set([...s, id]));
     } catch (e) {
-      alert((e as Error).message);
+      const msg = (e as Error).message;
+      // "already registered" isn't an error from the user's perspective
+      if (!msg.includes("already")) alert(msg);
+      setRegistered((s) => new Set([...s, id]));
     } finally {
       setRegistering(null);
     }
+  }
+
+  async function handleEnter(id: string) {
+    if (!user) { navigate("/login"); return; }
+    // Auto-register on Enter so users don't have to click Register first
+    try { await api.registerContest(id); } catch { /* already registered is fine */ }
+    navigate(`/contests/${id}`);
   }
 
   const statusBadge = (status: "UPCOMING" | "LIVE" | "ENDED") => {
@@ -205,15 +218,15 @@ export function ContestsPage() {
                 </div>
 
                 <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                  {(status === "UPCOMING" || status === "LIVE") && (
+                  {status === "UPCOMING" && (
                     <button
                       onClick={() => handleRegister(c.id)}
                       disabled={registering === c.id}
                       style={{
-                        background: "transparent",
-                        border: "1px solid var(--line)",
+                        background: registered.has(c.id) ? "rgba(63,185,80,0.12)" : "transparent",
+                        border: `1px solid ${registered.has(c.id) ? "rgba(63,185,80,0.3)" : "var(--line)"}`,
                         borderRadius: 6,
-                        color: "var(--txt-2)",
+                        color: registered.has(c.id) ? "var(--v-ac)" : "var(--txt-2)",
                         fontSize: 13,
                         fontWeight: 500,
                         padding: "6px 14px",
@@ -221,12 +234,12 @@ export function ContestsPage() {
                         opacity: registering === c.id ? 0.6 : 1,
                       }}
                     >
-                      Register
+                      {registered.has(c.id) ? "Registered ✓" : registering === c.id ? "Registering…" : "Register"}
                     </button>
                   )}
                   {status === "LIVE" && (
                     <button
-                      onClick={() => navigate(`/contests/${c.id}`)}
+                      onClick={() => handleEnter(c.id)}
                       style={{
                         background: "var(--v-ac)",
                         border: "none",
