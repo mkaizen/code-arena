@@ -156,28 +156,34 @@ async function main() {
   }
 
   // ── Live contest ──────────────────────────────────────────────────────────
+  // Always reset start time so re-running seed gives a fresh live contest.
+  const contestStart = new Date(Date.now() - 60_000); // 1 min ago → live immediately
   const existingContest = await prisma.contest.findFirst({ where: { name: "Code Arena Round 1" } });
-  if (!existingContest) {
+  if (existingContest) {
+    await prisma.contest.update({
+      where: { id: existingContest.id },
+      data: { startsAt: contestStart, durationSec: 24 * 60 * 60 },
+    });
+    console.log(`reset "Code Arena Round 1" start time → live for 24h`);
+  } else {
     const contest = await prisma.contest.create({
       data: {
         name: "Code Arena Round 1",
-        startsAt: new Date(Date.now() - 60_000), // started a minute ago → live now
-        durationSec: 2 * 60 * 60,
+        startsAt: contestStart,
+        durationSec: 24 * 60 * 60, // 24h so it stays live after a fresh deploy
         scoring: "ICPC",
         rated: true,
         freezeSec: 1800,
         problems: {
           create: problemIds.map((problemId, i) => ({
             problemId,
-            label: String.fromCharCode(65 + i), // A, B, ...
+            label: String.fromCharCode(65 + i),
             points: 100,
           })),
         },
       },
     });
     console.log(`created live contest "Code Arena Round 1" (${contest.id})`);
-  } else {
-    console.log(`contest "Code Arena Round 1" already exists, skipping`);
   }
 
   console.log("seed complete ✓");
