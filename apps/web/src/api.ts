@@ -127,7 +127,7 @@ export const api = {
   contest: (id: string): Promise<Contest> => req(`/contests/${id}`),
 
   registerContest: (id: string): Promise<{ ok: boolean }> =>
-    req(`/contests/${id}/register`, { method: "POST" }),
+    req(`/contests/${id}/register`, { method: "POST", body: "{}" }),
 
   leaderboard: (contestId: string): Promise<LeaderboardData> =>
     req(`/contests/${contestId}/leaderboard`),
