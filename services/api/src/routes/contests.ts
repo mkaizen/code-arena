@@ -2,11 +2,27 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../db.js";
 
 export async function contestRoutes(app: FastifyInstance) {
-  app.get("/contests", async () => {
-    return prisma.contest.findMany({
+  app.get("/contests", async (req) => {
+    const contests = await prisma.contest.findMany({
       orderBy: { startsAt: "desc" },
       select: { id: true, name: true, startsAt: true, durationSec: true, scoring: true, rated: true },
     });
+
+    // Optionally authenticated: if a valid token is present, mark which
+    // contests this user is registered for so the UI persists that state.
+    let registeredIds = new Set<string>();
+    try {
+      await req.jwtVerify();
+      const regs = await prisma.registration.findMany({
+        where: { userId: req.user.sub },
+        select: { contestId: true },
+      });
+      registeredIds = new Set(regs.map((r) => r.contestId));
+    } catch {
+      // anonymous request — no registration info
+    }
+
+    return contests.map((c) => ({ ...c, registered: registeredIds.has(c.id) }));
   });
 
   // FR-9: register for an upcoming contest.
