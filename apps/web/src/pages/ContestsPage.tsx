@@ -63,7 +63,10 @@ export function ContestsPage() {
 
   useEffect(() => {
     api.contests()
-      .then(setContests)
+      .then((cs) => {
+        setContests(cs);
+        setRegistered(new Set(cs.filter((c) => c.registered).map((c) => c.id)));
+      })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);

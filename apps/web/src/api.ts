@@ -76,6 +76,7 @@ export interface Contest {
   durationSec: number;
   scoring: "ICPC" | "POINTS";
   rated: boolean;
+  registered?: boolean;
 }
 
 export interface Submission {
