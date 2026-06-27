@@ -13,9 +13,10 @@ export function broadcast(event: ServerEvent) {
 }
 
 export async function wsRoutes(app: FastifyInstance) {
-  app.get("/ws", { websocket: true }, (conn) => {
-    const sock = conn.socket;
-    sockets.add(sock);
-    sock.on("close", () => sockets.delete(sock));
+  // @fastify/websocket v10+ passes the raw WebSocket as the first arg
+  // (the old `connection.socket` wrapper was removed).
+  app.get("/ws", { websocket: true }, (socket) => {
+    sockets.add(socket);
+    socket.on("close", () => sockets.delete(socket));
   });
 }
