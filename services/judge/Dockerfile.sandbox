@@ -8,6 +8,7 @@ RUN useradd -m -u 10001 runner
 USER runner
 
 FROM python:3.12-slim AS py
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 RUN useradd -m -u 10001 runner
 USER runner
 
