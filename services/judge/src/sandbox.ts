@@ -77,6 +77,7 @@ function dockerRun(
     "--memory-swap=" + Math.ceil(limits.memoryKb / 1024) + "m",
     "--cpus=1",
     "--tmpfs", "/tmp:rw,size=64m",
+    "--tmpfs", "/home/runner:rw,size=16m",
     "-v", `${dir}:/work:rw`,
     "-w", "/work",
     recipe.image,

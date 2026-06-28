@@ -129,19 +129,29 @@ export function ContestPage() {
 
   useEffect(() => {
     if (!id) return;
-    api.contest(id).then(setContest).catch(() => {});
     api.leaderboard(id).then((lb) => setLeaderboard(lb)).catch(() => {});
 
-    // Load problems - using global problems for now (contest problems endpoint not in API spec)
-    api.problems().then((ps) => {
+    api.contest(id).then((c) => {
+      setContest(c);
       const letters = "ABCDEFGHIJ";
-      const cps: ContestProblem[] = ps.slice(0, 8).map((p, i) => ({
-        ...p,
-        letter: letters[i] ?? String(i + 1),
-      }));
-      setProblems(cps);
-      if (cps.length > 0) {
-        selectProblem(cps[0]);
+      if (c.problems && c.problems.length > 0) {
+        // Use the contest's actual problems, labelled as configured.
+        const cps: ContestProblem[] = c.problems.map((entry, i) => ({
+          ...entry.problem,
+          letter: entry.label || letters[i] || String(i + 1),
+        }));
+        setProblems(cps);
+        if (cps.length > 0) selectProblem(cps[0]);
+      } else {
+        // Fallback: contest has no problems attached — show the global bank.
+        api.problems().then((ps) => {
+          const cps: ContestProblem[] = ps.slice(0, 8).map((p, i) => ({
+            ...p,
+            letter: letters[i] ?? String(i + 1),
+          }));
+          setProblems(cps);
+          if (cps.length > 0) selectProblem(cps[0]);
+        }).catch(() => {});
       }
     }).catch(() => {});
   }, [id]);
