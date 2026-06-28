@@ -25,6 +25,39 @@ export async function contestRoutes(app: FastifyInstance) {
     return contests.map((c) => ({ ...c, registered: registeredIds.has(c.id) }));
   });
 
+  app.get("/contests/:id", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const contest = await prisma.contest.findUnique({
+      where: { id },
+      select: {
+        id: true, name: true, startsAt: true, durationSec: true, scoring: true, rated: true,
+        problems: {
+          orderBy: { label: "asc" },
+          select: {
+            label: true,
+            points: true,
+            problem: {
+              select: { id: true, slug: true, title: true, difficulty: true, ratingValue: true, tags: true },
+            },
+          },
+        },
+      },
+    });
+    if (!contest) return reply.code(404).send({ error: "not found" });
+
+    let registered = false;
+    try {
+      await req.jwtVerify();
+      registered = !!(await prisma.registration.findUnique({
+        where: { contestId_userId: { contestId: id, userId: req.user.sub } },
+      }));
+    } catch {
+      // anonymous — registered stays false
+    }
+
+    return { ...contest, registered };
+  });
+
   // FR-9: register for an upcoming contest.
   app.post("/contests/:id/register", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { id } = req.params as { id: string };

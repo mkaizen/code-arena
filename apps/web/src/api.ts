@@ -69,6 +69,12 @@ export interface Problem extends ProblemSummary {
   samples: Sample[];
 }
 
+export interface ContestProblemEntry {
+  label: string;
+  points: number;
+  problem: ProblemSummary;
+}
+
 export interface Contest {
   id: string;
   name: string;
@@ -77,6 +83,7 @@ export interface Contest {
   scoring: "ICPC" | "POINTS";
   rated: boolean;
   registered?: boolean;
+  problems?: ContestProblemEntry[];
 }
 
 export interface Submission {
