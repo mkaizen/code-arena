@@ -25,7 +25,7 @@ async function judge(submissionId: string): Promise<JudgeResult> {
   const tests = await loadTests(sub.problem.testsKey); // object-storage read
   const limits = { timeMs: sub.problem.timeMs, memoryKb: sub.problem.memoryKb };
 
-  const result: JudgeResult = { verdict: Verdict.AC, maxTimeMs: 0, maxMemoryKb: 0, cases: [] };
+  const result: JudgeResult = { verdict: Verdict.AC, maxTimeMs: 0, maxMemoryKb: 0, cases: [], totalCases: tests.length };
 
   for (let i = 0; i < tests.length; i++) {
     const t = tests[i];
@@ -35,14 +35,51 @@ async function judge(submissionId: string): Promise<JudgeResult> {
 
     let v: Verdict;
     if (out.verdict === Verdict.CE) { result.compileLog = out.compileLog; v = Verdict.CE; }
-    else if (out.verdict) v = out.verdict; // TLE / MLE / RE
+    else if (out.verdict === Verdict.RE) { result.runtimeLog = out.runtimeLog; v = Verdict.RE; }
+    else if (out.verdict) v = out.verdict; // TLE / MLE
     else v = normalize(out.stdout) === normalize(t.expected) ? Verdict.AC : Verdict.WA;
 
     result.cases.push({ index: i + 1, verdict: v, timeMs: out.timeMs, memoryKb: out.memoryKb });
 
-    if (v !== Verdict.AC) { result.verdict = v; result.failedCase = i + 1; break; }
+    if (v !== Verdict.AC) {
+      result.verdict = v;
+      result.failedCase = i + 1;
+      result.message = explain(v, i + 1, tests.length, limits, out);
+      break;
+    }
+  }
+
+  if (result.verdict === Verdict.AC) {
+    result.message = `Accepted — passed all ${tests.length} test${tests.length === 1 ? "" : "s"} in ${result.maxTimeMs}ms`;
   }
   return result;
+}
+
+/** Build a human-readable one-liner explaining a non-AC verdict. */
+function explain(
+  v: Verdict,
+  caseNo: number,
+  total: number,
+  limits: { timeMs: number; memoryKb: number },
+  out: { runtimeLog?: string },
+): string {
+  const where = `test ${caseNo} of ${total}`;
+  switch (v) {
+    case Verdict.WA:
+      return `Wrong answer on ${where} — your output didn't match the expected output.`;
+    case Verdict.TLE:
+      return `Time limit exceeded on ${where} — exceeded the ${limits.timeMs}ms limit. Check for an inefficient algorithm or an infinite loop.`;
+    case Verdict.MLE:
+      return `Memory limit exceeded on ${where} — exceeded the ${Math.round(limits.memoryKb / 1024)}MB limit.`;
+    case Verdict.RE: {
+      const first = (out.runtimeLog ?? "").split("\n").filter(Boolean).pop();
+      return `Runtime error on ${where}${first ? ` — ${first}` : " — your program crashed (non-zero exit)."}`;
+    }
+    case Verdict.CE:
+      return "Compilation error — your code didn't compile. See the log below.";
+    default:
+      return `Failed on ${where}.`;
+  }
 }
 
 const worker = new Worker(
@@ -56,7 +93,14 @@ const worker = new Worker(
       result = await judge(submissionId);
     } catch (err) {
       console.error("judge error", err);
-      result = { verdict: Verdict.IE, maxTimeMs: 0, maxMemoryKb: 0, cases: [] };
+      const reason = err instanceof Error ? err.message : String(err);
+      result = {
+        verdict: Verdict.IE,
+        maxTimeMs: 0,
+        maxMemoryKb: 0,
+        cases: [],
+        message: `Internal judge error — ${reason}. This is a server-side issue, not a problem with your code. Please retry; if it persists, contact an admin.`,
+      };
     }
 
     await prisma.submission.update({

@@ -24,8 +24,15 @@ export interface JudgeResult {
   verdict: Verdict;
   /** 1-based index of the first failing case, when applicable (FR-15). */
   failedCase?: number;
+  /** Total number of test cases run, for "failed on test X of Y" context. */
+  totalCases?: number;
   maxTimeMs: number;
   maxMemoryKb: number;
+  /** Compiler stderr, present on COMPILATION_ERROR. */
   compileLog?: string;
+  /** Program stderr, present on RUNTIME_ERROR. */
+  runtimeLog?: string;
+  /** Human-readable one-line explanation of the verdict. */
+  message?: string;
   cases: CaseResult[];
 }

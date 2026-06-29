@@ -551,8 +551,14 @@ export function ContestPage() {
                         {entry.result && entry.result.maxTimeMs > 0 && (
                           <span style={{ color: "var(--txt-3)" }}> · {entry.result.maxTimeMs}ms · {Math.round(entry.result.maxMemoryKb / 1024)}KB</span>
                         )}
+                        {entry.result?.message && (
+                          <div style={{ color: "var(--txt-2)", marginTop: 3, fontSize: 11, whiteSpace: "pre-wrap" }}>{entry.result.message}</div>
+                        )}
                         {entry.result?.compileLog && (
                           <pre style={{ color: "var(--v-ce)", marginTop: 4, fontSize: 11, whiteSpace: "pre-wrap" }}>{entry.result.compileLog}</pre>
+                        )}
+                        {entry.result?.runtimeLog && (
+                          <pre style={{ color: "var(--v-wa)", marginTop: 4, fontSize: 11, whiteSpace: "pre-wrap" }}>{entry.result.runtimeLog}</pre>
                         )}
                       </span>
                     ) : (
