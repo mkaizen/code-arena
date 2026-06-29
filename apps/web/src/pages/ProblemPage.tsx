@@ -6,6 +6,7 @@ import { TopBar } from "../components/TopBar.js";
 import { api, type Problem, type Submission } from "../api.js";
 import { useAuth } from "../ctx/AuthContext.js";
 import { useWs } from "../hooks/useWs.js";
+import { loadDraft, saveDraft } from "../draft.js";
 import type { ServerEvent } from "@arena/shared";
 
 const STARTERS: Record<Language, string> = {
@@ -92,6 +93,13 @@ export function ProblemPage() {
       .catch(() => {});
   }, [user, problem]);
 
+  // Restore the saved draft (or starter) whenever the problem or language
+  // changes, so the editor content survives a refresh.
+  useEffect(() => {
+    if (!problem) return;
+    setSource(loadDraft(problem.slug, lang) ?? STARTERS[lang]);
+  }, [problem, lang]);
+
   useWs((ev: ServerEvent) => {
     if (ev.type === "verdict" && ev.submissionId === pendingId) {
       setPendingId(null);
@@ -117,6 +125,13 @@ export function ProblemPage() {
       }
     }
   });
+
+  function handleReset() {
+    if (!window.confirm("Reset to the starter code? Your current code will be discarded.")) return;
+    const starter = STARTERS[lang];
+    setSource(starter);
+    if (problem) saveDraft(problem.slug, lang, starter);
+  }
 
   async function handleSubmit() {
     if (!problem || !user) {
@@ -293,11 +308,7 @@ export function ProblemPage() {
             >
               <select
                 value={lang}
-                onChange={(e) => {
-                  const l = e.target.value as Language;
-                  setLang(l);
-                  setSource(STARTERS[l]);
-                }}
+                onChange={(e) => setLang(e.target.value as Language)}
                 style={{
                   background: "var(--panel-2)",
                   border: "1px solid var(--line)",
@@ -313,6 +324,23 @@ export function ProblemPage() {
                 ))}
               </select>
               <div style={{ flex: 1 }} />
+              <button
+                onClick={handleReset}
+                title="Reset to starter code"
+                style={{
+                  background: "transparent",
+                  color: "var(--txt-2)",
+                  fontWeight: 500,
+                  fontSize: 12,
+                  padding: "5px 12px",
+                  border: "1px solid var(--line)",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontFamily: "var(--disp)",
+                }}
+              >
+                Reset
+              </button>
               <button
                 onClick={handleSubmit}
                 style={{
@@ -338,7 +366,11 @@ export function ProblemPage() {
                 theme="vs-dark"
                 language={MONACO_LANG[lang]}
                 value={source}
-                onChange={(v) => setSource(v ?? "")}
+                onChange={(v) => {
+                  const val = v ?? "";
+                  setSource(val);
+                  if (problem) saveDraft(problem.slug, lang, val);
+                }}
                 options={{
                   fontSize: 13,
                   fontFamily: "'JetBrains Mono', ui-monospace, monospace",
