@@ -156,6 +156,23 @@ export function ContestPage() {
     }).catch(() => {});
   }, [id]);
 
+  // Load prior submissions so solved/tried state (and the problem unlock gate)
+  // survives a page refresh, not just live verdicts within this session.
+  useEffect(() => {
+    if (!id || !user || problems.length === 0) return;
+    api.submissions().then((subs) => {
+      setSubmittedProblems((prev) => {
+        const next = { ...prev };
+        for (const s of subs) {
+          if (s.contestId !== id) continue;
+          if (s.verdict === "ACCEPTED") next[s.problemId] = "solved";
+          else if (next[s.problemId] !== "solved") next[s.problemId] = "tried";
+        }
+        return next;
+      });
+    }).catch(() => {});
+  }, [id, user, problems.length]);
+
   function selectProblem(cp: ContestProblem) {
     setActiveLetter(cp.letter);
     setLoadingProblem(true);
@@ -215,6 +232,12 @@ export function ContestPage() {
   useWs(handleWsEvent);
 
   const tier = user ? tierOf(user.rating) : null;
+
+  // Progressive unlock: only the first problem is shown until it's solved;
+  // solving it reveals the rest of the set.
+  const firstSolved = problems.length > 0 && submittedProblems[problems[0].id] === "solved";
+  const visibleProblems = problems.filter((_, i) => i === 0 || firstSolved);
+  const lockedCount = problems.length - visibleProblems.length;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--ink)", overflow: "hidden" }}>
@@ -314,7 +337,7 @@ export function ContestPage() {
           >
             PROBLEMS
           </div>
-          {problems.map((cp) => {
+          {visibleProblems.map((cp) => {
             const pState = submittedProblems[cp.id];
             const isActive = activeLetter === cp.letter;
             return (
@@ -374,6 +397,28 @@ export function ContestPage() {
               </button>
             );
           })}
+          {lockedCount > 0 && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "12px",
+                color: "var(--txt-3)",
+                fontSize: 11,
+                lineHeight: 1.5,
+              }}
+            >
+              <span style={{ fontSize: 13 }}>🔒</span>
+              <span>
+                {lockedCount} more problem{lockedCount === 1 ? "" : "s"} — solve{" "}
+                <span style={{ fontFamily: "var(--mono)", color: "var(--txt-2)", fontWeight: 700 }}>
+                  {problems[0]?.letter}
+                </span>{" "}
+                to unlock.
+              </span>
+            </div>
+          )}
         </aside>
 
         {/* Center: Problem statement + editor */}
@@ -643,7 +688,7 @@ export function ContestPage() {
                       {row.handle}
                     </span>
                     <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
-                      {problems.map((cp) => {
+                      {visibleProblems.map((cp) => {
                         const pp = row.perProblem[cp.id];
                         return (
                           <span
