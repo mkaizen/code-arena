@@ -199,6 +199,12 @@ export function ContestPage() {
     saveDraft(activeProblem.slug, lang, val);
   }
 
+  function handleReset() {
+    if (!activeProblem) return;
+    if (!window.confirm("Reset to the starter code? Your current code will be discarded.")) return;
+    setSource(STARTERS[lang]);
+  }
+
   async function handleSubmit() {
     if (!activeProblem || !id) return;
     const source = getSource();
@@ -543,6 +549,23 @@ export function ContestPage() {
                   ))}
                 </select>
                 <div style={{ flex: 1 }} />
+                <button
+                  onClick={handleReset}
+                  title="Reset to starter code"
+                  style={{
+                    background: "transparent",
+                    color: "var(--txt-2)",
+                    fontWeight: 500,
+                    fontSize: 12,
+                    padding: "5px 12px",
+                    border: "1px solid var(--line)",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    fontFamily: "var(--disp)",
+                  }}
+                >
+                  Reset
+                </button>
                 <button
                   onClick={handleSubmit}
                   style={{
