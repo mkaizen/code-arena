@@ -233,11 +233,17 @@ export function ContestPage() {
 
   const tier = user ? tierOf(user.rating) : null;
 
-  // Progressive unlock: only the first problem is shown until it's solved;
-  // solving it reveals the rest of the set.
-  const firstSolved = problems.length > 0 && submittedProblems[problems[0].id] === "solved";
-  const visibleProblems = problems.filter((_, i) => i === 0 || firstSolved);
+  // Sequential unlock: a problem is shown only once the previous one is solved.
+  // The first is always visible; each AC reveals exactly the next problem.
+  let unlockedCount = 0;
+  for (let i = 0; i < problems.length; i++) {
+    unlockedCount = i + 1;
+    if (submittedProblems[problems[i].id] !== "solved") break;
+  }
+  const visibleProblems = problems.slice(0, unlockedCount);
   const lockedCount = problems.length - visibleProblems.length;
+  // The problem whose solve unlocks the next locked one.
+  const gateLetter = visibleProblems[visibleProblems.length - 1]?.letter;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--ink)", overflow: "hidden" }}>
@@ -411,11 +417,11 @@ export function ContestPage() {
             >
               <span style={{ fontSize: 13 }}>🔒</span>
               <span>
-                {lockedCount} more problem{lockedCount === 1 ? "" : "s"} — solve{" "}
+                Solve{" "}
                 <span style={{ fontFamily: "var(--mono)", color: "var(--txt-2)", fontWeight: 700 }}>
-                  {problems[0]?.letter}
+                  {gateLetter}
                 </span>{" "}
-                to unlock.
+                to unlock the next problem ({lockedCount} locked).
               </span>
             </div>
           )}
