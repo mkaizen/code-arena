@@ -6,15 +6,7 @@ import { api, type Contest, type Problem, type ProblemSummary } from "../api.js"
 import { useAuth } from "../ctx/AuthContext.js";
 import { useWs } from "../hooks/useWs.js";
 import { loadDraft, saveDraft } from "../draft.js";
-
-const STARTERS: Record<Language, string> = {
-  cpp: '#include <bits/stdc++.h>\nusing namespace std;\nint main(){\n  ios_base::sync_with_stdio(false);\n  cin.tie(NULL);\n  \n  return 0;\n}\n',
-  py: "import sys\ninput = sys.stdin.readline\n\ndef solve():\n    pass\n\nsolve()\n",
-  java: "import java.util.*;\nimport java.io.*;\npublic class Main {\n  public static void main(String[] args) throws IOException {\n    BufferedReader br = new BufferedReader(new InputStreamReader(System.in));\n    \n  }\n}\n",
-  js: "const lines = require('fs').readFileSync('/dev/stdin','utf8').trim().split('\\n');\nlet idx = 0;\n",
-  go: "package main\n\nimport (\n  \"bufio\"\n  \"fmt\"\n  \"os\"\n)\n\nfunc main() {\n  reader := bufio.NewReader(os.Stdin)\n  _ = reader\n  _ = fmt.Sprint\n}\n",
-  rs: "use std::io::{self, BufRead};\n\nfn main() {\n  let stdin = io.stdin();\n  for line in stdin.lock().lines() {\n    let _line = line.unwrap();\n  }\n}\n",
-};
+import { STARTERS } from "../starters.js";
 
 const LANG_LABELS: Record<Language, string> = {
   cpp: "C++17", py: "Python 3", java: "Java 17", js: "JavaScript", go: "Go", rs: "Rust",
