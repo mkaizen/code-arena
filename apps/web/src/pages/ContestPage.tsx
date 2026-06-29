@@ -5,6 +5,7 @@ import { tierOf, type Language, type ServerEvent, type LeaderboardRow, type Judg
 import { api, type Contest, type Problem, type ProblemSummary } from "../api.js";
 import { useAuth } from "../ctx/AuthContext.js";
 import { useWs } from "../hooks/useWs.js";
+import { loadDraft, saveDraft } from "../draft.js";
 
 const STARTERS: Record<Language, string> = {
   cpp: '#include <bits/stdc++.h>\nusing namespace std;\nint main(){\n  ios_base::sync_with_stdio(false);\n  cin.tie(NULL);\n  \n  return 0;\n}\n',
@@ -178,19 +179,24 @@ export function ContestPage() {
     setLoadingProblem(true);
     api.problem(cp.slug).then((p) => {
       setActiveProblem(p);
-      if (!sources[cp.slug]) {
-        setSources((s) => ({ ...s, [cp.slug]: STARTERS[lang] }));
+      const k = `${cp.slug}:${lang}`;
+      if (sources[k] === undefined) {
+        setSources((s) => ({ ...s, [k]: loadDraft(cp.slug, lang) ?? STARTERS[lang] }));
       }
     }).catch(() => {}).finally(() => setLoadingProblem(false));
   }
 
   function getSource(): string {
-    return (activeProblem && sources[activeProblem.slug]) ?? STARTERS[lang];
+    if (!activeProblem) return STARTERS[lang];
+    const k = `${activeProblem.slug}:${lang}`;
+    return sources[k] ?? loadDraft(activeProblem.slug, lang) ?? STARTERS[lang];
   }
 
   function setSource(val: string) {
     if (!activeProblem) return;
-    setSources((s) => ({ ...s, [activeProblem.slug]: val }));
+    const k = `${activeProblem.slug}:${lang}`;
+    setSources((s) => ({ ...s, [k]: val }));
+    saveDraft(activeProblem.slug, lang, val);
   }
 
   async function handleSubmit() {
@@ -518,9 +524,8 @@ export function ContestPage() {
                   onChange={(e) => {
                     const l = e.target.value as Language;
                     setLang(l);
-                    if (activeProblem && !sources[`${activeProblem.slug}_${l}`]) {
-                      setSources((s) => ({ ...s, [activeProblem.slug]: STARTERS[l] }));
-                    }
+                    // getSource() falls back to the saved draft / starter for
+                    // the newly selected language, so no manual seeding needed.
                   }}
                   style={{
                     background: "var(--panel-2)",
