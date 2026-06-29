@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, rm, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Verdict } from "@arena/shared";
@@ -27,7 +27,11 @@ export async function runInSandbox(
 ): Promise<RunOutcome> {
   const dir = await mkdtemp(join(tmpdir(), "arena-"));
   try {
-    await writeFile(join(dir, recipe.source), source);
+    // mkdtemp creates the dir 0700 (owner-only). The sandbox container runs as
+    // an unprivileged user (uid 10001), so it must be able to traverse /work
+    // to read the source and write compiled artifacts. Open up the per-run dir.
+    await chmod(dir, 0o777);
+    await writeFile(join(dir, recipe.source), source, { mode: 0o644 });
 
     if (recipe.compile) {
       const c = await dockerRun(recipe, dir, recipe.compile, "", {
