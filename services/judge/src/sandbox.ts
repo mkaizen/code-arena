@@ -11,6 +11,7 @@ export interface RunOutcome {
   timeMs: number;
   memoryKb: number;
   compileLog?: string;
+  runtimeLog?: string; // program stderr / exit code detail on RUNTIME_ERROR
 }
 
 /**
@@ -41,7 +42,10 @@ export async function runInSandbox(
     const r = await dockerRun(recipe, dir, recipe.run, input, limits);
     if (r.timedOut) return { verdict: Verdict.TLE, stdout: "", timeMs: r.timeMs, memoryKb: r.memoryKb };
     if (r.oom) return { verdict: Verdict.MLE, stdout: "", timeMs: r.timeMs, memoryKb: r.memoryKb };
-    if (r.code !== 0) return { verdict: Verdict.RE, stdout: r.stdout, timeMs: r.timeMs, memoryKb: r.memoryKb };
+    if (r.code !== 0) {
+      const detail = r.stderr.trim() || `process exited with code ${r.code}`;
+      return { verdict: Verdict.RE, stdout: r.stdout, timeMs: r.timeMs, memoryKb: r.memoryKb, runtimeLog: detail.slice(0, 4000) };
+    }
     return { verdict: null, stdout: r.stdout, timeMs: r.timeMs, memoryKb: r.memoryKb };
   } finally {
     await rm(dir, { recursive: true, force: true });
