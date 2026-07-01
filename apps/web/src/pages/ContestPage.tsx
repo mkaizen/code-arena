@@ -6,15 +6,7 @@ import { api, type Contest, type Problem, type ProblemSummary } from "../api.js"
 import { useAuth } from "../ctx/AuthContext.js";
 import { useWs } from "../hooks/useWs.js";
 import { loadDraft, saveDraft } from "../draft.js";
-import { STARTERS } from "../starters.js";
-
-const LANG_LABELS: Record<Language, string> = {
-  cpp: "C++17", py: "Python 3", java: "Java 17", js: "JavaScript", go: "Go", rs: "Rust",
-};
-
-const MONACO_LANG: Record<Language, string> = {
-  cpp: "cpp", py: "python", java: "java", js: "javascript", go: "go", rs: "rust",
-};
+import { STARTERS, LANG_LABELS, MONACO_LANG } from "../starters.js";
 
 interface ContestProblem extends ProblemSummary {
   letter: string;

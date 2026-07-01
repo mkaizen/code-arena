@@ -3,6 +3,7 @@ import { env } from "../env.js";
 import { broadcast } from "../ws.js";
 import { prisma } from "../db.js";
 import { recordAccepted, getLeaderboard, isFrozen, ensureFreezeSnapshot } from "./freeze.js";
+import { onAccepted as onMatchAccepted } from "../match/engine.js";
 import type { JudgeResult, ScoringModel } from "@arena/shared";
 
 interface VerdictMsg {
@@ -60,8 +61,14 @@ export function startVerdictSubscriber(): void {
 
       const submission = await prisma.submission.findUnique({
         where: { id: submissionId },
-        select: { userId: true, contestId: true, rated: true },
+        select: { userId: true, contestId: true, matchId: true, rated: true },
       });
+
+      if (submission?.matchId) {
+        await onMatchAccepted(submission.matchId);
+        return;
+      }
+
       if (!submission?.contestId || !submission.rated) return;
 
       const { solved, penalty } = await computeStanding(submission.userId, submission.contestId);

@@ -7,6 +7,7 @@ import { judgeQueue } from "../queue.js";
 const submitBody = z.object({
   problemId: z.string(),
   contestId: z.string().optional(),
+  matchId: z.string().optional(),
   language: z.enum(LANGUAGES as [string, ...string[]]),
   source: z.string().min(1).max(64_000),
 });
@@ -35,6 +36,24 @@ export async function submissionRoutes(app: FastifyInstance) {
       if (contest.registrations.length === 0) return reply.code(403).send({ error: "not registered for contest" });
 
       rated = contest.rated; // FR-25: only contest subs are rated; practice is not.
+    } else if (b.matchId) {
+      const match = await prisma.match.findUnique({
+        where: { id: b.matchId },
+        include: { players: { where: { userId } } },
+      });
+      if (!match) return reply.code(404).send({ error: "match not found" });
+      if (match.status !== "ACTIVE") return reply.code(409).send({ error: "match has ended" });
+      const me = match.players[0];
+      if (!me) return reply.code(403).send({ error: "not a player in this match" });
+      if (me.status !== "ALIVE") return reply.code(403).send({ error: "you have been eliminated" });
+
+      const currentProblem = await prisma.matchProblem.findUnique({
+        where: { matchId_round: { matchId: b.matchId, round: match.round } },
+      });
+      if (!currentProblem || currentProblem.problemId !== b.problemId) {
+        return reply.code(400).send({ error: "not the current round's problem" });
+      }
+      // Battle Royale submissions never affect rating.
     }
 
     const submission = await prisma.submission.create({
@@ -42,6 +61,7 @@ export async function submissionRoutes(app: FastifyInstance) {
         userId,
         problemId: b.problemId,
         contestId: b.contestId,
+        matchId: b.matchId,
         language: b.language,
         source: b.source,
         rated,

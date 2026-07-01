@@ -9,8 +9,10 @@ import { contestRoutes } from "./routes/contests.js";
 import { submissionRoutes } from "./routes/submissions.js";
 import { leaderboardRoutes } from "./routes/leaderboard.js";
 import { adminRoutes } from "./routes/admin.js";
+import { matchRoutes } from "./routes/matches.js";
 import { wsRoutes } from "./ws.js";
 import { startVerdictSubscriber } from "./leaderboard/verdictSub.js";
+import { sweepOverdueMatches } from "./match/engine.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -45,9 +47,14 @@ async function main() {
   await app.register(submissionRoutes);
   await app.register(leaderboardRoutes);
   await app.register(adminRoutes);
+  await app.register(matchRoutes);
   await app.register(wsRoutes);
 
   startVerdictSubscriber();
+  // Self-heals stuck Battle Royale rounds if a setTimeout was lost (e.g. API restart).
+  setInterval(() => {
+    sweepOverdueMatches().catch((err) => app.log.error(err, "match sweep failed"));
+  }, 15_000);
   await app.listen({ port: env.API_PORT, host: "0.0.0.0" });
 }
 

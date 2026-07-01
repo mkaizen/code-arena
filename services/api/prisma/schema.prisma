@@ -37,6 +37,16 @@ enum Verdict {
   JUDGING
 }
 
+enum MatchStatus {
+  ACTIVE
+  FINISHED
+}
+
+enum MatchPlayerStatus {
+  ALIVE
+  ELIMINATED
+}
+
 model User {
   id            String   @id @default(cuid())
   handle        String   @unique
@@ -48,10 +58,12 @@ model User {
   editorPrefs   Json?    // FR-3
   createdAt     DateTime @default(now())
 
-  oauthAccounts OAuthAccount[]
-  submissions   Submission[]
-  registrations Registration[]
-  ratingChanges RatingChange[]
+  oauthAccounts   OAuthAccount[]
+  submissions     Submission[]
+  registrations   Registration[]
+  ratingChanges   RatingChange[]
+  matchPlayers    MatchPlayer[]
+  matchQueueEntry MatchQueueEntry?
 
   @@index([rating])
 }
@@ -82,9 +94,10 @@ model Problem {
   version     Int        @default(1) // FR-7
   createdAt   DateTime   @default(now())
 
-  samples     Sample[]
+  samples         Sample[]
   contestProblems ContestProblem[]
-  submissions Submission[]
+  matchProblems   MatchProblem[]
+  submissions     Submission[]
 }
 
 model Sample {
@@ -144,6 +157,8 @@ model Submission {
   problemId   String
   contest     Contest? @relation(fields: [contestId], references: [id])
   contestId   String?
+  match       Match?   @relation(fields: [matchId], references: [id])
+  matchId     String?
   language    String
   source      String
   verdict     Verdict  @default(PENDING)
@@ -157,6 +172,7 @@ model Submission {
 
   @@index([userId, createdAt])
   @@index([contestId, problemId])
+  @@index([matchId, problemId])
 }
 
 model RatingChange {
@@ -171,4 +187,53 @@ model RatingChange {
   createdAt DateTime @default(now())
 
   @@unique([userId, contestId]) // FR-21/FR-22, deterministic & reproducible (NFR-6)
+}
+
+// ── Battle Royale mode ───────────────────────────────────────────────────────
+// 6 players queue, then race through an ascending-difficulty problem ladder.
+// Each round has a hard timer; anyone who hasn't solved it when time's up is
+// eliminated. Last player standing wins.
+
+model Match {
+  id               String      @id @default(cuid())
+  status           MatchStatus @default(ACTIVE)
+  round            Int         @default(0)
+  roundStartedAt   DateTime    @default(now())
+  roundDurationSec Int         @default(300)
+  createdAt        DateTime    @default(now())
+  endedAt          DateTime?
+
+  players     MatchPlayer[]
+  problems    MatchProblem[]
+  submissions Submission[]
+
+  @@index([status])
+}
+
+model MatchProblem {
+  match     Match   @relation(fields: [matchId], references: [id])
+  matchId   String
+  problem   Problem @relation(fields: [problemId], references: [id])
+  problemId String
+  round     Int
+
+  @@id([matchId, round])
+}
+
+model MatchPlayer {
+  match           Match             @relation(fields: [matchId], references: [id])
+  matchId         String
+  user            User              @relation(fields: [userId], references: [id])
+  userId          String
+  status          MatchPlayerStatus @default(ALIVE)
+  eliminatedRound Int?
+  placement       Int?
+
+  @@id([matchId, userId])
+}
+
+model MatchQueueEntry {
+  user     User     @relation(fields: [userId], references: [id])
+  userId   String   @id
+  queuedAt DateTime @default(now())
 }
