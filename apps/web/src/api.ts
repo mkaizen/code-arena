@@ -1,4 +1,4 @@
-import type { Language, LeaderboardRow } from "@arena/shared";
+import type { Language, LeaderboardRow, MatchStateView } from "@arena/shared";
 
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
@@ -11,6 +11,7 @@ export function setToken(t: string | null) {
 export function getToken() { return token; }
 
 export interface StoredUser {
+  id: string;
   token: string;
   handle: string;
   rating: number;
@@ -125,7 +126,7 @@ export const api = {
 
   problem: (slug: string): Promise<Problem> => req(`/problems/${slug}`),
 
-  submit: (body: { problemId: string; contestId?: string; language: Language; source: string }): Promise<{ id: string; verdict: string }> =>
+  submit: (body: { problemId: string; contestId?: string; matchId?: string; language: Language; source: string }): Promise<{ id: string; verdict: string }> =>
     req("/submissions", { method: "POST", body: JSON.stringify(body) }),
 
   submissions: (): Promise<Submission[]> => req("/submissions"),
@@ -161,4 +162,16 @@ export const api = {
 
   adminFinalizeContest: (id: string): Promise<{ finalized: number; changes: { userId: string; before: number; after: number }[] }> =>
     req(`/admin/contests/${id}/finalize`, { method: "POST" }),
+
+  // Battle Royale
+  queueForMatch: (): Promise<{ matched: boolean; matchId?: string; count: number; capacity: number }> =>
+    req("/matches/queue", { method: "POST", body: "{}" }),
+
+  leaveMatchQueue: (): Promise<{ ok: boolean }> =>
+    req("/matches/queue", { method: "DELETE" }),
+
+  matchQueueStatus: (): Promise<{ queued: boolean; count: number; capacity: number }> =>
+    req("/matches/queue/status"),
+
+  match: (id: string): Promise<MatchStateView> => req(`/matches/${id}`),
 };

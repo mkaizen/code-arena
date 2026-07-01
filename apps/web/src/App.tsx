@@ -12,6 +12,8 @@ import { AdminPage } from "./pages/AdminPage.js";
 import { AdminProblemNewPage } from "./pages/AdminProblemNewPage.js";
 import { AdminContestNewPage } from "./pages/AdminContestNewPage.js";
 import { AdminContestFinalizePage } from "./pages/AdminContestFinalizePage.js";
+import { BattlePage } from "./pages/BattlePage.js";
+import { BattleMatchPage } from "./pages/BattleMatchPage.js";
 import "./styles.css";
 
 export function App() {
@@ -28,6 +30,8 @@ export function App() {
           <Route path="/problems/:slug" element={<ProblemPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/leaderboard" element={<GlobalLBPage />} />
+          <Route path="/battle" element={<BattlePage />} />
+          <Route path="/battle/:id" element={<BattleMatchPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/admin/problems/new" element={<AdminProblemNewPage />} />
           <Route path="/admin/contests/new" element={<AdminContestNewPage />} />

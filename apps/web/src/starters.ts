@@ -1,5 +1,13 @@
 import type { Language } from "@arena/shared";
 
+export const LANG_LABELS: Record<Language, string> = {
+  cpp: "C++17", py: "Python 3", java: "Java 17", js: "JavaScript", go: "Go", rs: "Rust",
+};
+
+export const MONACO_LANG: Record<Language, string> = {
+  cpp: "cpp", py: "python", java: "java", js: "javascript", go: "go", rs: "rust",
+};
+
 /**
  * Per-language starter templates. Each one compiles and runs as-is, sets up
  * fast/buffered stdin+stdout, and leaves a clear spot for the solution. They
