@@ -1,14 +1,20 @@
 import { prisma } from "../db.js";
 import { broadcast } from "../ws.js";
-import type { MatchPlayerView, MatchProblemView, MatchStateView } from "@arena/shared";
+import type { MatchMode, MatchPlayerView, MatchProblemView, MatchStateView } from "@arena/shared";
 
-export const MATCH_CAPACITY = 6;
-const ROUND_DURATION_SEC = 300; // 5 min per problem
-const MAX_ROUNDS = 6;
+/**
+ * Per-mode rules. ROYALE: 6 players, ascending ladder, miss a round's timer
+ * and you're eliminated. DUEL: 1v1 best-of-3 — the first accepted submission
+ * takes the round (ending it immediately); most round wins takes the match.
+ */
+export const MODE_CONFIG: Record<MatchMode, { capacity: number; roundDurationSec: number; rounds: number }> = {
+  ROYALE: { capacity: 6, roundDurationSec: 300, rounds: 6 },
+  DUEL: { capacity: 2, roundDurationSec: 600, rounds: 3 },
+};
 
 // Per-match scheduled round-timeout timer and a serialization lock so a
-// timer firing can never race a concurrent "everyone just solved it" advance
-// (both paths funnel through transitionRound under the same lock).
+// timer firing can never race a concurrent AC-driven advance (both paths
+// funnel through the transition functions under the same lock).
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 const locks = new Map<string, Promise<unknown>>();
 
@@ -34,9 +40,36 @@ function forgetMatchSoon(matchId: string): void {
   }, 60_000).unref?.();
 }
 
+/** Pick the problem ladder for a new match of the given mode. */
+async function pickProblems(mode: MatchMode): Promise<{ id: string }[]> {
+  const want = MODE_CONFIG[mode].rounds;
+  if (mode === "ROYALE") {
+    // Deterministic ascending ladder of the easiest problems.
+    return prisma.problem.findMany({ orderBy: { ratingValue: "asc" }, take: want, select: { id: true } });
+  }
+  // DUEL: random sample for variety, then ordered easiest → hardest.
+  const all = await prisma.problem.findMany({ select: { id: true, ratingValue: true } });
+  for (let i = all.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [all[i], all[j]] = [all[j], all[i]];
+  }
+  return all
+    .slice(0, want)
+    .sort((a, b) => a.ratingValue - b.ratingValue)
+    .map((p) => ({ id: p.id }));
+}
+
+async function broadcastQueueCount(mode: MatchMode): Promise<void> {
+  const count = await prisma.matchQueueEntry.count({ where: { mode } });
+  broadcast({ type: "queue_update", mode, count, capacity: MODE_CONFIG[mode].capacity });
+}
+
 export async function joinQueue(
   userId: string,
+  mode: MatchMode,
 ): Promise<{ matched: true; matchId: string } | { matched: false; count: number; capacity: number }> {
+  const cfg = MODE_CONFIG[mode];
+
   // Already mid-match (e.g. a duplicate click / reconnect) — send them back in.
   const live = await prisma.matchPlayer.findFirst({
     where: { userId, match: { status: "ACTIVE" } },
@@ -44,20 +77,21 @@ export async function joinQueue(
   });
   if (live) return { matched: true, matchId: live.matchId };
 
-  await prisma.matchQueueEntry.upsert({ where: { userId }, create: { userId }, update: {} });
+  // One queue at a time: switching modes moves the entry.
+  await prisma.matchQueueEntry.upsert({
+    where: { userId },
+    create: { userId, mode },
+    update: { mode, queuedAt: new Date() },
+  });
 
-  const waiting = await prisma.matchQueueEntry.findMany({ orderBy: { queuedAt: "asc" } });
-  if (waiting.length < MATCH_CAPACITY) {
-    broadcast({ type: "queue_update", count: waiting.length, capacity: MATCH_CAPACITY });
-    return { matched: false, count: waiting.length, capacity: MATCH_CAPACITY };
+  const waiting = await prisma.matchQueueEntry.findMany({ where: { mode }, orderBy: { queuedAt: "asc" } });
+  if (waiting.length < cfg.capacity) {
+    broadcast({ type: "queue_update", mode, count: waiting.length, capacity: cfg.capacity });
+    return { matched: false, count: waiting.length, capacity: cfg.capacity };
   }
 
-  const chosenIds = waiting.slice(0, MATCH_CAPACITY).map((c) => c.userId);
-  const problems = await prisma.problem.findMany({
-    orderBy: { ratingValue: "asc" },
-    take: MAX_ROUNDS,
-    select: { id: true },
-  });
+  const chosenIds = waiting.slice(0, cfg.capacity).map((c) => c.userId);
+  const problems = await pickProblems(mode);
   if (problems.length < 2) {
     // Not enough problems seeded to run a real match — leave the queue as-is.
     throw new Error("not enough problems available to start a match");
@@ -67,7 +101,8 @@ export async function joinQueue(
     await tx.matchQueueEntry.deleteMany({ where: { userId: { in: chosenIds } } });
     return tx.match.create({
       data: {
-        roundDurationSec: ROUND_DURATION_SEC,
+        mode,
+        roundDurationSec: cfg.roundDurationSec,
         players: { create: chosenIds.map((id) => ({ userId: id })) },
         problems: { create: problems.map((p, i) => ({ problemId: p.id, round: i })) },
       },
@@ -75,26 +110,33 @@ export async function joinQueue(
   });
 
   broadcast({ type: "match_found", matchId: match.id, playerIds: chosenIds });
-
-  const remaining = await prisma.matchQueueEntry.count();
-  broadcast({ type: "queue_update", count: remaining, capacity: MATCH_CAPACITY });
+  await broadcastQueueCount(mode);
 
   await withLock(match.id, () => _beginRound(match.id, 0));
   return { matched: true, matchId: match.id };
 }
 
 export async function leaveQueue(userId: string): Promise<void> {
+  const entry = await prisma.matchQueueEntry.findUnique({ where: { userId } });
   await prisma.matchQueueEntry.deleteMany({ where: { userId } });
-  const count = await prisma.matchQueueEntry.count();
-  broadcast({ type: "queue_update", count, capacity: MATCH_CAPACITY });
+  if (entry) await broadcastQueueCount(entry.mode as MatchMode);
 }
 
-export async function queueStatus(userId: string): Promise<{ queued: boolean; count: number; capacity: number }> {
-  const [count, mine] = await Promise.all([
-    prisma.matchQueueEntry.count(),
+export async function queueStatus(userId: string): Promise<{
+  queuedMode: MatchMode | null;
+  counts: Record<MatchMode, number>;
+  capacities: Record<MatchMode, number>;
+}> {
+  const [mine, royale, duel] = await Promise.all([
     prisma.matchQueueEntry.findUnique({ where: { userId } }),
+    prisma.matchQueueEntry.count({ where: { mode: "ROYALE" } }),
+    prisma.matchQueueEntry.count({ where: { mode: "DUEL" } }),
   ]);
-  return { queued: !!mine, count, capacity: MATCH_CAPACITY };
+  return {
+    queuedMode: (mine?.mode as MatchMode) ?? null,
+    counts: { ROYALE: royale, DUEL: duel },
+    capacities: { ROYALE: MODE_CONFIG.ROYALE.capacity, DUEL: MODE_CONFIG.DUEL.capacity },
+  };
 }
 
 async function loadProblemForRound(matchId: string, round: number): Promise<MatchProblemView | null> {
@@ -115,6 +157,18 @@ async function solvedCurrentRoundSet(matchId: string, round: number, roundStarte
     select: { userId: true },
   });
   return new Set(acSubs.map((s) => s.userId));
+}
+
+/** DUEL: earliest accepted submitter this round, or null if nobody has solved it. */
+async function earliestSolver(matchId: string, round: number, roundStartedAt: Date): Promise<string | null> {
+  const mp = await prisma.matchProblem.findUnique({ where: { matchId_round: { matchId, round } } });
+  if (!mp) return null;
+  const first = await prisma.submission.findFirst({
+    where: { matchId, problemId: mp.problemId, verdict: "ACCEPTED", createdAt: { gte: roundStartedAt } },
+    orderBy: { createdAt: "asc" },
+    select: { userId: true },
+  });
+  return first?.userId ?? null;
 }
 
 export async function getMatchState(matchId: string): Promise<MatchStateView | null> {
@@ -139,6 +193,7 @@ export async function getMatchState(matchId: string): Promise<MatchStateView | n
       status: p.status as MatchPlayerView["status"],
       solvedCurrentRound: solved.has(p.userId),
       eliminatedRound: p.eliminatedRound,
+      roundWins: p.roundWins,
       placement: p.placement,
     }))
     .sort((a, b) => {
@@ -146,11 +201,13 @@ export async function getMatchState(matchId: string): Promise<MatchStateView | n
       if (a.placement != null && b.placement != null) return a.placement - b.placement;
       if (a.placement != null) return -1;
       if (b.placement != null) return 1;
+      if (a.roundWins !== b.roundWins) return b.roundWins - a.roundWins;
       return a.handle.localeCompare(b.handle);
     });
 
   return {
     id: match.id,
+    mode: match.mode as MatchMode,
     status: match.status as MatchStateView["status"],
     round: match.round,
     totalRounds,
@@ -208,9 +265,71 @@ async function _finishMatch(matchId: string, winnerIds: string[]): Promise<void>
   forgetMatchSoon(matchId);
 }
 
+/** DUEL: rank by round wins — every player on the top score shares placement 1 (a draw). */
+async function _finishDuel(matchId: string): Promise<void> {
+  clearMatchTimer(matchId);
+  await prisma.match.update({ where: { id: matchId }, data: { status: "FINISHED", endedAt: new Date() } });
+
+  const players = await prisma.matchPlayer.findMany({ where: { matchId }, orderBy: { roundWins: "desc" } });
+  let placement = 1;
+  for (let i = 0; i < players.length; i++) {
+    if (i > 0 && players[i].roundWins < players[i - 1].roundWins) placement = i + 1;
+    await prisma.matchPlayer.update({
+      where: { matchId_userId: { matchId, userId: players[i].userId } },
+      data: { placement },
+    });
+  }
+
+  await broadcastMatchState(matchId);
+  forgetMatchSoon(matchId);
+}
+
+/**
+ * DUEL round resolution. The round ends the moment someone solves the problem
+ * (first AC takes it) or when the timer expires (drawn round, no point).
+ * The match ends early once a player has clinched a majority of the rounds.
+ */
+async function _transitionDuelRound(matchId: string, opts: { force: boolean }): Promise<void> {
+  const match = await prisma.match.findUnique({ where: { id: matchId } });
+  if (!match || match.status !== "ACTIVE") return;
+
+  const winnerId = await earliestSolver(matchId, match.round, match.roundStartedAt);
+
+  // AC-driven check that raced a rejudge/rollback and found no solver: the
+  // round isn't over — refresh views and let the timer keep running.
+  if (!opts.force && !winnerId) {
+    await broadcastMatchState(matchId);
+    return;
+  }
+
+  clearMatchTimer(matchId);
+
+  let wins = 0;
+  if (winnerId) {
+    const updated = await prisma.matchPlayer.update({
+      where: { matchId_userId: { matchId, userId: winnerId } },
+      data: { roundWins: { increment: 1 } },
+    });
+    wins = updated.roundWins;
+  }
+
+  const totalRounds = await prisma.matchProblem.count({ where: { matchId } });
+  const winsToClinch = Math.floor(totalRounds / 2) + 1;
+  const isLastRound = match.round + 1 >= totalRounds;
+
+  if (wins >= winsToClinch || isLastRound) {
+    await _finishDuel(matchId);
+  } else {
+    await _beginRound(matchId, match.round + 1);
+  }
+}
+
+/** ROYALE round resolution: timer-based elimination of everyone unsolved. */
 async function _transitionRound(matchId: string, opts: { force: boolean }): Promise<void> {
   const match = await prisma.match.findUnique({ where: { id: matchId } });
   if (!match || match.status !== "ACTIVE") return;
+
+  if (match.mode === "DUEL") return _transitionDuelRound(matchId, opts);
 
   const alive = await prisma.matchPlayer.findMany({ where: { matchId, status: "ALIVE" } });
   if (alive.length === 0) return; // defensive — shouldn't happen

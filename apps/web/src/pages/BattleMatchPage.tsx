@@ -62,13 +62,26 @@ function RoundTimer({ endsAt }: { endsAt: string | null }) {
   );
 }
 
-function playerStatus(p: MatchPlayerView, matchStatus: string): { label: string; color: string } {
-  if (matchStatus === "FINISHED" && p.placement != null) {
+function playerStatus(p: MatchPlayerView, match: MatchStateView): { label: string; color: string } {
+  const isDraw = match.status === "FINISHED" && match.players.filter((q) => q.placement === 1).length > 1;
+  if (match.status === "FINISHED" && p.placement != null) {
+    if (p.placement === 1 && isDraw) return { label: "🤝 Draw", color: "var(--v-tle)" };
     return { label: p.placement === 1 ? "🏆 Winner" : `#${p.placement}`, color: p.placement === 1 ? "var(--v-ac)" : "var(--txt-2)" };
   }
   if (p.status === "ELIMINATED") return { label: `Eliminated · R${(p.eliminatedRound ?? 0) + 1}`, color: "var(--v-wa)" };
   if (p.solvedCurrentRound) return { label: "Solved ✓", color: "var(--v-ac)" };
   return { label: "Racing…", color: "var(--txt-3)" };
+}
+
+/** DUEL: round-win pips, one per round (● won, ○ not yet). */
+function WinPips({ wins, total }: { wins: number; total: number }) {
+  return (
+    <span style={{ fontFamily: "var(--mono)", fontSize: 12, letterSpacing: 2 }}>
+      {Array.from({ length: total }, (_, i) => (
+        <span key={i} style={{ color: i < wins ? "var(--v-ac)" : "var(--txt-3)" }}>{i < wins ? "●" : "○"}</span>
+      ))}
+    </span>
+  );
 }
 
 interface ConsoleEntry {
@@ -171,6 +184,9 @@ export function BattleMatchPage() {
 
   const eliminated = myPlayer?.status === "ELIMINATED";
   const finished = match.status === "FINISHED";
+  const isDuel = match.mode === "DUEL";
+  const isDraw = finished && match.players.filter((p) => p.placement === 1).length > 1;
+  const opponent = isDuel ? match.players.find((p) => p.userId !== user?.id) ?? null : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--ink)", overflow: "hidden" }}>
@@ -178,18 +194,35 @@ export function BattleMatchPage() {
       <header style={{ height: 52, display: "flex", alignItems: "center", padding: "0 16px", borderBottom: "1px solid var(--line)", background: "var(--panel)", flexShrink: 0, gap: 16 }}>
         <Link to="/battle" style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 15, color: "var(--txt)", textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ color: "var(--txt-3)", fontWeight: 400, fontSize: 13 }}>←</span>
-          Battle<span style={{ color: "var(--v-ac)" }}>Royale</span>
+          {isDuel ? <>1v1&nbsp;<span style={{ color: "var(--v-ac)" }}>Duel</span></> : <>Battle<span style={{ color: "var(--v-ac)" }}>Royale</span></>}
         </Link>
         <div style={{ width: 1, height: 24, background: "var(--line)" }} />
-        <div style={{ flex: 1, fontFamily: "var(--disp)", fontWeight: 600, fontSize: 14, color: "var(--txt)" }}>
+        <div style={{ flex: 1, fontFamily: "var(--disp)", fontWeight: 600, fontSize: 14, color: "var(--txt)", display: "flex", alignItems: "center", gap: 12 }}>
           {finished ? "Match Finished" : `Round ${match.round + 1} / ${match.totalRounds}`}
+          {isDuel && myPlayer && opponent && (
+            <span style={{ fontFamily: "var(--mono)", fontSize: 14, color: "var(--txt-2)" }}>
+              <span style={{ color: "var(--v-ac)", fontWeight: 700 }}>{myPlayer.roundWins}</span>
+              {" — "}
+              <span style={{ color: "var(--v-wa)", fontWeight: 700 }}>{opponent.roundWins}</span>
+            </span>
+          )}
         </div>
         {!finished && <RoundTimer endsAt={match.roundEndsAt} />}
       </header>
 
       {finished && (
         <div style={{ padding: "10px 20px", background: "rgba(63,185,80,0.08)", borderBottom: "1px solid rgba(63,185,80,0.2)", color: "var(--v-ac)", fontSize: 13, fontWeight: 600, textAlign: "center" }}>
-          {myPlayer?.placement === 1 ? "🏆 You won the match!" : myPlayer?.placement ? `Match over — you placed #${myPlayer.placement}` : "Match over"}
+          {isDuel
+            ? isDraw
+              ? "🤝 The duel ended in a draw."
+              : myPlayer?.placement === 1
+                ? "🏆 You won the duel!"
+                : `You lost the duel${opponent ? ` to ${opponent.handle}` : ""}.`
+            : myPlayer?.placement === 1
+              ? "🏆 You won the match!"
+              : myPlayer?.placement
+                ? `Match over — you placed #${myPlayer.placement}`
+                : "Match over"}
         </div>
       )}
       {!finished && eliminated && (
@@ -310,7 +343,7 @@ export function BattleMatchPage() {
           </div>
           {match.players.map((p) => {
             const tier = tierOf(p.rating);
-            const st = playerStatus(p, match.status);
+            const st = playerStatus(p, match);
             const isMe = p.userId === user?.id;
             return (
               <div
@@ -325,6 +358,7 @@ export function BattleMatchPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontFamily: "var(--mono)", fontSize: 13, fontWeight: 700, color: tier.color }}>{p.handle}</span>
                   {isMe && <span style={{ fontSize: 10, color: "var(--txt-3)" }}>(you)</span>}
+                  {isDuel && <span style={{ marginLeft: "auto" }}><WinPips wins={p.roundWins} total={match.totalRounds} /></span>}
                 </div>
                 <span style={{ fontSize: 11, fontWeight: 600, color: st.color }}>{st.label}</span>
               </div>

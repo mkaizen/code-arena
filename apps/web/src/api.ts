@@ -1,4 +1,4 @@
-import type { Language, LeaderboardRow, MatchStateView } from "@arena/shared";
+import type { Language, LeaderboardRow, MatchMode, MatchStateView } from "@arena/shared";
 
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
@@ -163,15 +163,18 @@ export const api = {
   adminFinalizeContest: (id: string): Promise<{ finalized: number; changes: { userId: string; before: number; after: number }[] }> =>
     req(`/admin/contests/${id}/finalize`, { method: "POST" }),
 
-  // Battle Royale
-  queueForMatch: (): Promise<{ matched: boolean; matchId?: string; count: number; capacity: number }> =>
-    req("/matches/queue", { method: "POST", body: "{}" }),
+  // Real-time matches (Battle Royale + 1v1 Duel)
+  queueForMatch: (mode: MatchMode): Promise<{ matched: boolean; matchId?: string; count: number; capacity: number }> =>
+    req("/matches/queue", { method: "POST", body: JSON.stringify({ mode }) }),
 
   leaveMatchQueue: (): Promise<{ ok: boolean }> =>
     req("/matches/queue", { method: "DELETE" }),
 
-  matchQueueStatus: (): Promise<{ queued: boolean; count: number; capacity: number }> =>
-    req("/matches/queue/status"),
+  matchQueueStatus: (): Promise<{
+    queuedMode: MatchMode | null;
+    counts: Record<MatchMode, number>;
+    capacities: Record<MatchMode, number>;
+  }> => req("/matches/queue/status"),
 
   match: (id: string): Promise<MatchStateView> => req(`/matches/${id}`),
 };
