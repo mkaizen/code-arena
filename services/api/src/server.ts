@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import websocket from "@fastify/websocket";
+import rateLimit from "@fastify/rate-limit";
 import { env } from "./env.js";
 import { authRoutes } from "./routes/auth.js";
 import { problemRoutes } from "./routes/problems.js";
@@ -31,8 +32,10 @@ async function main() {
   const app = Fastify({ logger: true });
 
   await app.register(cors, { origin: true });
-  await app.register(jwt, { secret: env.JWT_SECRET });
+  // Tokens expire; the web app renews on boot via POST /auth/refresh.
+  await app.register(jwt, { secret: env.JWT_SECRET, sign: { expiresIn: "7d" } });
   await app.register(websocket);
+  await app.register(rateLimit, { global: false });
 
   app.decorate("authenticate", async (req: any, reply: any) => {
     try { await req.jwtVerify(); }

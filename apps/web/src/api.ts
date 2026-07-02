@@ -116,6 +116,9 @@ export const api = {
   oauth: (provider: "github" | "google", code: string): Promise<StoredUser> =>
     req("/auth/oauth", { method: "POST", body: JSON.stringify({ provider, code }) }),
 
+  refresh: (): Promise<StoredUser> =>
+    req("/auth/refresh", { method: "POST", body: "{}" }),
+
   problems: (params?: { difficulty?: string; tag?: string }): Promise<ProblemSummary[]> => {
     const qs = new URLSearchParams();
     if (params?.difficulty) qs.set("difficulty", params.difficulty);

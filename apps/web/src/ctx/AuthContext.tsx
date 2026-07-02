@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { api, storeUser, clearUser, getMe, type StoredUser } from "../api.js";
 
 interface AuthContextValue {
@@ -13,6 +13,15 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<StoredUser | null>(() => getMe());
+
+  // Tokens expire (7d server-side). Renew on boot so active users slide
+  // forward; if the stored token is expired/revoked, drop the session.
+  useEffect(() => {
+    if (!getMe()) return;
+    api.refresh()
+      .then((u) => { storeUser(u); setUser(u); })
+      .catch(() => { clearUser(); setUser(null); });
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     const u = await api.login(email, password);
