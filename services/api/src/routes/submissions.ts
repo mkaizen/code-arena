@@ -14,7 +14,11 @@ const submitBody = z.object({
 
 export async function submissionRoutes(app: FastifyInstance) {
   // FR-10/NFR-4: accept submissions only within the contest window.
-  app.post("/submissions", { onRequest: [app.authenticate] }, async (req, reply) => {
+  // Rate-limited per IP so a single client can't flood the judge queue.
+  app.post("/submissions", {
+    onRequest: [app.authenticate],
+    config: { rateLimit: { max: 12, timeWindow: "1 minute" } },
+  }, async (req, reply) => {
     const b = submitBody.parse(req.body);
     const userId = req.user.sub;
 
@@ -34,6 +38,29 @@ export async function submissionRoutes(app: FastifyInstance) {
       if (now >= end) return reply.code(409).send({ error: "contest window has closed" });
       if (contest.problems.length === 0) return reply.code(400).send({ error: "problem not in this contest" });
       if (contest.registrations.length === 0) return reply.code(403).send({ error: "not registered for contest" });
+
+      // Sequential unlock, enforced server-side (the UI gate alone is
+      // bypassable): a problem is open only if every earlier one is solved.
+      const ladder = await prisma.contestProblem.findMany({
+        where: { contestId: b.contestId },
+        orderBy: { label: "asc" },
+        select: { problemId: true },
+      });
+      const acs = await prisma.submission.findMany({
+        where: { userId, contestId: b.contestId, verdict: "ACCEPTED" },
+        select: { problemId: true },
+        distinct: ["problemId"],
+      });
+      const solved = new Set(acs.map((a) => a.problemId));
+      let unlockedCount = 0;
+      for (let i = 0; i < ladder.length; i++) {
+        unlockedCount = i + 1;
+        if (!solved.has(ladder[i].problemId)) break;
+      }
+      const idx = ladder.findIndex((p) => p.problemId === b.problemId);
+      if (idx >= unlockedCount) {
+        return reply.code(403).send({ error: "problem is locked — solve the previous problem first" });
+      }
 
       rated = contest.rated; // FR-25: only contest subs are rated; practice is not.
     } else if (b.matchId) {

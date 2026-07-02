@@ -20,9 +20,12 @@ const oauthBody = z.object({
   code: z.string(),
 });
 
+// Credential endpoints are brute-forceable — throttle per IP.
+const authLimit = { rateLimit: { max: 10, timeWindow: "1 minute" } };
+
 export async function authRoutes(app: FastifyInstance) {
   // FR-1: email/password registration.
-  app.post("/auth/register", async (req, reply) => {
+  app.post("/auth/register", { config: authLimit }, async (req, reply) => {
     const b = registerBody.parse(req.body);
     const passwordHash = await hashPassword(b.password);
     const user = await prisma.user.create({
@@ -31,7 +34,7 @@ export async function authRoutes(app: FastifyInstance) {
     return reply.send({ id: user.id, token: app.jwt.sign({ sub: user.id }), handle: user.handle, rating: user.rating, role: user.role });
   });
 
-  app.post("/auth/login", async (req, reply) => {
+  app.post("/auth/login", { config: authLimit }, async (req, reply) => {
     const b = loginBody.parse(req.body);
     const user = await prisma.user.findUnique({ where: { email: b.email } });
     if (!user?.passwordHash || !(await verifyPassword(user.passwordHash, b.password))) {
@@ -41,7 +44,7 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   // FR-1: OAuth login — exchange code, upsert identity, mint our own JWT.
-  app.post("/auth/oauth", async (req, reply) => {
+  app.post("/auth/oauth", { config: authLimit }, async (req, reply) => {
     const b = oauthBody.parse(req.body);
     const id = await exchangeOAuthCode(b.provider, b.code);
 
@@ -61,6 +64,14 @@ export async function authRoutes(app: FastifyInstance) {
         data: { provider: id.provider, providerId: id.providerId, userId: user.id },
       });
     }
+    return reply.send({ id: user.id, token: app.jwt.sign({ sub: user.id }), handle: user.handle, rating: user.rating, role: user.role });
+  });
+
+  // Exchange a valid (unexpired) token for a fresh one. The web app calls
+  // this on boot, so sessions slide forward while stale tokens age out.
+  app.post("/auth/refresh", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const user = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!user) return reply.code(401).send({ error: "unauthorized" });
     return reply.send({ id: user.id, token: app.jwt.sign({ sub: user.id }), handle: user.handle, rating: user.rating, role: user.role });
   });
 }
