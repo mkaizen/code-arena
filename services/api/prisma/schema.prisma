@@ -236,6 +236,12 @@ model MatchPlayer {
   placement       Int?
   // DUEL: rounds won so far (first accepted submission takes the round).
   roundWins       Int               @default(0)
+  // Left the match — no recent heartbeat past the grace window (FR: forfeit).
+  forfeited       Boolean           @default(false)
+  lastSeenAt      DateTime?
+  // Rating snapshot applied when the match finishes (matches are rated).
+  ratingBefore    Int?
+  ratingAfter     Int?
 
   @@id([matchId, userId])
 }

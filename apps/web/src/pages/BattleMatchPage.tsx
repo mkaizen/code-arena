@@ -68,9 +68,21 @@ function playerStatus(p: MatchPlayerView, match: MatchStateView): { label: strin
     if (p.placement === 1 && isDraw) return { label: "🤝 Draw", color: "var(--v-tle)" };
     return { label: p.placement === 1 ? "🏆 Winner" : `#${p.placement}`, color: p.placement === 1 ? "var(--v-ac)" : "var(--txt-2)" };
   }
+  if (p.forfeited) return { label: "Forfeited · left", color: "var(--v-wa)" };
   if (p.status === "ELIMINATED") return { label: `Eliminated · R${(p.eliminatedRound ?? 0) + 1}`, color: "var(--v-wa)" };
   if (p.solvedCurrentRound) return { label: "Solved ✓", color: "var(--v-ac)" };
   return { label: "Racing…", color: "var(--txt-3)" };
+}
+
+function RatingDelta({ before, after }: { before: number | null; after: number | null }) {
+  if (before == null || after == null) return null;
+  const d = after - before;
+  const color = d > 0 ? "var(--v-ac)" : d < 0 ? "var(--v-wa)" : "var(--txt-3)";
+  return (
+    <span style={{ fontFamily: "var(--mono)", fontSize: 11, color }}>
+      {d >= 0 ? "+" : ""}{d} <span style={{ color: "var(--txt-3)" }}>→ {after}</span>
+    </span>
+  );
 }
 
 /** DUEL: round-win pips, one per round (● won, ○ not yet). */
@@ -158,6 +170,18 @@ export function BattleMatchPage() {
 
   const myPlayer = match?.players.find((p) => p.userId === user?.id) ?? null;
   const canSubmit = !!user && !!match && match.status === "ACTIVE" && myPlayer?.status === "ALIVE" && !!problem;
+
+  // Heartbeat while the match is live so we aren't judged as having abandoned
+  // it. Fires immediately on mount, then every 10s (grace is 30s server-side).
+  const amPlaying = !!id && match?.status === "ACTIVE" && myPlayer?.status === "ALIVE";
+  useEffect(() => {
+    if (!amPlaying || !id) return;
+    let stopped = false;
+    const beat = () => { if (!stopped) api.matchHeartbeat(id).catch(() => {}); };
+    beat();
+    const timer = setInterval(beat, 10_000);
+    return () => { stopped = true; clearInterval(timer); };
+  }, [amPlaying, id]);
 
   async function handleSubmit() {
     if (!canSubmit || !problem || !id) return;
@@ -360,7 +384,10 @@ export function BattleMatchPage() {
                   {isMe && <span style={{ fontSize: 10, color: "var(--txt-3)" }}>(you)</span>}
                   {isDuel && <span style={{ marginLeft: "auto" }}><WinPips wins={p.roundWins} total={match.totalRounds} /></span>}
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 600, color: st.color }}>{st.label}</span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: st.color }}>{st.label}</span>
+                  {finished && <RatingDelta before={p.ratingBefore} after={p.ratingAfter} />}
+                </div>
               </div>
             );
           })}

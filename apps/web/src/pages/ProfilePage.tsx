@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { tierOf } from "@arena/shared";
+import { tierOf, type MatchHistoryEntry, type MatchRecord } from "@arena/shared";
 import { TopBar } from "../components/TopBar.js";
 import { api, type Submission } from "../api.js";
 import { useAuth } from "../ctx/AuthContext.js";
@@ -46,6 +46,8 @@ function timeAgo(iso: string): string {
 export function ProfilePage() {
   const { user } = useAuth();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [record, setRecord] = useState<MatchRecord | null>(null);
+  const [matches, setMatches] = useState<MatchHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -54,6 +56,9 @@ export function ProfilePage() {
       .then(setSubmissions)
       .catch(() => {})
       .finally(() => setLoading(false));
+    api.matchHistory()
+      .then((h) => { setRecord(h.record); setMatches(h.matches); })
+      .catch(() => {});
   }, [user]);
 
   if (!user) {
@@ -150,9 +155,56 @@ export function ProfilePage() {
                 </span>
                 <span style={{ marginLeft: 6, color: "var(--txt-3)", fontSize: 12 }}>submissions</span>
               </div>
+              {record && record.played > 0 && (
+                <div>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 18, fontWeight: 700 }}>
+                    <span style={{ color: "var(--v-ac)" }}>{record.wins}</span>
+                    <span style={{ color: "var(--txt-3)" }}>–</span>
+                    <span style={{ color: "var(--v-wa)" }}>{record.losses}</span>
+                  </span>
+                  <span style={{ marginLeft: 6, color: "var(--txt-3)", fontSize: 12 }}>match W–L</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
+
+        {/* Match History */}
+        {matches.length > 0 && (
+          <>
+            <h2 style={{ fontFamily: "var(--disp)", fontSize: 16, fontWeight: 600, color: "var(--txt)", marginBottom: 12 }}>
+              Match History
+            </h2>
+            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden", marginBottom: 24 }}>
+              {matches.map((m, i) => {
+                const delta = m.ratingBefore != null && m.ratingAfter != null ? m.ratingAfter - m.ratingBefore : null;
+                const place = m.placement != null ? (m.mode === "DUEL" ? (m.won ? "Win" : "Loss") : `#${m.placement} / ${m.playerCount}`) : "—";
+                return (
+                  <div
+                    key={m.matchId}
+                    style={{
+                      display: "grid", gridTemplateColumns: "90px 1fr 90px 70px", gap: 8, padding: "10px 16px", alignItems: "center",
+                      borderBottom: i < matches.length - 1 ? "1px solid var(--line-soft)" : "none", fontSize: 13,
+                    }}
+                  >
+                    <span style={{ fontFamily: "var(--disp)", fontSize: 11, fontWeight: 700, color: m.mode === "DUEL" ? "var(--v-tle)" : "var(--v-ac)" }}>
+                      {m.mode === "DUEL" ? "1v1 Duel" : "Royale"}
+                    </span>
+                    <span style={{ color: m.won ? "var(--v-ac)" : "var(--txt-2)", fontWeight: 600 }}>
+                      {m.won ? "🏆 " : ""}{place}
+                    </span>
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 12, color: delta == null ? "var(--txt-3)" : delta >= 0 ? "var(--v-ac)" : "var(--v-wa)" }}>
+                      {delta == null ? "—" : `${delta >= 0 ? "+" : ""}${delta}`}
+                    </span>
+                    <span style={{ color: "var(--txt-3)", fontSize: 11, textAlign: "right" }}>
+                      {m.endedAt ? timeAgo(m.endedAt) : ""}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
 
         {/* Recent Submissions */}
         <h2

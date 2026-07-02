@@ -55,8 +55,31 @@ export interface MatchPlayerView {
   eliminatedRound: number | null;
   /** DUEL: rounds this player has won so far. */
   roundWins: number;
+  /** Left the match (disconnected past the grace window). */
+  forfeited: boolean;
   /** Final standing once the match is FINISHED (1 = winner). */
   placement: number | null;
+  /** Rating change applied at finish (matches are rated); null while active. */
+  ratingBefore: number | null;
+  ratingAfter: number | null;
+}
+
+/** One finished match in a user's history (profile page). */
+export interface MatchHistoryEntry {
+  matchId: string;
+  mode: MatchMode;
+  placement: number | null;
+  playerCount: number;
+  won: boolean;
+  ratingBefore: number | null;
+  ratingAfter: number | null;
+  endedAt: string | null;
+}
+
+export interface MatchRecord {
+  wins: number;
+  losses: number;
+  played: number;
 }
 
 export interface MatchProblemView {
