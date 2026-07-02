@@ -1,11 +1,16 @@
 import type { FastifyInstance } from "fastify";
-import { joinQueue, leaveQueue, queueStatus, getMatchState, MATCH_CAPACITY } from "../match/engine.js";
+import { z } from "zod";
+import { joinQueue, leaveQueue, queueStatus, getMatchState, MODE_CONFIG } from "../match/engine.js";
+
+const queueBody = z.object({ mode: z.enum(["ROYALE", "DUEL"]).default("ROYALE") });
 
 export async function matchRoutes(app: FastifyInstance) {
   app.post("/matches/queue", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { mode } = queueBody.parse(req.body ?? {});
     try {
-      const result = await joinQueue(req.user.sub);
-      if (result.matched) return { matched: true, matchId: result.matchId, count: MATCH_CAPACITY, capacity: MATCH_CAPACITY };
+      const result = await joinQueue(req.user.sub, mode);
+      const capacity = MODE_CONFIG[mode].capacity;
+      if (result.matched) return { matched: true, matchId: result.matchId, count: capacity, capacity };
       return { matched: false, matchId: undefined, count: result.count, capacity: result.capacity };
     } catch (err) {
       return reply.code(503).send({ error: (err as Error).message });

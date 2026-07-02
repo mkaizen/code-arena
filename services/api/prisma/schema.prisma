@@ -42,6 +42,11 @@ enum MatchStatus {
   FINISHED
 }
 
+enum MatchMode {
+  ROYALE // 6-player elimination ladder
+  DUEL   // 1v1, best-of-3 rounds, first AC takes the round
+}
+
 enum MatchPlayerStatus {
   ALIVE
   ELIMINATED
@@ -196,6 +201,7 @@ model RatingChange {
 
 model Match {
   id               String      @id @default(cuid())
+  mode             MatchMode   @default(ROYALE)
   status           MatchStatus @default(ACTIVE)
   round            Int         @default(0)
   roundStartedAt   DateTime    @default(now())
@@ -228,12 +234,15 @@ model MatchPlayer {
   status          MatchPlayerStatus @default(ALIVE)
   eliminatedRound Int?
   placement       Int?
+  // DUEL: rounds won so far (first accepted submission takes the round).
+  roundWins       Int               @default(0)
 
   @@id([matchId, userId])
 }
 
 model MatchQueueEntry {
-  user     User     @relation(fields: [userId], references: [id])
-  userId   String   @id
-  queuedAt DateTime @default(now())
+  user     User      @relation(fields: [userId], references: [id])
+  userId   String    @id
+  mode     MatchMode @default(ROYALE)
+  queuedAt DateTime  @default(now())
 }

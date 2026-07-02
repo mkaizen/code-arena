@@ -23,7 +23,7 @@ export type ServerEvent =
   | { type: "verdict"; submissionId: string; result: import("./verdicts.js").JudgeResult }
   | { type: "leaderboard"; contestId: string; frozen: boolean; rows: LeaderboardRow[] }
   | { type: "contest"; contestId: string; state: "upcoming" | "live" | "ended" }
-  | { type: "queue_update"; count: number; capacity: number }
+  | { type: "queue_update"; mode: MatchMode; count: number; capacity: number }
   | { type: "match_found"; matchId: string; playerIds: string[] }
   | { type: "match_state"; match: MatchStateView };
 
@@ -37,7 +37,12 @@ export interface LeaderboardRow {
   perProblem: Record<string, { solved: boolean; tries: number; timeMin: number }>;
 }
 
-/** Battle Royale: 6 players race an ascending-difficulty problem ladder. */
+/**
+ * Real-time matches. ROYALE: 6 players race an ascending-difficulty ladder,
+ * miss a round's timer and you're eliminated. DUEL: 1v1 best-of-3 — first
+ * accepted submission takes the round, most round wins takes the match.
+ */
+export type MatchMode = "ROYALE" | "DUEL";
 export type MatchPlayerStatus = "ALIVE" | "ELIMINATED";
 
 export interface MatchPlayerView {
@@ -48,6 +53,8 @@ export interface MatchPlayerView {
   /** Whether this player has an accepted submission for the current round. */
   solvedCurrentRound: boolean;
   eliminatedRound: number | null;
+  /** DUEL: rounds this player has won so far. */
+  roundWins: number;
   /** Final standing once the match is FINISHED (1 = winner). */
   placement: number | null;
 }
@@ -62,6 +69,7 @@ export interface MatchProblemView {
 
 export interface MatchStateView {
   id: string;
+  mode: MatchMode;
   status: "ACTIVE" | "FINISHED";
   round: number;
   totalRounds: number;
