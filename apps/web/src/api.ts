@@ -1,4 +1,4 @@
-import type { Language, LeaderboardRow, MatchMode, MatchStateView } from "@arena/shared";
+import type { Language, LeaderboardRow, MatchHistoryEntry, MatchMode, MatchRecord, MatchStateView } from "@arena/shared";
 
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
@@ -180,4 +180,10 @@ export const api = {
   }> => req("/matches/queue/status"),
 
   match: (id: string): Promise<MatchStateView> => req(`/matches/${id}`),
+
+  matchHeartbeat: (id: string): Promise<{ ok: boolean }> =>
+    req(`/matches/${id}/heartbeat`, { method: "POST", body: "{}" }),
+
+  matchHistory: (): Promise<{ record: MatchRecord; matches: MatchHistoryEntry[] }> =>
+    req("/matches/history"),
 };

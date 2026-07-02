@@ -1,5 +1,6 @@
 import { prisma } from "../db.js";
 import { broadcast } from "../ws.js";
+import { recomputeRatings } from "../rating/elo.js";
 import type { MatchMode, MatchPlayerView, MatchProblemView, MatchStateView } from "@arena/shared";
 
 /**
@@ -11,6 +12,11 @@ export const MODE_CONFIG: Record<MatchMode, { capacity: number; roundDurationSec
   ROYALE: { capacity: 6, roundDurationSec: 300, rounds: 6 },
   DUEL: { capacity: 2, roundDurationSec: 600, rounds: 3 },
 };
+
+// A player with no heartbeat for this long is treated as having abandoned the
+// match and is forfeited. Seeded at match start, refreshed by the client while
+// the match page is open (see recordHeartbeat).
+const FORFEIT_GRACE_MS = 30_000;
 
 // Per-match scheduled round-timeout timer and a serialization lock so a
 // timer firing can never race a concurrent AC-driven advance (both paths
@@ -103,7 +109,9 @@ export async function joinQueue(
       data: {
         mode,
         roundDurationSec: cfg.roundDurationSec,
-        players: { create: chosenIds.map((id) => ({ userId: id })) },
+        // Seed lastSeenAt so players get a full grace window to open the page
+        // before the forfeit sweep can consider them absent.
+        players: { create: chosenIds.map((id) => ({ userId: id, lastSeenAt: new Date() })) },
         problems: { create: problems.map((p, i) => ({ problemId: p.id, round: i })) },
       },
     });
@@ -194,7 +202,10 @@ export async function getMatchState(matchId: string): Promise<MatchStateView | n
       solvedCurrentRound: solved.has(p.userId),
       eliminatedRound: p.eliminatedRound,
       roundWins: p.roundWins,
+      forfeited: p.forfeited,
       placement: p.placement,
+      ratingBefore: p.ratingBefore,
+      ratingAfter: p.ratingAfter,
     }))
     .sort((a, b) => {
       if (a.status !== b.status) return a.status === "ALIVE" ? -1 : 1;
@@ -238,6 +249,40 @@ async function _beginRound(matchId: string, round: number): Promise<void> {
   timers.set(matchId, timer);
 }
 
+/**
+ * Rate a finished match: turn final placements into Elo deltas (reusing the
+ * contest recompute) and persist them on both the player rows and User.rating.
+ * Placement ties share a rank, so a duel draw is a no-op wash — as it should be.
+ */
+async function _applyMatchRatings(matchId: string): Promise<void> {
+  const players = await prisma.matchPlayer.findMany({
+    where: { matchId },
+    include: { user: { select: { rating: true } } },
+  });
+  const participants = players
+    .filter((p) => p.placement != null)
+    .map((p) => ({ userId: p.userId, rating: p.user.rating, rank: p.placement! }));
+  if (participants.length < 2) return;
+
+  const deltas = recomputeRatings(participants);
+  await prisma.$transaction([
+    ...deltas.map((d) =>
+      prisma.matchPlayer.update({
+        where: { matchId_userId: { matchId, userId: d.userId } },
+        data: { ratingBefore: d.before, ratingAfter: d.after },
+      }),
+    ),
+    ...deltas.map((d) => prisma.user.update({ where: { id: d.userId }, data: { rating: d.after } })),
+  ]);
+}
+
+/** Shared finish tail: rate, push final state, then release in-memory state. */
+async function _settleFinished(matchId: string): Promise<void> {
+  await _applyMatchRatings(matchId);
+  await broadcastMatchState(matchId);
+  forgetMatchSoon(matchId);
+}
+
 async function _finishMatch(matchId: string, winnerIds: string[]): Promise<void> {
   clearMatchTimer(matchId);
   await prisma.match.update({ where: { id: matchId }, data: { status: "FINISHED", endedAt: new Date() } });
@@ -261,8 +306,7 @@ async function _finishMatch(matchId: string, winnerIds: string[]): Promise<void>
     placement += ids.length;
   }
 
-  await broadcastMatchState(matchId);
-  forgetMatchSoon(matchId);
+  await _settleFinished(matchId);
 }
 
 /** DUEL: rank by round wins — every player on the top score shares placement 1 (a draw). */
@@ -280,8 +324,7 @@ async function _finishDuel(matchId: string): Promise<void> {
     });
   }
 
-  await broadcastMatchState(matchId);
-  forgetMatchSoon(matchId);
+  await _settleFinished(matchId);
 }
 
 /**
@@ -393,5 +436,69 @@ export async function sweepOverdueMatches(): Promise<void> {
     if (now >= deadline + 2000) {
       await onRoundTimeout(m.id);
     }
+  }
+}
+
+/** The match page pings this while open so the player isn't judged absent. */
+export async function recordHeartbeat(matchId: string, userId: string): Promise<void> {
+  await prisma.matchPlayer.updateMany({
+    where: { matchId, userId },
+    data: { lastSeenAt: new Date() },
+  });
+}
+
+/** Forfeit still-in players whose heartbeat has gone stale (they left). */
+async function _forfeitStale(matchId: string): Promise<void> {
+  const match = await prisma.match.findUnique({ where: { id: matchId } });
+  if (!match || match.status !== "ACTIVE") return;
+
+  const cutoff = Date.now() - FORFEIT_GRACE_MS;
+  const alive = await prisma.matchPlayer.findMany({ where: { matchId, status: "ALIVE" } });
+  const stale = alive.filter((p) => (p.lastSeenAt?.getTime() ?? 0) < cutoff);
+  if (stale.length === 0) return;
+
+  const staleIds = stale.map((p) => p.userId);
+  await prisma.matchPlayer.updateMany({
+    where: { matchId, userId: { in: staleIds } },
+    data: { status: "ELIMINATED", forfeited: true, eliminatedRound: match.round },
+  });
+  const survivors = alive.filter((p) => !staleIds.includes(p.userId));
+
+  if (match.mode === "DUEL") {
+    // A forfeit hands the win to whoever's still here, regardless of round score.
+    clearMatchTimer(matchId);
+    await prisma.match.update({ where: { id: matchId }, data: { status: "FINISHED", endedAt: new Date() } });
+    if (survivors.length === 1) {
+      await prisma.matchPlayer.update({
+        where: { matchId_userId: { matchId, userId: survivors[0].userId } },
+        data: { placement: 1 },
+      });
+      await prisma.matchPlayer.updateMany({ where: { matchId, userId: { in: staleIds } }, data: { placement: 2 } });
+    } else {
+      // Both gone — rank by whatever round wins stand.
+      const all = await prisma.matchPlayer.findMany({ where: { matchId }, orderBy: { roundWins: "desc" } });
+      let placement = 1;
+      for (let i = 0; i < all.length; i++) {
+        if (i > 0 && all[i].roundWins < all[i - 1].roundWins) placement = i + 1;
+        await prisma.matchPlayer.update({ where: { matchId_userId: { matchId, userId: all[i].userId } }, data: { placement } });
+      }
+    }
+    await _settleFinished(matchId);
+    return;
+  }
+
+  // ROYALE: a forfeit is just an elimination. End if it thins the field to one.
+  if (survivors.length <= 1) {
+    await _finishMatch(matchId, survivors.map((p) => p.userId));
+  } else {
+    await broadcastMatchState(matchId);
+  }
+}
+
+/** Periodic: forfeit absent players across all active matches. */
+export async function sweepForfeits(): Promise<void> {
+  const active = await prisma.match.findMany({ where: { status: "ACTIVE" }, select: { id: true } });
+  for (const m of active) {
+    await withLock(m.id, () => _forfeitStale(m.id));
   }
 }
