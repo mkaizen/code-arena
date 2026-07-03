@@ -150,35 +150,56 @@ async function main() {
   console.log(`admin user: admin@codearena.dev / password123`);
 
   // ── Problems ──────────────────────────────────────────────────────────────
+  // Each problem is isolated in its own try/catch so a single failure (e.g. a
+  // transient object-storage error) can't abort the whole seed and leave the
+  // bank half-populated. Re-running also self-heals any problem an earlier
+  // partial run left pointing at a placeholder tests key.
   const problemIds: string[] = [];
+  let nCreated = 0, nRepaired = 0, nSkipped = 0, nFailed = 0;
   for (const p of PROBLEMS) {
-    const existing = await prisma.problem.findUnique({ where: { slug: p.slug } });
-    if (existing) {
-      problemIds.push(existing.id);
-      console.log(`problem ${p.slug} already exists, skipping`);
-      continue;
+    try {
+      const existing = await prisma.problem.findUnique({ where: { slug: p.slug } });
+      if (existing) {
+        problemIds.push(existing.id);
+        if (existing.testsKey.startsWith("problems/pending/")) {
+          // Tests never got uploaded on a prior run — repair it now.
+          const testsKey = `problems/${existing.id}/tests.tar`;
+          await packAndUpload(testsKey, p.tests);
+          await prisma.problem.update({ where: { id: existing.id }, data: { testsKey, testCount: p.tests.length } });
+          nRepaired++;
+          console.log(`problem ${p.slug} repaired (tests re-uploaded)`);
+        } else {
+          nSkipped++;
+        }
+        continue;
+      }
+      const created = await prisma.problem.create({
+        data: {
+          slug: p.slug,
+          title: p.title,
+          statement: p.statement,
+          difficulty: p.difficulty,
+          ratingValue: p.ratingValue,
+          tags: p.tags,
+          timeMs: 2000,
+          memoryKb: 262_144,
+          testsKey: `problems/pending/${p.slug}.tar`,
+          testCount: p.tests.length,
+          samples: { create: p.samples.map((s, i) => ({ input: s.input, output: s.output, ordinal: i })) },
+        },
+      });
+      const testsKey = `problems/${created.id}/tests.tar`;
+      await packAndUpload(testsKey, p.tests);
+      await prisma.problem.update({ where: { id: created.id }, data: { testsKey } });
+      problemIds.push(created.id);
+      nCreated++;
+      console.log(`created problem ${p.slug} (${created.id})`);
+    } catch (err) {
+      nFailed++;
+      console.error(`FAILED to seed problem ${p.slug}: ${err instanceof Error ? err.message : err}`);
     }
-    const created = await prisma.problem.create({
-      data: {
-        slug: p.slug,
-        title: p.title,
-        statement: p.statement,
-        difficulty: p.difficulty,
-        ratingValue: p.ratingValue,
-        tags: p.tags,
-        timeMs: 2000,
-        memoryKb: 262_144,
-        testsKey: `problems/pending/${p.slug}.tar`,
-        testCount: p.tests.length,
-        samples: { create: p.samples.map((s, i) => ({ input: s.input, output: s.output, ordinal: i })) },
-      },
-    });
-    const testsKey = `problems/${created.id}/tests.tar`;
-    await packAndUpload(testsKey, p.tests);
-    await prisma.problem.update({ where: { id: created.id }, data: { testsKey } });
-    problemIds.push(created.id);
-    console.log(`created problem ${p.slug} (${created.id}), tests -> ${testsKey}`);
   }
+  console.log(`problems: ${nCreated} created, ${nRepaired} repaired, ${nSkipped} already present, ${nFailed} failed (of ${PROBLEMS.length} total)`);
 
   // ── Live contest ──────────────────────────────────────────────────────────
   // Always reset start time so re-running seed gives a fresh live contest.
