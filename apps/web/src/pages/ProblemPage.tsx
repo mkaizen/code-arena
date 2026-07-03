@@ -10,6 +10,7 @@ import { loadDraft, saveDraft } from "../draft.js";
 import { STARTERS, LANG_LABELS, MONACO_LANG } from "../starters.js";
 import { useRun } from "../hooks/useRun.js";
 import { RunResults } from "../components/RunResults.js";
+import { sanitizeStatement } from "../sanitize.js";
 import type { ServerEvent } from "@arena/shared";
 
 function verdictColor(verdict: string): string {
@@ -196,7 +197,7 @@ export function ProblemPage() {
             </div>
 
             <div
-              dangerouslySetInnerHTML={{ __html: problem.statement }}
+              dangerouslySetInnerHTML={{ __html: sanitizeStatement(problem.statement) }}
               style={{ color: "var(--txt-2)", fontSize: 13, lineHeight: 1.8, marginBottom: 20 }}
             />
 
