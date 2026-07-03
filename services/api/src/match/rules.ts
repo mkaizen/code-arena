@@ -1,0 +1,55 @@
+/**
+ * Pure match-outcome rules, factored out of the DB-coupled engine so they can
+ * be unit-tested in isolation. No prisma, no timers, no side effects.
+ */
+
+/** DUEL: round wins needed to clinch a best-of-N (majority). */
+export function winsToClinch(totalRounds: number): number {
+  return Math.floor(totalRounds / 2) + 1;
+}
+
+/**
+ * ROYALE final ranking. Winners share placement 1; everyone else is ranked by
+ * how far they got — a later elimination round is a better placement, and
+ * players knocked out in the same round share a rank (standard competition
+ * ranking, so the next rank skips by the size of the tie group).
+ */
+export function placementsByElimination(
+  players: { userId: string; eliminatedRound: number | null }[],
+  winnerIds: string[],
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  const winners = new Set(winnerIds);
+  for (const id of winnerIds) out[id] = 1;
+
+  const byRound = new Map<number, string[]>();
+  for (const p of players) {
+    if (winners.has(p.userId)) continue;
+    const r = p.eliminatedRound ?? -1;
+    if (!byRound.has(r)) byRound.set(r, []);
+    byRound.get(r)!.push(p.userId);
+  }
+
+  let placement = winnerIds.length + 1;
+  for (const round of [...byRound.keys()].sort((a, b) => b - a)) {
+    const ids = byRound.get(round)!;
+    for (const id of ids) out[id] = placement;
+    placement += ids.length;
+  }
+  return out;
+}
+
+/**
+ * DUEL final ranking by round wins (most wins first). Equal wins share a rank,
+ * so two players on the same score both get placement 1 — a draw.
+ */
+export function placementsByScore(players: { userId: string; roundWins: number }[]): Record<string, number> {
+  const sorted = [...players].sort((a, b) => b.roundWins - a.roundWins);
+  const out: Record<string, number> = {};
+  let placement = 1;
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i].roundWins < sorted[i - 1].roundWins) placement = i + 1;
+    out[sorted[i].userId] = placement;
+  }
+  return out;
+}

@@ -23,3 +23,6 @@ services/api/prisma/*.db
 
 # docker volumes (if bind-mounted locally)
 .data/
+
+# Local DB backups (see backup service)
+/backups/

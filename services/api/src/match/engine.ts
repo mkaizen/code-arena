@@ -1,6 +1,7 @@
 import { prisma } from "../db.js";
 import { broadcast } from "../ws.js";
 import { recomputeRatings } from "../rating/elo.js";
+import { winsToClinch, placementsByElimination, placementsByScore } from "./rules.js";
 import type { MatchMode, MatchPlayerView, MatchProblemView, MatchStateView } from "@arena/shared";
 
 /**
@@ -287,24 +288,13 @@ async function _finishMatch(matchId: string, winnerIds: string[]): Promise<void>
   clearMatchTimer(matchId);
   await prisma.match.update({ where: { id: matchId }, data: { status: "FINISHED", endedAt: new Date() } });
 
-  if (winnerIds.length > 0) {
-    await prisma.matchPlayer.updateMany({ where: { matchId, userId: { in: winnerIds } }, data: { placement: 1 } });
-  }
-
-  // Standard competition ranking: later elimination = better placement, ties share a rank.
-  const eliminated = await prisma.matchPlayer.findMany({ where: { matchId, userId: { notIn: winnerIds } } });
-  const byRound = new Map<number, string[]>();
-  for (const p of eliminated) {
-    const r = p.eliminatedRound ?? -1;
-    if (!byRound.has(r)) byRound.set(r, []);
-    byRound.get(r)!.push(p.userId);
-  }
-  let placement = winnerIds.length + 1;
-  for (const round of [...byRound.keys()].sort((a, b) => b - a)) {
-    const ids = byRound.get(round)!;
-    await prisma.matchPlayer.updateMany({ where: { matchId, userId: { in: ids } }, data: { placement } });
-    placement += ids.length;
-  }
+  const players = await prisma.matchPlayer.findMany({ where: { matchId }, select: { userId: true, eliminatedRound: true } });
+  const placements = placementsByElimination(players, winnerIds);
+  await prisma.$transaction(
+    Object.entries(placements).map(([userId, placement]) =>
+      prisma.matchPlayer.update({ where: { matchId_userId: { matchId, userId } }, data: { placement } }),
+    ),
+  );
 
   await _settleFinished(matchId);
 }
@@ -314,15 +304,13 @@ async function _finishDuel(matchId: string): Promise<void> {
   clearMatchTimer(matchId);
   await prisma.match.update({ where: { id: matchId }, data: { status: "FINISHED", endedAt: new Date() } });
 
-  const players = await prisma.matchPlayer.findMany({ where: { matchId }, orderBy: { roundWins: "desc" } });
-  let placement = 1;
-  for (let i = 0; i < players.length; i++) {
-    if (i > 0 && players[i].roundWins < players[i - 1].roundWins) placement = i + 1;
-    await prisma.matchPlayer.update({
-      where: { matchId_userId: { matchId, userId: players[i].userId } },
-      data: { placement },
-    });
-  }
+  const players = await prisma.matchPlayer.findMany({ where: { matchId }, select: { userId: true, roundWins: true } });
+  const placements = placementsByScore(players);
+  await prisma.$transaction(
+    Object.entries(placements).map(([userId, placement]) =>
+      prisma.matchPlayer.update({ where: { matchId_userId: { matchId, userId } }, data: { placement } }),
+    ),
+  );
 
   await _settleFinished(matchId);
 }
@@ -357,10 +345,9 @@ async function _transitionDuelRound(matchId: string, opts: { force: boolean }): 
   }
 
   const totalRounds = await prisma.matchProblem.count({ where: { matchId } });
-  const winsToClinch = Math.floor(totalRounds / 2) + 1;
   const isLastRound = match.round + 1 >= totalRounds;
 
-  if (wins >= winsToClinch || isLastRound) {
+  if (wins >= winsToClinch(totalRounds) || isLastRound) {
     await _finishDuel(matchId);
   } else {
     await _beginRound(matchId, match.round + 1);
@@ -476,12 +463,13 @@ async function _forfeitStale(matchId: string): Promise<void> {
       await prisma.matchPlayer.updateMany({ where: { matchId, userId: { in: staleIds } }, data: { placement: 2 } });
     } else {
       // Both gone — rank by whatever round wins stand.
-      const all = await prisma.matchPlayer.findMany({ where: { matchId }, orderBy: { roundWins: "desc" } });
-      let placement = 1;
-      for (let i = 0; i < all.length; i++) {
-        if (i > 0 && all[i].roundWins < all[i - 1].roundWins) placement = i + 1;
-        await prisma.matchPlayer.update({ where: { matchId_userId: { matchId, userId: all[i].userId } }, data: { placement } });
-      }
+      const all = await prisma.matchPlayer.findMany({ where: { matchId }, select: { userId: true, roundWins: true } });
+      const placements = placementsByScore(all);
+      await prisma.$transaction(
+        Object.entries(placements).map(([userId, placement]) =>
+          prisma.matchPlayer.update({ where: { matchId_userId: { matchId, userId } }, data: { placement } }),
+        ),
+      );
     }
     await _settleFinished(matchId);
     return;

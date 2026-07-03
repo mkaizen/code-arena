@@ -7,6 +7,9 @@
 #
 # Seed demo data once (admin user, problems, a live contest):
 #   docker compose --env-file .env.prod -f docker-compose.prod.yml --profile seed up seed
+#
+# The `backup` service writes nightly gzipped pg_dumps to ./backups on the host.
+# Copy that directory off-box (scp/rsync) for real disaster recovery.
 services:
   postgres:
     image: postgres:16
@@ -21,6 +24,24 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # Nightly gzipped pg_dump into ./backups on the host (retained 7 days by
+  # default). Copy ./backups off-box periodically for real disaster recovery.
+  backup:
+    image: postgres:16
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-arena}
+      POSTGRES_DB: ${POSTGRES_DB:-arena}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup.sh:/backup.sh:ro
+    entrypoint: ["sh", "/backup.sh"]
 
   redis:
     image: redis:7
