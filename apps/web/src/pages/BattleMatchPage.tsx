@@ -7,6 +7,8 @@ import { useAuth } from "../ctx/AuthContext.js";
 import { useWs } from "../hooks/useWs.js";
 import { loadDraft, saveDraft } from "../draft.js";
 import { STARTERS, LANG_LABELS, MONACO_LANG } from "../starters.js";
+import { useRun } from "../hooks/useRun.js";
+import { RunResults } from "../components/RunResults.js";
 
 function verdictColor(verdict: string): string {
   if (verdict === "ACCEPTED") return "var(--v-ac)";
@@ -115,6 +117,7 @@ export function BattleMatchPage() {
   const [loadError, setLoadError] = useState("");
   const pendingSubmissions = useRef<Set<string>>(new Set());
   const prevRound = useRef<number | null>(null);
+  const run = useRun(problem?.id);
 
   useEffect(() => {
     if (!id) return;
@@ -140,13 +143,14 @@ export function BattleMatchPage() {
   }, [match?.round]);
 
   const handleWsEvent = useCallback((ev: ServerEvent) => {
+    run.onEvent(ev);
     if (ev.type === "match_state" && ev.match.id === id) {
       setMatch(ev.match);
     } else if (ev.type === "verdict" && pendingSubmissions.current.has(ev.submissionId)) {
       pendingSubmissions.current.delete(ev.submissionId);
       setConsole((c) => [...c, { type: "verdict", verdict: ev.result.verdict, result: ev.result }]);
     }
-  }, [id]);
+  }, [id, run.onEvent]);
 
   useWs(handleWsEvent);
 
@@ -166,6 +170,11 @@ export function BattleMatchPage() {
     if (!problem) return;
     if (!window.confirm("Reset to the starter code? Your current code will be discarded.")) return;
     setSource(STARTERS[lang]);
+  }
+
+  function handleRun() {
+    if (!problem) return;
+    run.start(lang, source);
   }
 
   const myPlayer = match?.players.find((p) => p.userId === user?.id) ?? null;
@@ -304,6 +313,14 @@ export function BattleMatchPage() {
                   Reset
                 </button>
                 <button
+                  onClick={handleRun}
+                  disabled={run.running || !problem}
+                  title="Run against sample cases"
+                  style={{ background: "var(--panel-2)", color: "var(--txt)", fontWeight: 600, fontSize: 12, padding: "5px 14px", border: "1px solid var(--line)", borderRadius: 6, cursor: run.running ? "not-allowed" : "pointer", fontFamily: "var(--disp)", opacity: run.running ? 0.7 : 1 }}
+                >
+                  {run.running ? "Running…" : "▶ Run"}
+                </button>
+                <button
                   onClick={handleSubmit}
                   disabled={!canSubmit}
                   style={{
@@ -333,7 +350,12 @@ export function BattleMatchPage() {
 
               <div style={{ height: 130, borderTop: "1px solid var(--line)", background: "var(--panel)", overflow: "auto", padding: "8px 12px", flexShrink: 0 }}>
                 <div style={{ fontSize: 10, letterSpacing: "0.08em", color: "var(--txt-3)", marginBottom: 6, fontWeight: 600 }}>CONSOLE</div>
-                {console_.length === 0 && <div style={{ color: "var(--txt-3)", fontSize: 12 }}>No submissions yet.</div>}
+                {(run.running || run.result) && (
+                  <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid var(--line-soft)" }}>
+                    <RunResults result={run.result} running={run.running} />
+                  </div>
+                )}
+                {console_.length === 0 && !run.result && !run.running && <div style={{ color: "var(--txt-3)", fontSize: 12 }}>No submissions yet. ▶ Run tests against the samples.</div>}
                 {console_.map((entry, i) => (
                   <div key={i} style={{ marginBottom: 4, fontFamily: "var(--mono)", fontSize: 12 }}>
                     {entry.type === "error" ? (
@@ -345,6 +367,8 @@ export function BattleMatchPage() {
                         <span style={{ color: verdictColor(entry.verdict), fontWeight: 700 }}>{verdictLabel(entry.verdict)}</span>
                         {entry.result && entry.result.maxTimeMs > 0 && <span style={{ color: "var(--txt-3)" }}> · {entry.result.maxTimeMs}ms</span>}
                         {entry.result?.message && <div style={{ color: "var(--txt-2)", marginTop: 3, fontSize: 11, whiteSpace: "pre-wrap" }}>{entry.result.message}</div>}
+                        {entry.result?.failedStdout && <pre style={{ color: "var(--txt-2)", marginTop: 4, fontSize: 11, whiteSpace: "pre-wrap" }}>Your output:{"\n"}{entry.result.failedStdout}</pre>}
+                        {entry.result?.failedStderr && <pre style={{ color: "var(--v-tle)", marginTop: 4, fontSize: 11, whiteSpace: "pre-wrap" }}>Stderr:{"\n"}{entry.result.failedStderr}</pre>}
                       </span>
                     ) : (
                       <span style={{ color: "var(--txt-3)" }}>{entry.message}</span>

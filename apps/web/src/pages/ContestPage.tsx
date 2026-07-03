@@ -7,6 +7,8 @@ import { useAuth } from "../ctx/AuthContext.js";
 import { useWs } from "../hooks/useWs.js";
 import { loadDraft, saveDraft } from "../draft.js";
 import { STARTERS, LANG_LABELS, MONACO_LANG } from "../starters.js";
+import { useRun } from "../hooks/useRun.js";
+import { RunResults } from "../components/RunResults.js";
 
 interface ContestProblem extends ProblemSummary {
   letter: string;
@@ -111,6 +113,7 @@ export function ContestPage() {
   const [submittedProblems, setSubmittedProblems] = useState<Record<string, "solved" | "tried">>({});
   const [loadingProblem, setLoadingProblem] = useState(false);
   const pendingSubmissions = useRef<Map<string, string>>(new Map());
+  const run = useRun(activeProblem?.id);
 
   useEffect(() => {
     if (!id) return;
@@ -204,7 +207,13 @@ export function ContestPage() {
     }
   }
 
+  function handleRun() {
+    if (!activeProblem) return;
+    run.start(lang, getSource());
+  }
+
   const handleWsEvent = useCallback((ev: ServerEvent) => {
+    run.onEvent(ev);
     if (ev.type === "verdict") {
       const { submissionId, result } = ev;
       if (pendingSubmissions.current.has(submissionId)) {
@@ -551,6 +560,25 @@ export function ContestPage() {
                   Reset
                 </button>
                 <button
+                  onClick={handleRun}
+                  disabled={run.running}
+                  title="Run against sample cases"
+                  style={{
+                    background: "var(--panel-2)",
+                    color: "var(--txt)",
+                    fontWeight: 600,
+                    fontSize: 12,
+                    padding: "5px 14px",
+                    border: "1px solid var(--line)",
+                    borderRadius: 6,
+                    cursor: run.running ? "not-allowed" : "pointer",
+                    fontFamily: "var(--disp)",
+                    opacity: run.running ? 0.7 : 1,
+                  }}
+                >
+                  {run.running ? "Running…" : "▶ Run"}
+                </button>
+                <button
                   onClick={handleSubmit}
                   style={{
                     background: "var(--v-ac)",
@@ -600,8 +628,13 @@ export function ContestPage() {
                 <div style={{ fontSize: 10, letterSpacing: "0.08em", color: "var(--txt-3)", marginBottom: 6, fontWeight: 600 }}>
                   CONSOLE
                 </div>
-                {console_.length === 0 && (
-                  <div style={{ color: "var(--txt-3)", fontSize: 12 }}>No submissions yet.</div>
+                {(run.running || run.result) && (
+                  <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid var(--line-soft)" }}>
+                    <RunResults result={run.result} running={run.running} />
+                  </div>
+                )}
+                {console_.length === 0 && !run.result && !run.running && (
+                  <div style={{ color: "var(--txt-3)", fontSize: 12 }}>No submissions yet. Press ▶ Run to test against the samples.</div>
                 )}
                 {console_.map((entry, i) => (
                   <div key={i} style={{ marginBottom: 4, fontFamily: "var(--mono)", fontSize: 12 }}>
@@ -622,6 +655,12 @@ export function ContestPage() {
                         )}
                         {entry.result?.runtimeLog && (
                           <pre style={{ color: "var(--v-wa)", marginTop: 4, fontSize: 11, whiteSpace: "pre-wrap" }}>{entry.result.runtimeLog}</pre>
+                        )}
+                        {entry.result?.failedStdout && (
+                          <pre style={{ color: "var(--txt-2)", marginTop: 4, fontSize: 11, whiteSpace: "pre-wrap" }}>Your output:{"\n"}{entry.result.failedStdout}</pre>
+                        )}
+                        {entry.result?.failedStderr && (
+                          <pre style={{ color: "var(--v-tle)", marginTop: 4, fontSize: 11, whiteSpace: "pre-wrap" }}>Stderr:{"\n"}{entry.result.failedStderr}</pre>
                         )}
                       </span>
                     ) : (

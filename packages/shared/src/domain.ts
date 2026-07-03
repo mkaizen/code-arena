@@ -21,6 +21,7 @@ export interface SubmissionPayload {
 /** What the WebSocket pushes to clients (FR-19). */
 export type ServerEvent =
   | { type: "verdict"; submissionId: string; result: import("./verdicts.js").JudgeResult }
+  | { type: "run_result"; runId: string; result: import("./verdicts.js").RunResult }
   | { type: "leaderboard"; contestId: string; frozen: boolean; rows: LeaderboardRow[] }
   | { type: "contest"; contestId: string; state: "upcoming" | "live" | "ended" }
   | { type: "queue_update"; mode: MatchMode; count: number; capacity: number }

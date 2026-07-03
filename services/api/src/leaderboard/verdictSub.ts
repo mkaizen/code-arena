@@ -46,13 +46,20 @@ export function startVerdictSubscriber(): void {
   const u = new URL(env.REDIS_URL);
   const sub = new IORedis({ host: u.hostname, port: Number(u.port) || 6379 });
 
-  sub.subscribe("arena:verdicts", (err) => {
+  sub.subscribe("arena:verdicts", "arena:runs", (err) => {
     if (err) console.error("verdict sub failed", err);
     else console.log("verdict subscriber ready");
   });
 
-  sub.on("message", async (_ch: string, msg: string) => {
+  sub.on("message", async (ch: string, msg: string) => {
     try {
+      // Run results (test-against-samples) just fan straight out to the client.
+      if (ch === "arena:runs") {
+        const { runId, result } = JSON.parse(msg);
+        broadcast({ type: "run_result", runId, result });
+        return;
+      }
+
       const { submissionId, result } = JSON.parse(msg) as VerdictMsg;
 
       broadcast({ type: "verdict", submissionId, result });

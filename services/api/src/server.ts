@@ -8,6 +8,7 @@ import { authRoutes } from "./routes/auth.js";
 import { problemRoutes } from "./routes/problems.js";
 import { contestRoutes } from "./routes/contests.js";
 import { submissionRoutes } from "./routes/submissions.js";
+import { runRoutes } from "./routes/run.js";
 import { leaderboardRoutes } from "./routes/leaderboard.js";
 import { adminRoutes } from "./routes/admin.js";
 import { matchRoutes } from "./routes/matches.js";
@@ -48,6 +49,7 @@ async function main() {
   await app.register(problemRoutes);
   await app.register(contestRoutes);
   await app.register(submissionRoutes);
+  await app.register(runRoutes);
   await app.register(leaderboardRoutes);
   await app.register(adminRoutes);
   await app.register(matchRoutes);
