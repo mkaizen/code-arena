@@ -1,3 +1,4 @@
+import http from "node:http";
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
 import { PrismaClient } from "@prisma/client";
@@ -123,6 +124,13 @@ const worker = new Worker(
 
 worker.on("ready", () => console.log("judge worker ready"));
 worker.on("failed", (job, err) => console.error("job failed", job?.id, err));
+
+// Minimal health endpoint so the container has a liveness probe — a hung event
+// loop stops answering, which flips the Docker healthcheck to unhealthy.
+const HEALTH_PORT = Number(process.env.HEALTH_PORT ?? 9090);
+http
+  .createServer((_req, res) => { res.writeHead(200, { "content-type": "text/plain" }); res.end("ok"); })
+  .listen(HEALTH_PORT, () => console.log(`judge health server on :${HEALTH_PORT}`));
 
 // ── Run (test against samples / custom input) ────────────────────────────────
 // Unlike judging, this only ever touches PUBLIC sample tests (or the user's own

@@ -9,6 +9,7 @@ import { loadDraft, saveDraft } from "../draft.js";
 import { STARTERS, LANG_LABELS, MONACO_LANG } from "../starters.js";
 import { useRun } from "../hooks/useRun.js";
 import { RunResults } from "../components/RunResults.js";
+import { sanitizeStatement } from "../sanitize.js";
 
 interface ContestProblem extends ProblemSummary {
   letter: string;
@@ -459,7 +460,7 @@ export function ContestPage() {
                 </div>
 
                 <div
-                  dangerouslySetInnerHTML={{ __html: activeProblem.statement }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeStatement(activeProblem.statement) }}
                   style={{ color: "var(--txt-2)", fontSize: 13, lineHeight: 1.7, marginBottom: 16 }}
                 />
 

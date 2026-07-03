@@ -9,6 +9,7 @@ import { loadDraft, saveDraft } from "../draft.js";
 import { STARTERS, LANG_LABELS, MONACO_LANG } from "../starters.js";
 import { useRun } from "../hooks/useRun.js";
 import { RunResults } from "../components/RunResults.js";
+import { sanitizeStatement } from "../sanitize.js";
 
 function verdictColor(verdict: string): string {
   if (verdict === "ACCEPTED") return "var(--v-ac)";
@@ -277,7 +278,7 @@ export function BattleMatchPage() {
                   </span>
                   <span style={{ fontSize: 12, color: "var(--txt-3)", fontFamily: "var(--mono)" }}>{problem.timeMs}ms · {Math.round(problem.memoryKb / 1024)}MB</span>
                 </div>
-                <div dangerouslySetInnerHTML={{ __html: problem.statement }} style={{ color: "var(--txt-2)", fontSize: 13, lineHeight: 1.7, marginBottom: 16 }} />
+                <div dangerouslySetInnerHTML={{ __html: sanitizeStatement(problem.statement) }} style={{ color: "var(--txt-2)", fontSize: 13, lineHeight: 1.7, marginBottom: 16 }} />
                 {problem.samples.length > 0 && (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                     {problem.samples.map((s) => (

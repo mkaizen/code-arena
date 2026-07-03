@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { tierOf } from "@arena/shared";
 import { TopBar } from "../components/TopBar.js";
 import { api, type ProblemSummary } from "../api.js";
+import { useAuth } from "../ctx/AuthContext.js";
 
 type Difficulty = "all" | "easy" | "med" | "hard";
 
@@ -21,7 +22,9 @@ function diffColor(d: string): string {
 }
 
 export function ProblemsPage() {
+  const { user } = useAuth();
   const [problems, setProblems] = useState<ProblemSummary[]>([]);
+  const [solvedIds, setSolvedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [diff, setDiff] = useState<Difficulty>("all");
@@ -39,6 +42,14 @@ export function ProblemsPage() {
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [diff, activeTag]);
+
+  // Mark which problems the signed-in user has already solved.
+  useEffect(() => {
+    if (!user) { setSolvedIds(new Set()); return; }
+    api.submissions()
+      .then((subs) => setSolvedIds(new Set(subs.filter((s) => s.verdict === "ACCEPTED").map((s) => s.problemId))))
+      .catch(() => {});
+  }, [user]);
 
   // Collect all unique tags
   const allTags = Array.from(new Set(problems.flatMap((p) => p.tags))).sort();
@@ -173,7 +184,15 @@ export function ProblemsPage() {
                   onMouseEnter={(e) => (e.currentTarget.style.background = "var(--panel-2)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
-                  <span style={{ fontSize: 14, fontWeight: 500, color: "var(--txt)" }}>{p.title}</span>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: "var(--txt)", display: "flex", alignItems: "center", gap: 8 }}>
+                    <span
+                      title={solvedIds.has(p.id) ? "Solved" : undefined}
+                      style={{ color: "var(--v-ac)", fontWeight: 700, width: 14, flexShrink: 0, visibility: solvedIds.has(p.id) ? "visible" : "hidden" }}
+                    >
+                      ✓
+                    </span>
+                    {p.title}
+                  </span>
                   <span
                     style={{
                       fontSize: 11,
