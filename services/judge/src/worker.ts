@@ -5,16 +5,13 @@ import { Verdict, type JudgeResult, type Language, type RunResult, type RunCaseR
 import { RECIPES } from "./recipes.js";
 import { runInSandbox } from "./sandbox.js";
 import { loadTests } from "./storage.js";
+import { normalize } from "./normalize.js";
 
 const prisma = new PrismaClient();
 const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
 const { hostname, port } = new URL(redisUrl);
 const connection = { host: hostname, port: Number(port) || 6379, maxRetriesPerRequest: null as null };
 const pub = new IORedis({ host: hostname, port: Number(port) || 6379 });
-
-function normalize(s: string): string {
-  return s.replace(/\r\n/g, "\n").split("\n").map((l) => l.replace(/\s+$/, "")).join("\n").replace(/\n+$/, "");
-}
 
 async function judge(submissionId: string): Promise<JudgeResult> {
   const sub = await prisma.submission.findUniqueOrThrow({

@@ -4,13 +4,15 @@
   "version": "0.1.0",
   "description": "Competitive coding contest platform — timed contests, sandboxed judging, live leaderboards, ratings.",
   "packageManager": "pnpm@9.7.0",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
+    "test": "vitest run",
     "db:generate": "pnpm --filter @arena/api prisma generate",
     "db:migrate": "pnpm --filter @arena/api prisma migrate dev",
     "db:deploy": "pnpm --filter @arena/api prisma migrate deploy",
@@ -20,6 +22,7 @@
   },
   "devDependencies": {
     "turbo": "^2.0.9",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.0"
   }
 }
