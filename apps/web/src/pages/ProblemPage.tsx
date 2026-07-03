@@ -8,6 +8,8 @@ import { useAuth } from "../ctx/AuthContext.js";
 import { useWs } from "../hooks/useWs.js";
 import { loadDraft, saveDraft } from "../draft.js";
 import { STARTERS, LANG_LABELS, MONACO_LANG } from "../starters.js";
+import { useRun } from "../hooks/useRun.js";
+import { RunResults } from "../components/RunResults.js";
 import type { ServerEvent } from "@arena/shared";
 
 function verdictColor(verdict: string): string {
@@ -57,6 +59,10 @@ export function ProblemPage() {
   const [console_, setConsole] = useState<string>("");
   const [consoleColor, setConsoleColor] = useState("var(--txt-2)");
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [bottomTab, setBottomTab] = useState<"console" | "run">("console");
+  const [showCustom, setShowCustom] = useState(false);
+  const [customInput, setCustomInput] = useState("");
+  const run = useRun(problem?.id);
 
   useEffect(() => {
     if (!slug) return;
@@ -85,6 +91,7 @@ export function ProblemPage() {
   }, [problem, lang]);
 
   useWs((ev: ServerEvent) => {
+    run.onEvent(ev);
     if (ev.type === "verdict" && ev.submissionId === pendingId) {
       setPendingId(null);
       const color = verdictColor(ev.result.verdict);
@@ -94,6 +101,8 @@ export function ProblemPage() {
       if (ev.result.message) msg += `\n${ev.result.message}`;
       if (ev.result.compileLog) msg += `\n\n${ev.result.compileLog}`;
       if (ev.result.runtimeLog) msg += `\n\n${ev.result.runtimeLog}`;
+      if (ev.result.failedStdout) msg += `\n\nYour output on that test:\n${ev.result.failedStdout}`;
+      if (ev.result.failedStderr) msg += `\n\nStderr (debug prints):\n${ev.result.failedStderr}`;
       setConsole(msg);
       if (problem) {
         setSubmissions((prev) => [
@@ -133,6 +142,15 @@ export function ProblemPage() {
       setConsole((e as Error).message);
       setConsoleColor("var(--v-wa)");
     }
+  }
+
+  function handleRun() {
+    if (!problem || !user) {
+      setBottomTab("run");
+      return;
+    }
+    setBottomTab("run");
+    run.start(lang, source, showCustom && customInput.trim() ? customInput : undefined);
   }
 
   return (
@@ -307,6 +325,10 @@ export function ProblemPage() {
                   <option key={k} value={k}>{v}</option>
                 ))}
               </select>
+              <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--txt-3)", cursor: "pointer" }}>
+                <input type="checkbox" checked={showCustom} onChange={(e) => setShowCustom(e.target.checked)} />
+                Custom input
+              </label>
               <div style={{ flex: 1 }} />
               <button
                 onClick={handleReset}
@@ -326,6 +348,25 @@ export function ProblemPage() {
                 Reset
               </button>
               <button
+                onClick={handleRun}
+                disabled={run.running}
+                title="Run against sample cases"
+                style={{
+                  background: "var(--panel-2)",
+                  color: "var(--txt)",
+                  fontWeight: 600,
+                  fontSize: 12,
+                  padding: "5px 14px",
+                  border: "1px solid var(--line)",
+                  borderRadius: 6,
+                  cursor: run.running ? "not-allowed" : "pointer",
+                  fontFamily: "var(--disp)",
+                  opacity: run.running ? 0.7 : 1,
+                }}
+              >
+                {run.running ? "Running…" : "▶ Run"}
+              </button>
+              <button
                 onClick={handleSubmit}
                 style={{
                   background: "var(--v-ac)",
@@ -342,6 +383,18 @@ export function ProblemPage() {
                 Submit
               </button>
             </div>
+
+            {showCustom && (
+              <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--line)", background: "var(--panel)", flexShrink: 0 }}>
+                <textarea
+                  value={customInput}
+                  onChange={(e) => setCustomInput(e.target.value)}
+                  placeholder="Custom stdin for ▶ Run (leave blank to use samples)…"
+                  rows={2}
+                  style={{ width: "100%", boxSizing: "border-box", background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--txt)", fontFamily: "var(--mono)", fontSize: 12, padding: "6px 8px", resize: "vertical" }}
+                />
+              </div>
+            )}
 
             {/* Monaco editor */}
             <div style={{ flex: 1, minHeight: 0 }}>
@@ -365,32 +418,45 @@ export function ProblemPage() {
               />
             </div>
 
-            {/* Console */}
+            {/* Console / Run results (tabbed) */}
             <div
               style={{
-                height: 100,
+                height: 190,
                 borderTop: "1px solid var(--line)",
                 background: "var(--panel)",
-                padding: "8px 12px",
+                display: "flex",
+                flexDirection: "column",
                 flexShrink: 0,
               }}
             >
-              <div style={{ fontSize: 10, letterSpacing: "0.08em", color: "var(--txt-3)", marginBottom: 4, fontWeight: 600 }}>
-                CONSOLE
+              <div style={{ display: "flex", gap: 4, padding: "6px 12px 0", flexShrink: 0 }}>
+                {(["console", "run"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setBottomTab(t)}
+                    style={{
+                      fontSize: 10, letterSpacing: "0.08em", fontWeight: 600, padding: "4px 10px",
+                      background: bottomTab === t ? "var(--panel-2)" : "transparent",
+                      border: "1px solid " + (bottomTab === t ? "var(--line)" : "transparent"),
+                      borderBottom: "none", borderRadius: "5px 5px 0 0",
+                      color: bottomTab === t ? "var(--txt)" : "var(--txt-3)", cursor: "pointer", fontFamily: "var(--disp)",
+                    }}
+                  >
+                    {t === "console" ? "CONSOLE" : "RUN RESULTS"}
+                  </button>
+                ))}
               </div>
-              <pre
-                style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: 12,
-                  color: consoleColor,
-                  margin: 0,
-                  whiteSpace: "pre-wrap",
-                  overflow: "auto",
-                  maxHeight: 60,
-                }}
-              >
-                {console_ || "Submit your solution to see results."}
-              </pre>
+              <div style={{ flex: 1, overflow: "auto", padding: "8px 12px" }}>
+                {bottomTab === "console" ? (
+                  <pre style={{ fontFamily: "var(--mono)", fontSize: 12, color: consoleColor, margin: 0, whiteSpace: "pre-wrap" }}>
+                    {console_ || "Submit your solution to see results."}
+                  </pre>
+                ) : run.result || run.running ? (
+                  <RunResults result={run.result} running={run.running} />
+                ) : (
+                  <div style={{ color: "var(--txt-3)", fontSize: 12 }}>Press ▶ Run to test against the sample cases.</div>
+                )}
+              </div>
             </div>
           </div>
         </div>

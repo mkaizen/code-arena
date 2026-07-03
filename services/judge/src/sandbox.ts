@@ -8,6 +8,7 @@ import type { Recipe } from "./recipes.js";
 export interface RunOutcome {
   verdict: Verdict | null; // null means "ran cleanly, compare output"
   stdout: string;
+  stderr: string; // captured program stderr (debug prints), always populated
   timeMs: number;
   memoryKb: number;
   compileLog?: string;
@@ -39,18 +40,19 @@ export async function runInSandbox(
         memoryKb: 512 * 1024,
       });
       if (c.code !== 0) {
-        return { verdict: Verdict.CE, stdout: "", timeMs: 0, memoryKb: 0, compileLog: c.stderr.slice(0, 4000) };
+        return { verdict: Verdict.CE, stdout: "", stderr: c.stderr.slice(0, 4000), timeMs: 0, memoryKb: 0, compileLog: c.stderr.slice(0, 4000) };
       }
     }
 
     const r = await dockerRun(recipe, dir, recipe.run, input, limits);
-    if (r.timedOut) return { verdict: Verdict.TLE, stdout: "", timeMs: r.timeMs, memoryKb: r.memoryKb };
-    if (r.oom) return { verdict: Verdict.MLE, stdout: "", timeMs: r.timeMs, memoryKb: r.memoryKb };
+    const stderr = r.stderr.slice(0, 4000);
+    if (r.timedOut) return { verdict: Verdict.TLE, stdout: r.stdout, stderr, timeMs: r.timeMs, memoryKb: r.memoryKb };
+    if (r.oom) return { verdict: Verdict.MLE, stdout: r.stdout, stderr, timeMs: r.timeMs, memoryKb: r.memoryKb };
     if (r.code !== 0) {
       const detail = r.stderr.trim() || `process exited with code ${r.code}`;
-      return { verdict: Verdict.RE, stdout: r.stdout, timeMs: r.timeMs, memoryKb: r.memoryKb, runtimeLog: detail.slice(0, 4000) };
+      return { verdict: Verdict.RE, stdout: r.stdout, stderr, timeMs: r.timeMs, memoryKb: r.memoryKb, runtimeLog: detail.slice(0, 4000) };
     }
-    return { verdict: null, stdout: r.stdout, timeMs: r.timeMs, memoryKb: r.memoryKb };
+    return { verdict: null, stdout: r.stdout, stderr, timeMs: r.timeMs, memoryKb: r.memoryKb };
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

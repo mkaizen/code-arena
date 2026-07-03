@@ -132,6 +132,9 @@ export const api = {
   submit: (body: { problemId: string; contestId?: string; matchId?: string; language: Language; source: string }): Promise<{ id: string; verdict: string }> =>
     req("/submissions", { method: "POST", body: JSON.stringify(body) }),
 
+  run: (body: { problemId: string; language: Language; source: string; customInput?: string }): Promise<{ runId: string }> =>
+    req("/run", { method: "POST", body: JSON.stringify(body) }),
+
   submissions: (): Promise<Submission[]> => req("/submissions"),
 
   contests: (): Promise<Contest[]> => req("/contests"),

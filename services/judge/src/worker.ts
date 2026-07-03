@@ -1,7 +1,7 @@
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
 import { PrismaClient } from "@prisma/client";
-import { Verdict, type JudgeResult, type Language } from "@arena/shared";
+import { Verdict, type JudgeResult, type Language, type RunResult, type RunCaseResult } from "@arena/shared";
 import { RECIPES } from "./recipes.js";
 import { runInSandbox } from "./sandbox.js";
 import { loadTests } from "./storage.js";
@@ -45,6 +45,10 @@ async function judge(submissionId: string): Promise<JudgeResult> {
       result.verdict = v;
       result.failedCase = i + 1;
       result.message = explain(v, i + 1, tests.length, limits, out);
+      // Surface the user's OWN output on the failing case (their prints), so
+      // stray debug output is obvious. Hidden input/expected are never shown.
+      if (out.stdout) result.failedStdout = out.stdout.slice(0, 2000);
+      if (out.stderr) result.failedStderr = out.stderr.slice(0, 2000);
       break;
     }
   }
@@ -122,3 +126,85 @@ const worker = new Worker(
 
 worker.on("ready", () => console.log("judge worker ready"));
 worker.on("failed", (job, err) => console.error("job failed", job?.id, err));
+
+// ── Run (test against samples / custom input) ────────────────────────────────
+// Unlike judging, this only ever touches PUBLIC sample tests (or the user's own
+// custom input), so it can safely return full I/O — the whole point is debugging.
+
+interface RunJob {
+  runId: string;
+  problemId: string;
+  language: Language;
+  source: string;
+  customInput?: string;
+}
+
+const TRUNC = 4000;
+
+async function doRun(job: RunJob): Promise<RunResult> {
+  const recipe = RECIPES[job.language];
+  const problem = await prisma.problem.findUniqueOrThrow({
+    where: { id: job.problemId },
+    include: { samples: { orderBy: { ordinal: "asc" } } },
+  });
+  const limits = { timeMs: problem.timeMs, memoryKb: problem.memoryKb };
+
+  // Custom input runs once with no expected output; otherwise run every sample.
+  const jobs = job.customInput != null
+    ? [{ label: "Custom Input", input: job.customInput, expected: null as string | null }]
+    : problem.samples.map((s, i) => ({ label: `Sample ${i + 1}`, input: s.input, expected: s.output }));
+
+  const cases: RunCaseResult[] = [];
+  let compileLog: string | undefined;
+
+  for (const t of jobs) {
+    const out = await runInSandbox(recipe, job.source, t.input, limits);
+
+    if (out.verdict === Verdict.CE) {
+      compileLog = out.compileLog;
+      // A compile error fails everything the same way — record once and stop.
+      cases.push({ label: t.label, input: t.input.slice(0, TRUNC), expected: t.expected, stdout: "", stderr: "", timeMs: 0, status: "COMPILATION_ERROR" });
+      break;
+    }
+
+    let status: RunCaseResult["status"];
+    if (out.verdict === Verdict.RE) status = "RUNTIME_ERROR";
+    else if (out.verdict === Verdict.TLE) status = "TIME_LIMIT_EXCEEDED";
+    else if (out.verdict === Verdict.MLE) status = "MEMORY_LIMIT_EXCEEDED";
+    else if (t.expected == null) status = "RAN";
+    else status = normalize(out.stdout) === normalize(t.expected) ? "PASS" : "FAIL";
+
+    cases.push({
+      label: t.label,
+      input: t.input.slice(0, TRUNC),
+      expected: t.expected == null ? null : t.expected.slice(0, TRUNC),
+      stdout: out.stdout.slice(0, TRUNC),
+      stderr: out.stderr.slice(0, TRUNC),
+      timeMs: out.timeMs,
+      status,
+    });
+  }
+
+  return { runId: job.runId, compileLog, cases };
+}
+
+const runWorker = new Worker(
+  "run",
+  async (job) => {
+    const data = job.data as RunJob;
+    let result: RunResult;
+    try {
+      result = await doRun(data);
+    } catch (err) {
+      console.error("run error", err);
+      const reason = err instanceof Error ? err.message : String(err);
+      result = { runId: data.runId, cases: [{ label: "Error", input: "", expected: null, stdout: "", stderr: reason, timeMs: 0, status: "RUNTIME_ERROR" }] };
+    }
+    await pub.publish("arena:runs", JSON.stringify({ runId: data.runId, result }));
+    return result;
+  },
+  { connection, concurrency: Number(process.env.JUDGE_CONCURRENCY ?? 2) },
+);
+
+runWorker.on("ready", () => console.log("run worker ready"));
+runWorker.on("failed", (job, err) => console.error("run job failed", job?.id, err));
