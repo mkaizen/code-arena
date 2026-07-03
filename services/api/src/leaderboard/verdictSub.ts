@@ -1,6 +1,6 @@
 import IORedis from "ioredis";
 import { env } from "../env.js";
-import { broadcast } from "../ws.js";
+import { broadcast, sendToUser } from "../ws.js";
 import { prisma } from "../db.js";
 import { recordAccepted, getLeaderboard, isFrozen, ensureFreezeSnapshot } from "./freeze.js";
 import { onAccepted as onMatchAccepted } from "../match/engine.js";
@@ -53,23 +53,24 @@ export function startVerdictSubscriber(): void {
 
   sub.on("message", async (ch: string, msg: string) => {
     try {
-      // Run results (test-against-samples) just fan straight out to the client.
+      // Run results (test-against-samples) go only to the user who ran them.
       if (ch === "arena:runs") {
-        const { runId, result } = JSON.parse(msg);
-        broadcast({ type: "run_result", runId, result });
+        const { runId, userId, result } = JSON.parse(msg);
+        if (userId) sendToUser(userId, { type: "run_result", runId, result });
         return;
       }
 
       const { submissionId, result } = JSON.parse(msg) as VerdictMsg;
 
-      broadcast({ type: "verdict", submissionId, result });
-
-      if (result.verdict !== "ACCEPTED") return;
-
       const submission = await prisma.submission.findUnique({
         where: { id: submissionId },
         select: { userId: true, contestId: true, matchId: true, rated: true },
       });
+
+      // A verdict is private to its author — never fan it out to everyone.
+      if (submission) sendToUser(submission.userId, { type: "verdict", submissionId, result });
+
+      if (result.verdict !== "ACCEPTED") return;
 
       if (submission?.matchId) {
         await onMatchAccepted(submission.matchId);

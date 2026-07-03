@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { ServerEvent } from "@arena/shared";
+import { getToken } from "../api.js";
 
 const BASE_WS = (import.meta.env.VITE_API_URL ?? "http://localhost:8080")
   .replace(/^http/, "ws");
@@ -16,7 +17,12 @@ export function useWs(onEvent: (e: ServerEvent) => void) {
 
     function connect() {
       if (closed) return;
-      ws = new WebSocket(`${BASE_WS}/ws`);
+      // Authenticate the socket so it receives this user's private events
+      // (own verdicts/run results, the matches they're in). Read the token at
+      // connect time so a reconnect after a refresh uses the current one.
+      const token = getToken();
+      const url = token ? `${BASE_WS}/ws?token=${encodeURIComponent(token)}` : `${BASE_WS}/ws`;
+      ws = new WebSocket(url);
 
       ws.onmessage = (ev) => {
         try {

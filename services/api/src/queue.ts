@@ -7,6 +7,7 @@ export interface JudgeJob {
 
 export interface RunJob {
   runId: string;
+  userId: string;
   problemId: string;
   language: string;
   source: string;
