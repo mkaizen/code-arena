@@ -1,5 +1,5 @@
 import { prisma } from "../db.js";
-import { broadcast } from "../ws.js";
+import { broadcast, sendToUsers } from "../ws.js";
 import { recomputeRatings } from "../rating/elo.js";
 import { winsToClinch, placementsByElimination, placementsByScore } from "./rules.js";
 import type { MatchMode, MatchPlayerView, MatchProblemView, MatchStateView } from "@arena/shared";
@@ -118,7 +118,7 @@ export async function joinQueue(
     });
   });
 
-  broadcast({ type: "match_found", matchId: match.id, playerIds: chosenIds });
+  sendToUsers(chosenIds, { type: "match_found", matchId: match.id, playerIds: chosenIds });
   await broadcastQueueCount(mode);
 
   await withLock(match.id, () => _beginRound(match.id, 0));
@@ -231,7 +231,7 @@ export async function getMatchState(matchId: string): Promise<MatchStateView | n
 
 async function broadcastMatchState(matchId: string): Promise<void> {
   const state = await getMatchState(matchId);
-  if (state) broadcast({ type: "match_state", match: state });
+  if (state) sendToUsers(state.players.map((p) => p.userId), { type: "match_state", match: state });
 }
 
 // ── Internal, lock-free transitions (callers must already hold the lock) ────

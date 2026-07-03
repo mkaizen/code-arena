@@ -138,6 +138,7 @@ http
 
 interface RunJob {
   runId: string;
+  userId: string;
   problemId: string;
   language: Language;
   source: string;
@@ -205,7 +206,7 @@ const runWorker = new Worker(
       const reason = err instanceof Error ? err.message : String(err);
       result = { runId: data.runId, cases: [{ label: "Error", input: "", expected: null, stdout: "", stderr: reason, timeMs: 0, status: "RUNTIME_ERROR" }] };
     }
-    await pub.publish("arena:runs", JSON.stringify({ runId: data.runId, result }));
+    await pub.publish("arena:runs", JSON.stringify({ runId: data.runId, userId: data.userId, result }));
     return result;
   },
   { connection, concurrency: Number(process.env.JUDGE_CONCURRENCY ?? 2) },

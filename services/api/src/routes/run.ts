@@ -28,7 +28,7 @@ export async function runRoutes(app: FastifyInstance) {
       const runId = randomUUID();
       await runQueue.add(
         "run",
-        { runId, problemId: b.problemId, language: b.language, source: b.source, customInput: b.customInput },
+        { runId, userId: req.user.sub, problemId: b.problemId, language: b.language, source: b.source, customInput: b.customInput },
         { removeOnComplete: 200, removeOnFail: 200 },
       );
       return reply.code(202).send({ runId });
