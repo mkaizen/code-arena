@@ -646,7 +646,7 @@ export function ContestPage() {
                         {entry.submissionId && <span style={{ color: "var(--txt-3)" }}>[{entry.submissionId.slice(0, 8)}] </span>}
                         <span style={{ color: verdictColor(entry.verdict), fontWeight: 700 }}>{verdictLabel(entry.verdict)}</span>
                         {entry.result && entry.result.maxTimeMs > 0 && (
-                          <span style={{ color: "var(--txt-3)" }}> · {entry.result.maxTimeMs}ms · {Math.round(entry.result.maxMemoryKb / 1024)}KB</span>
+                          <span style={{ color: "var(--txt-3)" }}> · {entry.result.maxTimeMs}ms{entry.result.maxMemoryKb > 0 ? ` · ${(entry.result.maxMemoryKb / 1024).toFixed(1)}MB` : ""}</span>
                         )}
                         {entry.result?.message && (
                           <div style={{ color: "var(--txt-2)", marginTop: 3, fontSize: 11, whiteSpace: "pre-wrap" }}>{entry.result.message}</div>

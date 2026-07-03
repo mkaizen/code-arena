@@ -99,6 +99,7 @@ export function ProblemPage() {
       setConsoleColor(color);
       let msg = verdictLabel(ev.result.verdict);
       if (ev.result.maxTimeMs > 0) msg += ` · ${ev.result.maxTimeMs}ms`;
+      if (ev.result.maxMemoryKb > 0) msg += ` · ${(ev.result.maxMemoryKb / 1024).toFixed(1)}MB`;
       if (ev.result.message) msg += `\n${ev.result.message}`;
       if (ev.result.compileLog) msg += `\n\n${ev.result.compileLog}`;
       if (ev.result.runtimeLog) msg += `\n\n${ev.result.runtimeLog}`;
