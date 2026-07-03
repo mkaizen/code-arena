@@ -6,6 +6,7 @@ import { ContestPage } from "./pages/ContestPage.js";
 import { ProblemsPage } from "./pages/ProblemsPage.js";
 import { ProblemPage } from "./pages/ProblemPage.js";
 import { ProfilePage } from "./pages/ProfilePage.js";
+import { UserProfilePage } from "./pages/UserProfilePage.js";
 import { GlobalLBPage } from "./pages/GlobalLBPage.js";
 import { OAuthCallbackPage } from "./pages/OAuthCallbackPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
@@ -29,6 +30,7 @@ export function App() {
           <Route path="/problems" element={<ProblemsPage />} />
           <Route path="/problems/:slug" element={<ProblemPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/u/:handle" element={<UserProfilePage />} />
           <Route path="/leaderboard" element={<GlobalLBPage />} />
           <Route path="/battle" element={<BattlePage />} />
           <Route path="/battle/:id" element={<BattleMatchPage />} />
