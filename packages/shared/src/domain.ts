@@ -83,6 +83,17 @@ export interface MatchRecord {
   played: number;
 }
 
+/** Public, read-only view of any user (their profile page). */
+export interface PublicProfile {
+  handle: string;
+  rating: number;
+  joinedAt: string;
+  solved: number;
+  submissions: number;
+  record: MatchRecord;
+  recentMatches: MatchHistoryEntry[];
+}
+
 export interface MatchProblemView {
   id: string;
   slug: string;

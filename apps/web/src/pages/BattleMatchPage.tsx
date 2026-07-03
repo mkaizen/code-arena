@@ -405,7 +405,7 @@ export function BattleMatchPage() {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontFamily: "var(--mono)", fontSize: 13, fontWeight: 700, color: tier.color }}>{p.handle}</span>
+                  <Link to={`/u/${encodeURIComponent(p.handle)}`} style={{ fontFamily: "var(--mono)", fontSize: 13, fontWeight: 700, color: tier.color, textDecoration: "none" }}>{p.handle}</Link>
                   {isMe && <span style={{ fontSize: 10, color: "var(--txt-3)" }}>(you)</span>}
                   {isDuel && <span style={{ marginLeft: "auto" }}><WinPips wins={p.roundWins} total={match.totalRounds} /></span>}
                 </div>

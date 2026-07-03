@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { tierOf } from "@arena/shared";
 import { TopBar } from "../components/TopBar.js";
 import { api, type GlobalLBRow } from "../api.js";
@@ -105,16 +106,20 @@ export function GlobalLBPage() {
                   >
                     {i + 1}
                   </span>
-                  <span
+                  <Link
+                    to={`/u/${encodeURIComponent(row.handle)}`}
                     style={{
                       fontFamily: "var(--mono)",
                       fontSize: 14,
                       fontWeight: 700,
                       color: tier.color,
+                      textDecoration: "none",
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                    onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
                   >
                     {row.handle}
-                  </span>
+                  </Link>
                   <span
                     style={{
                       fontFamily: "var(--mono)",

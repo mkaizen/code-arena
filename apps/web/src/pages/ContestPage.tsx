@@ -742,9 +742,9 @@ export function ContestPage() {
                     <span style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--txt-3)", width: 20, flexShrink: 0 }}>
                       {row.rank}
                     </span>
-                    <span style={{ fontFamily: "var(--mono)", fontSize: 12, color: rowTier.color, fontWeight: 700, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <Link to={`/u/${encodeURIComponent(row.handle)}`} style={{ fontFamily: "var(--mono)", fontSize: 12, color: rowTier.color, fontWeight: 700, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: "none" }}>
                       {row.handle}
-                    </span>
+                    </Link>
                     <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
                       {visibleProblems.map((cp) => {
                         const pp = row.perProblem[cp.id];

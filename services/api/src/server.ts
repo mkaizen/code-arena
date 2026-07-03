@@ -12,6 +12,7 @@ import { runRoutes } from "./routes/run.js";
 import { leaderboardRoutes } from "./routes/leaderboard.js";
 import { adminRoutes } from "./routes/admin.js";
 import { matchRoutes } from "./routes/matches.js";
+import { userRoutes } from "./routes/users.js";
 import { wsRoutes } from "./ws.js";
 import { startVerdictSubscriber } from "./leaderboard/verdictSub.js";
 import { sweepOverdueMatches, sweepForfeits } from "./match/engine.js";
@@ -53,6 +54,7 @@ async function main() {
   await app.register(leaderboardRoutes);
   await app.register(adminRoutes);
   await app.register(matchRoutes);
+  await app.register(userRoutes);
   await app.register(wsRoutes);
 
   startVerdictSubscriber();
