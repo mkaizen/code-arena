@@ -1,9 +1,40 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, writeFile, rm, chmod } from "node:fs/promises";
+import { mkdtemp, writeFile, rm, chmod, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Verdict } from "@arena/shared";
 import type { Recipe } from "./recipes.js";
+
+const MEM_FILE = ".mem";
+
+/**
+ * Wrap a run command so the container records its own peak memory. After the
+ * program exits we read the kernel's cgroup high-water mark from inside the
+ * container (cgroup v2 `memory.peak`, falling back to v1 `max_usage_in_bytes`
+ * or current usage) and write it to /work/.mem for the host to read back. If
+ * none are readable the file is absent and memory is reported as 0 — no image
+ * rebuild is required, and nothing breaks when the counters aren't available.
+ */
+function withMemoryProbe(runArgv: string[]): string[] {
+  const script =
+    '"$@"; rc=$?; ' +
+    "{ cat /sys/fs/cgroup/memory.peak " +
+    "|| cat /sys/fs/cgroup/memory/memory.max_usage_in_bytes " +
+    "|| cat /sys/fs/cgroup/memory.current; } > /work/.mem 2>/dev/null; " +
+    "exit $rc";
+  return ["sh", "-c", script, "sh", ...runArgv];
+}
+
+/** Read the bytes recorded by withMemoryProbe and convert to KB (0 if absent). */
+async function readPeakKb(dir: string): Promise<number> {
+  try {
+    const raw = (await readFile(join(dir, MEM_FILE), "utf8")).trim();
+    const bytes = Number.parseInt(raw, 10);
+    return Number.isFinite(bytes) && bytes > 0 ? Math.round(bytes / 1024) : 0;
+  } catch {
+    return 0;
+  }
+}
 
 export interface RunOutcome {
   verdict: Verdict | null; // null means "ran cleanly, compare output"
@@ -44,15 +75,16 @@ export async function runInSandbox(
       }
     }
 
-    const r = await dockerRun(recipe, dir, recipe.run, input, limits);
+    const r = await dockerRun(recipe, dir, withMemoryProbe(recipe.run), input, limits);
     const stderr = r.stderr.slice(0, 4000);
-    if (r.timedOut) return { verdict: Verdict.TLE, stdout: r.stdout, stderr, timeMs: r.timeMs, memoryKb: r.memoryKb };
-    if (r.oom) return { verdict: Verdict.MLE, stdout: r.stdout, stderr, timeMs: r.timeMs, memoryKb: r.memoryKb };
+    const memoryKb = await readPeakKb(dir);
+    if (r.timedOut) return { verdict: Verdict.TLE, stdout: r.stdout, stderr, timeMs: r.timeMs, memoryKb };
+    if (r.oom) return { verdict: Verdict.MLE, stdout: r.stdout, stderr, timeMs: r.timeMs, memoryKb };
     if (r.code !== 0) {
       const detail = r.stderr.trim() || `process exited with code ${r.code}`;
-      return { verdict: Verdict.RE, stdout: r.stdout, stderr, timeMs: r.timeMs, memoryKb: r.memoryKb, runtimeLog: detail.slice(0, 4000) };
+      return { verdict: Verdict.RE, stdout: r.stdout, stderr, timeMs: r.timeMs, memoryKb, runtimeLog: detail.slice(0, 4000) };
     }
-    return { verdict: null, stdout: r.stdout, stderr, timeMs: r.timeMs, memoryKb: r.memoryKb };
+    return { verdict: null, stdout: r.stdout, stderr, timeMs: r.timeMs, memoryKb };
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -63,7 +95,6 @@ interface ExecResult {
   stdout: string;
   stderr: string;
   timeMs: number;
-  memoryKb: number;
   timedOut: boolean;
   oom: boolean;
 }
@@ -115,9 +146,8 @@ function dockerRun(
         stdout,
         stderr,
         timeMs: Date.now() - start,
-        memoryKb: 0, // populated from cgroup stats in a fuller build
         timedOut,
-        oom: code === 137 && !timedOut, // docker OOM kill
+        oom: code === 137 && !timedOut, // docker OOM kill (peak read separately)
       });
     });
   });
