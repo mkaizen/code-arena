@@ -55,6 +55,10 @@ export interface ProblemSummary {
   difficulty: "easy" | "med" | "hard";
   ratingValue: number;
   tags: string[];
+  /** Distinct users who have an accepted submission. */
+  solved: number;
+  /** Accepted submissions as a % of all submissions; null if never attempted. */
+  acceptance: number | null;
 }
 
 export interface Sample {
