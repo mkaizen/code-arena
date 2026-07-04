@@ -17,12 +17,14 @@ import { AdminContestNewPage } from "./pages/AdminContestNewPage.js";
 import { AdminContestFinalizePage } from "./pages/AdminContestFinalizePage.js";
 import { BattlePage } from "./pages/BattlePage.js";
 import { BattleMatchPage } from "./pages/BattleMatchPage.js";
+import { PageViewTracker } from "./components/PageViewTracker.js";
 import "./styles.css";
 
 export function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <PageViewTracker />
         <Routes>
           <Route path="/" element={<Navigate to="/contests" replace />} />
           <Route path="/login" element={<LoginPage />} />
