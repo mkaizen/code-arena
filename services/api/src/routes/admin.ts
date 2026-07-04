@@ -55,6 +55,18 @@ const problemBody = z.object({
   tests: z.array(z.object({ input: z.string(), output: z.string() })).min(1),
 });
 
+const problemUpdateBody = z.object({
+  slug: z.string().min(2).max(64).regex(/^[a-z0-9-]+$/),
+  title: z.string().min(2).max(128),
+  statement: z.string().min(1),
+  difficulty: z.enum(["easy", "med", "hard"]),
+  ratingValue: z.number().int().min(800).max(3500),
+  tags: z.array(z.string()).default([]),
+  timeMs: z.number().int().min(100).max(10_000),
+  memoryKb: z.number().int().min(16_384).max(524_288),
+  samples: z.array(z.object({ input: z.string(), output: z.string() })).min(1),
+});
+
 const contestBody = z.object({
   name: z.string().min(2).max(128),
   startsAt: z.string().datetime(),
@@ -104,6 +116,60 @@ export async function adminRoutes(app: FastifyInstance) {
     await prisma.problem.update({ where: { id: problem.id }, data: { testsKey } });
 
     return reply.code(201).send({ id: problem.id, slug: problem.slug });
+  });
+
+  // List all problems for the admin manage view.
+  app.get("/admin/problems", { onRequest: [requireAdmin] }, async () => {
+    return prisma.problem.findMany({
+      orderBy: { ratingValue: "asc" },
+      select: { id: true, slug: true, title: true, difficulty: true, ratingValue: true, testCount: true },
+    });
+  });
+
+  // Fetch one problem for editing (metadata + statement + samples; hidden test
+  // cases live in object storage and are never returned).
+  app.get("/admin/problems/:id", { onRequest: [requireAdmin] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const p = await prisma.problem.findUnique({
+      where: { id },
+      include: { samples: { orderBy: { ordinal: "asc" } } },
+    });
+    if (!p) return reply.code(404).send({ error: "not found" });
+    return {
+      id: p.id, slug: p.slug, title: p.title, statement: p.statement,
+      difficulty: p.difficulty, ratingValue: p.ratingValue, tags: p.tags,
+      timeMs: p.timeMs, memoryKb: p.memoryKb, testCount: p.testCount,
+      samples: p.samples.map((s) => ({ input: s.input, output: s.output })),
+    };
+  });
+
+  // Update metadata, statement, and samples. Hidden tests are replaced
+  // separately via PUT /admin/problems/:id/tests (below).
+  app.put("/admin/problems/:id", { onRequest: [requireAdmin] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const b = problemUpdateBody.parse(req.body);
+    const existing = await prisma.problem.findUnique({ where: { id } });
+    if (!existing) return reply.code(404).send({ error: "not found" });
+
+    await prisma.$transaction([
+      prisma.sample.deleteMany({ where: { problemId: id } }),
+      prisma.problem.update({
+        where: { id },
+        data: {
+          slug: b.slug,
+          title: b.title,
+          statement: b.statement,
+          difficulty: b.difficulty as any,
+          ratingValue: b.ratingValue,
+          tags: b.tags,
+          timeMs: b.timeMs,
+          memoryKb: b.memoryKb,
+          version: { increment: 1 }, // FR-7: bump on edit
+          samples: { create: b.samples.map((s, i) => ({ input: s.input, output: s.output, ordinal: i })) },
+        },
+      }),
+    ]);
+    return { ok: true, slug: b.slug };
   });
 
   app.put("/admin/problems/:id/tests", { onRequest: [requireAdmin] }, async (req, reply) => {

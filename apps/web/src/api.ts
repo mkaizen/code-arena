@@ -70,6 +70,29 @@ export interface Problem extends ProblemSummary {
   samples: Sample[];
 }
 
+export interface AdminProblemRow {
+  id: string;
+  slug: string;
+  title: string;
+  difficulty: "easy" | "med" | "hard";
+  ratingValue: number;
+  testCount: number;
+}
+
+export interface AdminProblemDetail {
+  id: string;
+  slug: string;
+  title: string;
+  statement: string;
+  difficulty: "easy" | "med" | "hard";
+  ratingValue: number;
+  tags: string[];
+  timeMs: number;
+  memoryKb: number;
+  testCount: number;
+  samples: { input: string; output: string }[];
+}
+
 export interface ContestProblemEntry {
   label: string;
   points: number;
@@ -158,6 +181,21 @@ export const api = {
     tests: { input: string; output: string }[];
   }): Promise<{ id: string; slug: string }> =>
     req("/admin/problems", { method: "POST", body: JSON.stringify(body) }),
+
+  adminProblems: (): Promise<AdminProblemRow[]> => req("/admin/problems"),
+
+  adminGetProblem: (id: string): Promise<AdminProblemDetail> => req(`/admin/problems/${id}`),
+
+  adminUpdateProblem: (id: string, body: {
+    slug: string; title: string; statement: string;
+    difficulty: "easy" | "med" | "hard"; ratingValue: number; tags: string[];
+    timeMs: number; memoryKb: number;
+    samples: { input: string; output: string }[];
+  }): Promise<{ ok: boolean; slug: string }> =>
+    req(`/admin/problems/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+
+  adminReplaceTests: (id: string, tests: { input: string; output: string }[]): Promise<{ ok: boolean }> =>
+    req(`/admin/problems/${id}/tests`, { method: "PUT", body: JSON.stringify({ tests }) }),
 
   adminCreateContest: (body: {
     name: string; startsAt: string; durationSec: number;

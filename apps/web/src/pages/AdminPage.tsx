@@ -14,6 +14,7 @@ export function AdminPage() {
   }
 
   const cards = [
+    { to: "/admin/problems", title: "Manage Problems", desc: "Browse the bank and edit any problem's statement, metadata, or tests." },
     { to: "/admin/problems/new", title: "Create Problem", desc: "Write a new problem, add sample I/O and test cases." },
     { to: "/admin/contests/new", title: "Create Contest", desc: "Schedule a new rated or unrated contest." },
     { to: "/admin/contests/finalize", title: "Finalize Ratings", desc: "Run Elo recompute for a finished contest." },
