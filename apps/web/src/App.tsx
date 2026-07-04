@@ -11,6 +11,8 @@ import { GlobalLBPage } from "./pages/GlobalLBPage.js";
 import { OAuthCallbackPage } from "./pages/OAuthCallbackPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
 import { AdminProblemNewPage } from "./pages/AdminProblemNewPage.js";
+import { AdminProblemsPage } from "./pages/AdminProblemsPage.js";
+import { AdminProblemEditPage } from "./pages/AdminProblemEditPage.js";
 import { AdminContestNewPage } from "./pages/AdminContestNewPage.js";
 import { AdminContestFinalizePage } from "./pages/AdminContestFinalizePage.js";
 import { BattlePage } from "./pages/BattlePage.js";
@@ -35,7 +37,9 @@ export function App() {
           <Route path="/battle" element={<BattlePage />} />
           <Route path="/battle/:id" element={<BattleMatchPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/problems" element={<AdminProblemsPage />} />
           <Route path="/admin/problems/new" element={<AdminProblemNewPage />} />
+          <Route path="/admin/problems/:id/edit" element={<AdminProblemEditPage />} />
           <Route path="/admin/contests/new" element={<AdminContestNewPage />} />
           <Route path="/admin/contests/finalize" element={<AdminContestFinalizePage />} />
         </Routes>
