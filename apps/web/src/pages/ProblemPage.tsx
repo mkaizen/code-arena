@@ -195,6 +195,9 @@ export function ProblemPage() {
               >
                 {problem.difficulty === "easy" ? "Easy" : problem.difficulty === "med" ? "Medium" : "Hard"}
               </span>
+              <span style={{ fontFamily: "var(--mono)" }}>
+                Solved by {problem.solved}{problem.acceptance != null ? ` · ${problem.acceptance}% AC` : ""}
+              </span>
             </div>
 
             <div

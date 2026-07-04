@@ -141,7 +141,7 @@ export function ProblemsPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "2fr 90px 90px 1fr",
+                gridTemplateColumns: "2fr 84px 72px 108px 1fr",
                 padding: "10px 16px",
                 borderBottom: "1px solid var(--line)",
                 fontSize: 11,
@@ -153,6 +153,7 @@ export function ProblemsPage() {
               <span>TITLE</span>
               <span>DIFFICULTY</span>
               <span>RATING</span>
+              <span>SOLVED</span>
               <span>TAGS</span>
             </div>
 
@@ -170,7 +171,7 @@ export function ProblemsPage() {
                   onClick={() => navigate(`/problems/${p.slug}`)}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "2fr 90px 90px 1fr",
+                    gridTemplateColumns: "2fr 84px 72px 108px 1fr",
                     padding: "12px 16px",
                     width: "100%",
                     background: "transparent",
@@ -205,6 +206,12 @@ export function ProblemsPage() {
                   </span>
                   <span style={{ fontSize: 12, fontFamily: "var(--mono)", color: tier.color, fontWeight: 600 }}>
                     {p.ratingValue}
+                  </span>
+                  <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.3 }}>
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--txt-2)" }}>{p.solved}</span>
+                    {p.acceptance != null && (
+                      <span style={{ fontSize: 10, color: "var(--txt-3)" }}>{p.acceptance}% AC</span>
+                    )}
                   </span>
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                     {p.tags.slice(0, 3).map((tag) => (
