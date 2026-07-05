@@ -8,6 +8,8 @@ const registerBody = z.object({
   handle: z.string().min(2).max(24),
   email: z.string().email(),
   password: z.string().min(8),
+  // Referral growth loop: the referring user's handle, e.g. from ?ref=<handle>.
+  ref: z.string().max(24).optional(),
 });
 
 const loginBody = z.object({
@@ -28,8 +30,17 @@ export async function authRoutes(app: FastifyInstance) {
   app.post("/auth/register", { config: authLimit }, async (req, reply) => {
     const b = registerBody.parse(req.body);
     const passwordHash = await hashPassword(b.password);
+
+    // Referral is best-effort: an unknown/self handle is silently ignored
+    // rather than failing registration over it.
+    let referredById: string | undefined;
+    if (b.ref && b.ref.toLowerCase() !== b.handle.toLowerCase()) {
+      const referrer = await prisma.user.findUnique({ where: { handle: b.ref }, select: { id: true } });
+      referredById = referrer?.id;
+    }
+
     const user = await prisma.user.create({
-      data: { handle: b.handle, email: b.email, passwordHash },
+      data: { handle: b.handle, email: b.email, passwordHash, referredById },
     });
     return reply.send({ id: user.id, token: app.jwt.sign({ sub: user.id }), handle: user.handle, rating: user.rating, role: user.role });
   });

@@ -62,6 +62,22 @@ export function UserProfilePage() {
                   <h1 style={{ fontFamily: "var(--mono)", fontSize: 22, fontWeight: 700, color: tier.color, margin: 0 }}>{profile.handle}</h1>
                   <span style={{ fontFamily: "var(--disp)", fontSize: 13, fontWeight: 600, padding: "3px 10px", borderRadius: 6, background: "var(--panel-2)", color: tier.color, border: "1px solid var(--line)" }}>{tier.name}</span>
                   {isMe && <span style={{ fontSize: 11, color: "var(--txt-3)" }}>(you)</span>}
+                  {profile.recruiter && (
+                    <span
+                      style={{
+                        fontFamily: "var(--disp)",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        padding: "3px 10px",
+                        borderRadius: 6,
+                        background: "rgba(0,255,140,0.1)",
+                        color: "var(--v-ac)",
+                        border: "1px solid var(--v-ac)",
+                      }}
+                    >
+                      🏅 Recruiter
+                    </span>
+                  )}
                 </div>
                 <div style={{ display: "flex", gap: 24, color: "var(--txt-2)", fontSize: 13, flexWrap: "wrap" }}>
                   <Stat value={profile.rating} label="rating" color={tier.color} />

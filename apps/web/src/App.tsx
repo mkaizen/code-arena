@@ -18,6 +18,7 @@ import { AdminContestNewPage } from "./pages/AdminContestNewPage.js";
 import { AdminContestFinalizePage } from "./pages/AdminContestFinalizePage.js";
 import { BattlePage } from "./pages/BattlePage.js";
 import { BattleMatchPage } from "./pages/BattleMatchPage.js";
+import { MatchResultPage } from "./pages/MatchResultPage.js";
 import { PageViewTracker } from "./components/PageViewTracker.js";
 import "./styles.css";
 
@@ -39,6 +40,7 @@ export function App() {
           <Route path="/leaderboard" element={<GlobalLBPage />} />
           <Route path="/battle" element={<BattlePage />} />
           <Route path="/battle/:id" element={<BattleMatchPage />} />
+          <Route path="/share/:id" element={<MatchResultPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/admin/problems" element={<AdminProblemsPage />} />
           <Route path="/admin/problems/new" element={<AdminProblemNewPage />} />

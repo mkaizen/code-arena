@@ -137,8 +137,8 @@ export const api = {
   login: (email: string, password: string): Promise<StoredUser> =>
     req("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
 
-  register: (handle: string, email: string, password: string): Promise<StoredUser> =>
-    req("/auth/register", { method: "POST", body: JSON.stringify({ handle, email, password }) }),
+  register: (handle: string, email: string, password: string, ref?: string): Promise<StoredUser> =>
+    req("/auth/register", { method: "POST", body: JSON.stringify({ handle, email, password, ref }) }),
 
   oauth: (provider: "github" | "google", code: string): Promise<StoredUser> =>
     req("/auth/oauth", { method: "POST", body: JSON.stringify({ provider, code }) }),
@@ -225,6 +225,8 @@ export const api = {
   }> => req("/matches/queue/status"),
 
   match: (id: string): Promise<MatchStateView> => req(`/matches/${id}`),
+
+  publicMatch: (id: string): Promise<MatchStateView> => req(`/matches/${id}/public`),
 
   matchHeartbeat: (id: string): Promise<{ ok: boolean }> =>
     req(`/matches/${id}/heartbeat`, { method: "POST", body: "{}" }),

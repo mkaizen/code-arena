@@ -62,6 +62,10 @@ model User {
   defaultLang   String   @default("cpp") // FR-3
   editorPrefs   Json?    // FR-3
   createdAt     DateTime @default(now())
+  // Referral growth loop: set once at registration, never changes.
+  referredById  String?
+  referredBy    User?    @relation("Referrals", fields: [referredById], references: [id])
+  referrals     User[]   @relation("Referrals")
 
   oauthAccounts   OAuthAccount[]
   submissions     Submission[]
@@ -71,6 +75,7 @@ model User {
   matchQueueEntry MatchQueueEntry?
 
   @@index([rating])
+  @@index([referredById])
 }
 
 model OAuthAccount {
@@ -251,4 +256,7 @@ model MatchQueueEntry {
   userId   String    @id
   mode     MatchMode @default(ROYALE)
   queuedAt DateTime  @default(now())
+  // Referral perk: Recruiter-badge holders (see rewards.ts) cut the queue,
+  // snapshotted at join time so ordering doesn't require a join per poll.
+  priority Boolean   @default(false)
 }

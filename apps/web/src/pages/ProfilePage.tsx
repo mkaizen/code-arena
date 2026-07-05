@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { tierOf, type MatchHistoryEntry, type MatchRecord } from "@arena/shared";
+import { RECRUITER_THRESHOLD, tierOf, type MatchHistoryEntry, type MatchRecord } from "@arena/shared";
 import { TopBar } from "../components/TopBar.js";
 import { api, type Submission } from "../api.js";
 import { useAuth } from "../ctx/AuthContext.js";
@@ -49,6 +49,9 @@ export function ProfilePage() {
   const [record, setRecord] = useState<MatchRecord | null>(null);
   const [matches, setMatches] = useState<MatchHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [referrals, setReferrals] = useState(0);
+  const [recruiter, setRecruiter] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -58,6 +61,9 @@ export function ProfilePage() {
       .finally(() => setLoading(false));
     api.matchHistory()
       .then((h) => { setRecord(h.record); setMatches(h.matches); })
+      .catch(() => {});
+    api.userProfile(user.handle)
+      .then((p) => { setReferrals(p.referrals); setRecruiter(p.recruiter); })
       .catch(() => {});
   }, [user]);
 
@@ -166,6 +172,84 @@ export function ProfilePage() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Invite Friends */}
+        <div
+          style={{
+            background: "var(--panel)",
+            border: "1px solid var(--line)",
+            borderRadius: 12,
+            padding: "20px 24px",
+            marginBottom: 24,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
+            <h2 style={{ fontFamily: "var(--disp)", fontSize: 16, fontWeight: 600, color: "var(--txt)", margin: 0 }}>
+              Invite Friends
+            </h2>
+            {recruiter && (
+              <span
+                style={{
+                  fontFamily: "var(--disp)",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  padding: "3px 10px",
+                  borderRadius: 6,
+                  background: "rgba(0,255,140,0.1)",
+                  color: "var(--v-ac)",
+                  border: "1px solid var(--v-ac)",
+                }}
+              >
+                🏅 Recruiter
+              </span>
+            )}
+          </div>
+          <p style={{ color: "var(--txt-2)", fontSize: 13, marginBottom: 14 }}>
+            Invite {RECRUITER_THRESHOLD} friends to unlock the Recruiter badge and jump the matchmaking queue.
+            {" "}
+            <span style={{ color: "var(--v-ac)", fontWeight: 700 }}>{referrals}</span>
+            <span style={{ color: "var(--txt-3)" }}>/{RECRUITER_THRESHOLD} invited</span>
+          </p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              readOnly
+              value={`${window.location.origin}/login?ref=${user.handle}`}
+              onFocus={(e) => e.currentTarget.select()}
+              style={{
+                flex: 1,
+                background: "var(--panel-2)",
+                border: "1px solid var(--line)",
+                borderRadius: 8,
+                color: "var(--txt-2)",
+                fontSize: 13,
+                fontFamily: "var(--mono)",
+                padding: "9px 12px",
+                minWidth: 0,
+              }}
+            />
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}/login?ref=${user.handle}`);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
+              style={{
+                background: "var(--v-ac)",
+                color: "#06210C",
+                fontWeight: 700,
+                fontSize: 13,
+                padding: "9px 16px",
+                border: "none",
+                borderRadius: 8,
+                cursor: "pointer",
+                fontFamily: "var(--disp)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {copied ? "Copied!" : "Copy Link"}
+            </button>
           </div>
         </div>
 
