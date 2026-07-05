@@ -86,3 +86,12 @@ input, select, textarea {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
+
+@keyframes reveal {
+  to { opacity: 1; }
+}
+
+@keyframes pop {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
