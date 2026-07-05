@@ -245,18 +245,31 @@ export function BattleMatchPage() {
       </header>
 
       {finished && (
-        <div style={{ padding: "10px 20px", background: "rgba(63,185,80,0.08)", borderBottom: "1px solid rgba(63,185,80,0.2)", color: "var(--v-ac)", fontSize: 13, fontWeight: 600, textAlign: "center" }}>
-          {isDuel
-            ? isDraw
-              ? "🤝 The duel ended in a draw."
+        <div style={{ padding: "10px 20px", background: "rgba(63,185,80,0.08)", borderBottom: "1px solid rgba(63,185,80,0.2)", color: "var(--v-ac)", fontSize: 13, fontWeight: 600, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 14 }}>
+          <span>
+            {isDuel
+              ? isDraw
+                ? "🤝 The duel ended in a draw."
+                : myPlayer?.placement === 1
+                  ? "🏆 You won the duel!"
+                  : `You lost the duel${opponent ? ` to ${opponent.handle}` : ""}.`
               : myPlayer?.placement === 1
-                ? "🏆 You won the duel!"
-                : `You lost the duel${opponent ? ` to ${opponent.handle}` : ""}.`
-            : myPlayer?.placement === 1
-              ? "🏆 You won the match!"
-              : myPlayer?.placement
-                ? `Match over — you placed #${myPlayer.placement}`
-                : "Match over"}
+                ? "🏆 You won the match!"
+                : myPlayer?.placement
+                  ? `Match over — you placed #${myPlayer.placement}`
+                  : "Match over"}
+          </span>
+          {id && (
+            <Link
+              to={`/share/${id}`}
+              style={{
+                fontFamily: "var(--disp)", fontSize: 12, fontWeight: 700, color: "#06210C",
+                background: "var(--v-ac)", padding: "4px 12px", borderRadius: 6, textDecoration: "none",
+              }}
+            >
+              Share Result
+            </Link>
+          )}
         </div>
       )}
       {!finished && eliminated && (

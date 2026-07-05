@@ -83,6 +83,9 @@ export interface MatchRecord {
   played: number;
 }
 
+/** Successful referrals needed to unlock the Recruiter badge + queue priority. */
+export const RECRUITER_THRESHOLD = 3;
+
 /** Public, read-only view of any user (their profile page). */
 export interface PublicProfile {
   handle: string;
@@ -92,6 +95,10 @@ export interface PublicProfile {
   submissions: number;
   record: MatchRecord;
   recentMatches: MatchHistoryEntry[];
+  /** Successful invites (referral growth loop). */
+  referrals: number;
+  /** Unlocked once referrals >= RECRUITER_THRESHOLD (3). */
+  recruiter: boolean;
 }
 
 export interface MatchProblemView {

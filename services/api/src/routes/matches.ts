@@ -69,4 +69,15 @@ export async function matchRoutes(app: FastifyInstance) {
     if (!state) return reply.code(404).send({ error: "not found" });
     return state;
   });
+
+  // Public, unauthenticated: a finished match's result, for the shareable
+  // /share/:id card. Only ever exposes FINISHED matches — an in-progress
+  // match is never handed to anonymous viewers (that's still private to its
+  // players over the WebSocket), so there's nothing to spoil by sharing.
+  app.get("/matches/:id/public", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const state = await getMatchState(id);
+    if (!state || state.status !== "FINISHED") return reply.code(404).send({ error: "not found" });
+    return state;
+  });
 }

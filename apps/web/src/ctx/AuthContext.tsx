@@ -4,7 +4,7 @@ import { api, storeUser, clearUser, getMe, type StoredUser } from "../api.js";
 interface AuthContextValue {
   user: StoredUser | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (handle: string, email: string, password: string) => Promise<void>;
+  register: (handle: string, email: string, password: string, ref?: string) => Promise<void>;
   loginWithOAuth: (provider: "github" | "google", code: string) => Promise<void>;
   logout: () => void;
 }
@@ -29,8 +29,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(u);
   }, []);
 
-  const register = useCallback(async (handle: string, email: string, password: string) => {
-    const u = await api.register(handle, email, password);
+  const register = useCallback(async (handle: string, email: string, password: string, ref?: string) => {
+    const u = await api.register(handle, email, password, ref);
     storeUser(u);
     setUser(u);
   }, []);

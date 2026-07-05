@@ -1,12 +1,14 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../ctx/AuthContext.js";
 import { startOAuth, oauthEnabled, anyOAuthEnabled } from "../oauth.js";
 
 type Tab = "login" | "register";
 
 export function LoginPage() {
-  const [tab, setTab] = useState<Tab>("login");
+  const [searchParams] = useSearchParams();
+  const ref = searchParams.get("ref") ?? undefined;
+  const [tab, setTab] = useState<Tab>(ref ? "register" : "login");
   const [handle, setHandle] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,7 +25,7 @@ export function LoginPage() {
       if (tab === "login") {
         await login(email, password);
       } else {
-        await register(handle, email, password);
+        await register(handle, email, password, ref);
       }
       navigate("/contests");
     } catch (err) {
@@ -81,6 +83,11 @@ export function LoginPage() {
             Code<span style={{ color: "var(--v-ac)" }}>Arena</span>
           </h1>
           <p style={{ color: "var(--txt-3)", fontSize: 13 }}>Compete. Judge. Rank.</p>
+          {ref && (
+            <p style={{ color: "var(--v-ac)", fontSize: 12, marginTop: 6 }}>
+              Invited by @{ref}
+            </p>
+          )}
         </div>
 
         {/* Tabs */}

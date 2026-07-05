@@ -2,6 +2,7 @@ import { prisma } from "../db.js";
 import { broadcast, sendToUsers } from "../ws.js";
 import { recomputeRatings } from "../rating/elo.js";
 import { winsToClinch, placementsByElimination, placementsByScore } from "./rules.js";
+import { isRecruiter } from "../referrals.js";
 import type { MatchMode, MatchPlayerView, MatchProblemView, MatchStateView } from "@arena/shared";
 
 /**
@@ -84,14 +85,21 @@ export async function joinQueue(
   });
   if (live) return { matched: true, matchId: live.matchId };
 
+  // Referral perk: Recruiter-badge holders (3+ successful invites) cut the
+  // queue — snapshotted at join time so ordering never needs a join per poll.
+  const priority = await isRecruiter(userId);
+
   // One queue at a time: switching modes moves the entry.
   await prisma.matchQueueEntry.upsert({
     where: { userId },
-    create: { userId, mode },
-    update: { mode, queuedAt: new Date() },
+    create: { userId, mode, priority },
+    update: { mode, priority, queuedAt: new Date() },
   });
 
-  const waiting = await prisma.matchQueueEntry.findMany({ where: { mode }, orderBy: { queuedAt: "asc" } });
+  const waiting = await prisma.matchQueueEntry.findMany({
+    where: { mode },
+    orderBy: [{ priority: "desc" }, { queuedAt: "asc" }],
+  });
   if (waiting.length < cfg.capacity) {
     broadcast({ type: "queue_update", mode, count: waiting.length, capacity: cfg.capacity });
     return { matched: false, count: waiting.length, capacity: cfg.capacity };
