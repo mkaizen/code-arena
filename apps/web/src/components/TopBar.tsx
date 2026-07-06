@@ -46,6 +46,7 @@ export function TopBar() {
       {/* Nav links */}
       <nav style={{ display: "flex", gap: 4 }}>
         {[
+          { to: "/daily", label: "Daily" },
           { to: "/contests", label: "Contests" },
           { to: "/problems", label: "Problems" },
           { to: "/battle", label: "Battle Royale" },

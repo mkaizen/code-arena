@@ -19,6 +19,7 @@ import { AdminContestFinalizePage } from "./pages/AdminContestFinalizePage.js";
 import { BattlePage } from "./pages/BattlePage.js";
 import { BattleMatchPage } from "./pages/BattleMatchPage.js";
 import { MatchResultPage } from "./pages/MatchResultPage.js";
+import { DailyPage } from "./pages/DailyPage.js";
 import { PageViewTracker } from "./components/PageViewTracker.js";
 import "./styles.css";
 
@@ -33,6 +34,7 @@ export function App() {
           <Route path="/auth/callback/:provider" element={<OAuthCallbackPage />} />
           <Route path="/contests" element={<ContestsPage />} />
           <Route path="/contests/:id" element={<ContestPage />} />
+          <Route path="/daily" element={<DailyPage />} />
           <Route path="/problems" element={<ProblemsPage />} />
           <Route path="/problems/:slug" element={<ProblemPage />} />
           <Route path="/profile" element={<ProfilePage />} />

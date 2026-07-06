@@ -51,6 +51,7 @@ export function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [referrals, setReferrals] = useState(0);
   const [recruiter, setRecruiter] = useState(false);
+  const [streak, setStreak] = useState(0);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -63,7 +64,7 @@ export function ProfilePage() {
       .then((h) => { setRecord(h.record); setMatches(h.matches); })
       .catch(() => {});
     api.userProfile(user.handle)
-      .then((p) => { setReferrals(p.referrals); setRecruiter(p.recruiter); })
+      .then((p) => { setReferrals(p.referrals); setRecruiter(p.recruiter); setStreak(p.currentStreak); })
       .catch(() => {});
   }, [user]);
 
@@ -169,6 +170,14 @@ export function ProfilePage() {
                     <span style={{ color: "var(--v-wa)" }}>{record.losses}</span>
                   </span>
                   <span style={{ marginLeft: 6, color: "var(--txt-3)", fontSize: 12 }}>match W–L</span>
+                </div>
+              )}
+              {streak > 0 && (
+                <div>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 18, fontWeight: 700, color: "var(--v-tle)" }}>
+                    {streak}🔥
+                  </span>
+                  <span style={{ marginLeft: 6, color: "var(--txt-3)", fontSize: 12 }}>day streak</span>
                 </div>
               )}
             </div>

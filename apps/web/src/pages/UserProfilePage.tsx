@@ -89,6 +89,9 @@ export function UserProfilePage() {
                       label="match W–L"
                     />
                   )}
+                  {profile.currentStreak > 0 && (
+                    <Stat value={`${profile.currentStreak}🔥`} label="day streak" color="var(--v-tle)" />
+                  )}
                 </div>
                 <div style={{ color: "var(--txt-3)", fontSize: 12, marginTop: 8 }}>Joined {timeAgo(profile.joinedAt)}</div>
               </div>

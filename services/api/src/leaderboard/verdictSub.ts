@@ -4,6 +4,7 @@ import { broadcast, sendToUser } from "../ws.js";
 import { prisma } from "../db.js";
 import { recordAccepted, getLeaderboard, isFrozen, ensureFreezeSnapshot } from "./freeze.js";
 import { onAccepted as onMatchAccepted } from "../match/engine.js";
+import { recordDailySolve } from "../daily.js";
 import type { JudgeResult, ScoringModel } from "@arena/shared";
 
 interface VerdictMsg {
@@ -64,7 +65,7 @@ export function startVerdictSubscriber(): void {
 
       const submission = await prisma.submission.findUnique({
         where: { id: submissionId },
-        select: { userId: true, contestId: true, matchId: true, rated: true },
+        select: { userId: true, contestId: true, matchId: true, rated: true, problemId: true, createdAt: true },
       });
 
       // A verdict is private to its author — never fan it out to everyone.
@@ -75,6 +76,12 @@ export function startVerdictSubscriber(): void {
       if (submission?.matchId) {
         await onMatchAccepted(submission.matchId);
         return;
+      }
+
+      // Daily-challenge streaks are earned on free practice solves (no contest,
+      // no match). recordDailySolve no-ops unless it's actually today's problem.
+      if (submission && !submission.contestId) {
+        await recordDailySolve(submission.userId, submission.problemId, submission.createdAt);
       }
 
       if (!submission?.contestId || !submission.rated) return;

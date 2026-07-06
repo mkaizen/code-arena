@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../db.js";
 import { RECRUITER_THRESHOLD, referralCount } from "../referrals.js";
+import { streakFor } from "../daily.js";
 import type { MatchHistoryEntry, MatchMode, PublicProfile } from "@arena/shared";
 
 export async function userRoutes(app: FastifyInstance) {
@@ -15,7 +16,7 @@ export async function userRoutes(app: FastifyInstance) {
     });
     if (!user) return reply.code(404).send({ error: "user not found" });
 
-    const [acProblems, submissions, recent, placements, referrals] = await Promise.all([
+    const [acProblems, submissions, recent, placements, referrals, streak] = await Promise.all([
       prisma.submission.findMany({
         where: { userId: user.id, verdict: "ACCEPTED" },
         select: { problemId: true },
@@ -33,6 +34,7 @@ export async function userRoutes(app: FastifyInstance) {
         select: { placement: true },
       }),
       referralCount(user.id),
+      streakFor(user.id),
     ]);
 
     const wins = placements.filter((p) => p.placement === 1).length;
@@ -57,6 +59,8 @@ export async function userRoutes(app: FastifyInstance) {
       recentMatches,
       referrals,
       recruiter: referrals >= RECRUITER_THRESHOLD,
+      currentStreak: streak.current,
+      longestStreak: streak.longest,
     };
     return profile;
   });
