@@ -94,6 +94,59 @@ export function renderShareCard(match: MatchStateView, viewerUserId: string | un
   return canvas;
 }
 
+/** Draws a shareable PNG celebrating a daily-challenge streak. */
+export function renderStreakCard(handle: string, current: number, longest: number): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = COLORS.ink;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = COLORS.line;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(40, 40, W - 80, H - 80);
+
+  // Wordmark
+  ctx.textAlign = "left";
+  ctx.font = "700 32px 'Space Grotesk', sans-serif";
+  ctx.fillStyle = COLORS.txt;
+  ctx.fillText("Code", 64, 96);
+  const codeWidth = ctx.measureText("Code").width;
+  ctx.fillStyle = COLORS.ac;
+  ctx.fillText("Arena", 64 + codeWidth, 96);
+
+  ctx.font = "600 20px 'Space Grotesk', sans-serif";
+  ctx.fillStyle = COLORS.txt2;
+  ctx.fillText("Daily Challenge", 64, 130);
+
+  // Big flame + streak number
+  ctx.textAlign = "center";
+  ctx.font = "700 110px 'Space Grotesk', sans-serif";
+  ctx.fillStyle = COLORS.txt;
+  ctx.fillText(`🔥 ${current}`, W / 2, 320);
+
+  ctx.font = "700 34px 'Space Grotesk', sans-serif";
+  ctx.fillStyle = "#E3A008"; // warm streak accent
+  ctx.fillText(`DAY STREAK`, W / 2, 375);
+
+  // Handle + longest
+  ctx.font = "700 40px 'JetBrains Mono', monospace";
+  ctx.fillStyle = COLORS.txt;
+  ctx.fillText(`@${handle}`, W / 2, 455);
+
+  ctx.font = "500 22px 'Space Grotesk', sans-serif";
+  ctx.fillStyle = COLORS.txt2;
+  ctx.fillText(`Longest streak: ${longest} ${longest === 1 ? "day" : "days"}`, W / 2, 500);
+
+  ctx.font = "500 16px 'Space Grotesk', sans-serif";
+  ctx.fillStyle = COLORS.txt3;
+  ctx.fillText("codearena.space", W / 2, H - 64);
+
+  return canvas;
+}
+
 export function downloadCanvas(canvas: HTMLCanvasElement, filename: string) {
   canvas.toBlob((blob) => {
     if (!blob) return;
