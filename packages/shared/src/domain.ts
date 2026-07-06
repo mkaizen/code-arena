@@ -99,6 +99,40 @@ export interface PublicProfile {
   referrals: number;
   /** Unlocked once referrals >= RECRUITER_THRESHOLD (3). */
   recruiter: boolean;
+  /** Current daily-challenge streak (0 if lapsed). */
+  currentStreak: number;
+  /** Best daily-challenge streak ever reached. */
+  longestStreak: number;
+}
+
+/** A user's daily-challenge streak state. */
+export interface StreakInfo {
+  current: number;
+  longest: number;
+  solvedToday: boolean;
+}
+
+/** One cell of the daily-challenge solve calendar. */
+export interface CalendarDay {
+  /** YYYY-MM-DD (UTC). */
+  date: string;
+  solved: boolean;
+}
+
+/** The daily-challenge view: today's problem plus (if logged in) streak state. */
+export interface DailyView {
+  /** YYYY-MM-DD (UTC). */
+  date: string;
+  problem: {
+    id: string;
+    slug: string;
+    title: string;
+    difficulty: Difficulty;
+    ratingValue: number;
+    tags: string[];
+  } | null;
+  streak: StreakInfo | null;
+  calendar: CalendarDay[] | null;
 }
 
 export interface MatchProblemView {

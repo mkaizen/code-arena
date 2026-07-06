@@ -1,4 +1,4 @@
-import type { Language, LeaderboardRow, MatchHistoryEntry, MatchMode, MatchRecord, MatchStateView, PublicProfile } from "@arena/shared";
+import type { DailyView, Language, LeaderboardRow, MatchHistoryEntry, MatchMode, MatchRecord, MatchStateView, PublicProfile } from "@arena/shared";
 
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
@@ -236,4 +236,6 @@ export const api = {
 
   userProfile: (handle: string): Promise<PublicProfile> =>
     req(`/users/${encodeURIComponent(handle)}`),
+
+  daily: (): Promise<DailyView> => req("/daily"),
 };

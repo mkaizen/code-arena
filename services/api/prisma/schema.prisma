@@ -67,12 +67,19 @@ model User {
   referredBy    User?    @relation("Referrals", fields: [referredById], references: [id])
   referrals     User[]   @relation("Referrals")
 
+  // Daily-challenge streak. Denormalized so profiles/share cards read it in
+  // O(1); the DailySolve rows below are the source of truth for the calendar.
+  currentStreak Int       @default(0)
+  longestStreak Int       @default(0)
+  lastDailyDate DateTime? @db.Date // UTC date of the most recently solved daily
+
   oauthAccounts   OAuthAccount[]
   submissions     Submission[]
   registrations   Registration[]
   ratingChanges   RatingChange[]
   matchPlayers    MatchPlayer[]
   matchQueueEntry MatchQueueEntry?
+  dailySolves     DailySolve[]
 
   @@index([rating])
   @@index([referredById])
@@ -108,6 +115,7 @@ model Problem {
   contestProblems ContestProblem[]
   matchProblems   MatchProblem[]
   submissions     Submission[]
+  dailyChallenges DailyChallenge[]
 }
 
 model Sample {
@@ -259,4 +267,28 @@ model MatchQueueEntry {
   // Referral perk: Recruiter-badge holders (see rewards.ts) cut the queue,
   // snapshotted at join time so ordering doesn't require a join per poll.
   priority Boolean   @default(false)
+}
+
+// One featured problem per UTC calendar day. Rows are created lazily on the
+// first request for a given day (see daily.ts) and never change afterward, so
+// growing the problem bank can't retroactively alter a past day's challenge.
+model DailyChallenge {
+  date      DateTime @id @db.Date
+  problem   Problem  @relation(fields: [problemId], references: [id])
+  problemId String
+  createdAt DateTime @default(now())
+}
+
+// A user's successful solve of a given day's challenge — the source of truth
+// for the streak calendar. The denormalized counters on User are derived from
+// these and updated in the same transaction that inserts a row.
+model DailySolve {
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  date      DateTime @db.Date
+  problemId String
+  solvedAt  DateTime @default(now())
+
+  @@id([userId, date])
+  @@index([userId])
 }
