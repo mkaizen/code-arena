@@ -17,6 +17,15 @@ const schema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   OAUTH_REDIRECT_BASE: z.string().default("http://localhost:5173/auth/callback"),
+  // Public base URL of the web app, used to build links in emails.
+  WEB_BASE_URL: z.string().default("http://localhost:5173"),
+  // Public base URL of this API, used for one-click unsubscribe links that the
+  // API serves directly (no JS, works from any email client).
+  API_BASE_URL: z.string().default("http://localhost:8080"),
+  // Email is opt-in infrastructure: without RESEND_API_KEY, messages are logged
+  // rather than sent, so the app runs fine with no provider configured.
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().default("Code Arena <onboarding@resend.dev>"),
 });
 
 export const env = schema.parse(process.env);
