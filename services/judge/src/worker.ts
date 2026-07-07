@@ -138,7 +138,8 @@ http
 
 interface RunJob {
   runId: string;
-  userId: string;
+  /** Undefined for anonymous runs — no per-user WS to push to; they poll. */
+  userId?: string;
   problemId: string;
   language: Language;
   source: string;
@@ -206,6 +207,9 @@ const runWorker = new Worker(
       const reason = err instanceof Error ? err.message : String(err);
       result = { runId: data.runId, cases: [{ label: "Error", input: "", expected: null, stdout: "", stderr: reason, timeMs: 0, status: "RUNTIME_ERROR" }] };
     }
+    // Store for polling (anonymous runs have no per-user WebSocket to push to)
+    // as well as publishing for logged-in clients. Short TTL — it's ephemeral.
+    await pub.set(`run:result:${data.runId}`, JSON.stringify(result), "EX", 300);
     await pub.publish("arena:runs", JSON.stringify({ runId: data.runId, userId: data.userId, result }));
     return result;
   },
