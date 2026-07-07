@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import { type Language } from "@arena/shared";
 import { TopBar } from "../components/TopBar.js";
@@ -63,7 +63,10 @@ export function ProblemPage() {
   const [bottomTab, setBottomTab] = useState<"console" | "run">("console");
   const [showCustom, setShowCustom] = useState(false);
   const [customInput, setCustomInput] = useState("");
-  const run = useRun(problem?.id);
+  // Onboarding nudge shown to logged-out visitors at peak intent: "submit" when
+  // they try to submit, "solved" the moment their run passes every sample.
+  const [signupNudge, setSignupNudge] = useState<null | "submit" | "solved">(null);
+  const run = useRun(problem?.id, { poll: !user });
 
   useEffect(() => {
     if (!slug) return;
@@ -90,6 +93,16 @@ export function ProblemPage() {
     if (!problem) return;
     setSource(loadDraft(problem.slug, lang) ?? STARTERS[lang]);
   }, [problem, lang]);
+
+  // The onboarding "aha": a logged-out visitor whose run passes every sample
+  // gets nudged to sign up right then, while motivation peaks.
+  useEffect(() => {
+    if (user || !run.result) return;
+    const graded = run.result.cases.filter((c) => c.status === "PASS" || c.status === "FAIL");
+    if (graded.length > 0 && graded.every((c) => c.status === "PASS")) {
+      setSignupNudge("solved");
+    }
+  }, [run.result, user]);
 
   useWs((ev: ServerEvent) => {
     run.onEvent(ev);
@@ -129,9 +142,11 @@ export function ProblemPage() {
   }
 
   async function handleSubmit() {
-    if (!problem || !user) {
-      setConsole("You must be logged in to submit.");
-      setConsoleColor("var(--v-wa)");
+    if (!problem) return;
+    if (!user) {
+      // Peak-intent moment — invite them to create an account instead of a
+      // dead-end error. Their code is already saved as a draft locally.
+      setSignupNudge("submit");
       return;
     }
     setConsole("Submitting…");
@@ -147,10 +162,8 @@ export function ProblemPage() {
   }
 
   function handleRun() {
-    if (!problem || !user) {
-      setBottomTab("run");
-      return;
-    }
+    if (!problem) return;
+    // Guests can run freely — this is the whole point of the onboarding flow.
     setBottomTab("run");
     run.start(lang, source, showCustom && customInput.trim() ? customInput : undefined);
   }
@@ -462,6 +475,54 @@ export function ProblemPage() {
                   <div style={{ color: "var(--txt-3)", fontSize: 12 }}>Press ▶ Run to test against the sample cases.</div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {signupNudge && (
+        <div
+          onClick={() => setSignupNudge(null)}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 100,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%", maxWidth: 400, background: "var(--panel)", border: "1px solid var(--line)",
+              borderRadius: 12, padding: 28, textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: 34, marginBottom: 8 }}>{signupNudge === "solved" ? "🎉" : "🚀"}</div>
+            <h2 style={{ fontFamily: "var(--disp)", fontSize: 19, fontWeight: 700, color: "var(--txt)", margin: "0 0 8px" }}>
+              {signupNudge === "solved" ? "Nice — that passes every sample!" : "Create a free account"}
+            </h2>
+            <p style={{ color: "var(--txt-2)", fontSize: 14, lineHeight: 1.6, marginBottom: 20 }}>
+              {signupNudge === "solved"
+                ? "Create a free account to submit it for real, track what you've solved, and start a daily streak. It takes about ten seconds — your code is saved."
+                : "Sign up to submit your solution, save your progress, and compete on the leaderboard. Your code is already saved on this device."}
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <Link
+                to="/login"
+                style={{
+                  background: "var(--v-ac)", color: "#06210C", fontWeight: 700, fontSize: 14,
+                  padding: "11px 0", borderRadius: 8, textDecoration: "none", fontFamily: "var(--disp)",
+                }}
+              >
+                Create account & submit
+              </Link>
+              <button
+                onClick={() => setSignupNudge(null)}
+                style={{
+                  background: "transparent", color: "var(--txt-3)", fontWeight: 500, fontSize: 13,
+                  padding: "6px 0", border: "none", cursor: "pointer", fontFamily: "var(--disp)",
+                }}
+              >
+                Keep exploring
+              </button>
             </div>
           </div>
         </div>

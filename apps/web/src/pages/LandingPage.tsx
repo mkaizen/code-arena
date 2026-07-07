@@ -83,7 +83,7 @@ export function LandingPage() {
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <Link to="/login" style={{ ...btnSecondary, padding: "8px 16px", fontSize: 13 }}>Sign in</Link>
-            <Link to="/login" style={{ ...btnPrimary, padding: "8px 16px", fontSize: 13 }}>Get started</Link>
+            <Link to="/problems/two-sum" style={{ ...btnPrimary, padding: "8px 16px", fontSize: 13 }}>Get started</Link>
           </div>
         </div>
       </header>
@@ -102,7 +102,7 @@ export function LandingPage() {
               or grind the bank solo — every accepted solution moves your rating.
             </p>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <Link to="/login" style={btnPrimary}>Enter the arena →</Link>
+              <Link to="/problems/two-sum" style={btnPrimary}>Solve one now — no signup →</Link>
               <Link to="/problems" style={btnSecondary}>Browse the problem bank</Link>
             </div>
           </div>

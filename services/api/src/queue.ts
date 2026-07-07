@@ -7,7 +7,8 @@ export interface JudgeJob {
 
 export interface RunJob {
   runId: string;
-  userId: string;
+  /** Undefined for anonymous (logged-out) runs, which poll for their result. */
+  userId?: string;
   problemId: string;
   language: string;
   source: string;

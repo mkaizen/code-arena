@@ -1,4 +1,4 @@
-import type { DailyView, Language, LeaderboardRow, MatchHistoryEntry, MatchMode, MatchRecord, MatchStateView, PublicProfile } from "@arena/shared";
+import type { DailyView, Language, LeaderboardRow, MatchHistoryEntry, MatchMode, MatchRecord, MatchStateView, PublicProfile, RunResult } from "@arena/shared";
 
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
@@ -161,6 +161,9 @@ export const api = {
 
   run: (body: { problemId: string; language: Language; source: string; customInput?: string }): Promise<{ runId: string }> =>
     req("/run", { method: "POST", body: JSON.stringify(body) }),
+
+  // Poll a run's result — used by logged-out clients that have no WebSocket.
+  runResult: (runId: string): Promise<{ result: RunResult | null }> => req(`/run/${runId}`),
 
   submissions: (): Promise<Submission[]> => req("/submissions"),
 
