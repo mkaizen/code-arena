@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
 import { exchangeOAuthCode } from "../auth/oauth.js";
+import { sendReferralWelcome } from "../mail/notifications.js";
 
 const registerBody = z.object({
   handle: z.string().min(2).max(24),
@@ -42,6 +43,11 @@ export async function authRoutes(app: FastifyInstance) {
     const user = await prisma.user.create({
       data: { handle: b.handle, email: b.email, passwordHash, referredById },
     });
+    // Fire-and-forget: tell the referrer their invite landed. Never blocks or
+    // fails registration over a mail hiccup.
+    if (referredById) {
+      sendReferralWelcome(referredById, user.handle).catch((err) => req.log.error(err, "referral email failed"));
+    }
     return reply.send({ id: user.id, token: app.jwt.sign({ sub: user.id }), handle: user.handle, rating: user.rating, role: user.role });
   });
 

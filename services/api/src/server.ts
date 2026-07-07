@@ -14,9 +14,11 @@ import { adminRoutes } from "./routes/admin.js";
 import { matchRoutes } from "./routes/matches.js";
 import { userRoutes } from "./routes/users.js";
 import { dailyRoutes } from "./routes/daily.js";
+import { notificationRoutes } from "./routes/notifications.js";
 import { wsRoutes } from "./ws.js";
 import { startVerdictSubscriber } from "./leaderboard/verdictSub.js";
 import { sweepOverdueMatches, sweepForfeits } from "./match/engine.js";
+import { sweepContestReminders, sweepStreakNudges } from "./mail/notifications.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -57,6 +59,7 @@ async function main() {
   await app.register(matchRoutes);
   await app.register(userRoutes);
   await app.register(dailyRoutes);
+  await app.register(notificationRoutes);
   await app.register(wsRoutes);
 
   startVerdictSubscriber();
@@ -66,6 +69,12 @@ async function main() {
     sweepOverdueMatches().catch((err) => app.log.error(err, "match sweep failed"));
     sweepForfeits().catch((err) => app.log.error(err, "forfeit sweep failed"));
   }, 15_000);
+  // Email sweeps run on a slower cadence — contest reminders and streak nudges
+  // are time-of-day driven, not second-sensitive.
+  setInterval(() => {
+    sweepContestReminders().catch((err) => app.log.error(err, "contest reminder sweep failed"));
+    sweepStreakNudges().catch((err) => app.log.error(err, "streak nudge sweep failed"));
+  }, 5 * 60_000);
   await app.listen({ port: env.API_PORT, host: "0.0.0.0" });
 }
 

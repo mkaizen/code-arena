@@ -100,6 +100,12 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       OAUTH_REDIRECT_BASE: https://${DOMAIN}/auth/callback
+      WEB_BASE_URL: https://${DOMAIN}
+      API_BASE_URL: https://${DOMAIN}/api
+      # Email is optional: leave RESEND_API_KEY unset and messages are logged,
+      # not sent. Set it (+ a verified EMAIL_FROM) to turn on notifications.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-Code Arena <onboarding@resend.dev>}
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
