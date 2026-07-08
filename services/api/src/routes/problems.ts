@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { Language, SpeedRow, BrevityRow } from "@arena/shared";
 import { prisma } from "../db.js";
 
 interface StatRow { problemId: string; total: bigint; accepted: bigint; solvers: bigint }
@@ -61,5 +62,42 @@ export async function problemRoutes(app: FastifyInstance) {
     if (!p) return reply.code(404).send({ error: "not found" });
     const stats = await oneProblemStats(p.id);
     return { ...p, ...stats }; // hidden tests are never serialized to clients (FR-4)
+  });
+
+  // Per-problem speed (fastest runtime) & brevity (shortest source) boards.
+  // Best submission per user so one person can't fill the board; source code is
+  // never exposed — only the metric, handle, and language.
+  app.get("/problems/:slug/leaderboard", async (req, reply) => {
+    const { slug } = req.params as { slug: string };
+    const problem = await prisma.problem.findUnique({ where: { slug }, select: { id: true } });
+    if (!problem) return reply.code(404).send({ error: "not found" });
+
+    const [fastest, shortest] = await Promise.all([
+      prisma.$queryRaw<{ handle: string; timeMs: number; language: string }[]>`
+        SELECT u.handle, s."timeMs", s.language
+        FROM (
+          SELECT DISTINCT ON ("userId") "userId", "timeMs", language
+          FROM "Submission"
+          WHERE "problemId" = ${problem.id} AND verdict = 'ACCEPTED' AND "timeMs" IS NOT NULL
+          ORDER BY "userId", "timeMs" ASC
+        ) s JOIN "User" u ON u.id = s."userId"
+        ORDER BY s."timeMs" ASC
+        LIMIT 20`,
+      prisma.$queryRaw<{ handle: string; chars: number; language: string }[]>`
+        SELECT u.handle, s.chars, s.language
+        FROM (
+          SELECT DISTINCT ON ("userId") "userId", char_length(source) AS chars, language
+          FROM "Submission"
+          WHERE "problemId" = ${problem.id} AND verdict = 'ACCEPTED'
+          ORDER BY "userId", char_length(source) ASC
+        ) s JOIN "User" u ON u.id = s."userId"
+        ORDER BY s.chars ASC
+        LIMIT 20`,
+    ]);
+
+    return {
+      fastest: fastest.map((r): SpeedRow => ({ handle: r.handle, timeMs: Number(r.timeMs), language: r.language as Language })),
+      shortest: shortest.map((r): BrevityRow => ({ handle: r.handle, chars: Number(r.chars), language: r.language as Language })),
+    };
   });
 }

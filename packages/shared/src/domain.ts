@@ -135,6 +135,26 @@ export interface DailyView {
   calendar: CalendarDay[] | null;
 }
 
+// ── Per-problem speed & brevity leaderboards ────────────────────────────────
+export interface SpeedRow {
+  handle: string;
+  /** Fastest accepted runtime (ms). */
+  timeMs: number;
+  language: Language;
+}
+
+export interface BrevityRow {
+  handle: string;
+  /** Shortest accepted source length (characters). */
+  chars: number;
+  language: Language;
+}
+
+export interface ProblemLeaderboard {
+  fastest: SpeedRow[];
+  shortest: BrevityRow[];
+}
+
 // ── Ghost racing (race a replay of a past solve) ────────────────────────────
 export interface GhostEvent {
   /** Ms from race start. */

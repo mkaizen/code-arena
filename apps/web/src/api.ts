@@ -1,4 +1,4 @@
-import type { DailyView, GhostEvent, GhostFinishResponse, GhostStartResponse, Language, LeaderboardRow, MatchHistoryEntry, MatchMode, MatchRecord, MatchReplay, MatchStateView, PublicProfile, RunResult } from "@arena/shared";
+import type { DailyView, GhostEvent, GhostFinishResponse, GhostStartResponse, Language, LeaderboardRow, MatchHistoryEntry, MatchMode, MatchRecord, MatchReplay, MatchStateView, ProblemLeaderboard, PublicProfile, RunResult } from "@arena/shared";
 
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
@@ -155,6 +155,8 @@ export const api = {
   },
 
   problem: (slug: string): Promise<Problem> => req(`/problems/${slug}`),
+
+  problemLeaderboard: (slug: string): Promise<ProblemLeaderboard> => req(`/problems/${slug}/leaderboard`),
 
   submit: (body: { problemId: string; contestId?: string; matchId?: string; language: Language; source: string }): Promise<{ id: string; verdict: string }> =>
     req("/submissions", { method: "POST", body: JSON.stringify(body) }),
