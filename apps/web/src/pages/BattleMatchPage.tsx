@@ -260,15 +260,26 @@ export function BattleMatchPage() {
                   : "Match over"}
           </span>
           {id && (
-            <Link
-              to={`/share/${id}`}
-              style={{
-                fontFamily: "var(--disp)", fontSize: 12, fontWeight: 700, color: "#06210C",
-                background: "var(--v-ac)", padding: "4px 12px", borderRadius: 6, textDecoration: "none",
-              }}
-            >
-              Share Result
-            </Link>
+            <span style={{ display: "inline-flex", gap: 8 }}>
+              <Link
+                to={`/replay/${id}`}
+                style={{
+                  fontFamily: "var(--disp)", fontSize: 12, fontWeight: 700, color: "var(--v-ac)",
+                  background: "transparent", border: "1px solid var(--v-ac)", padding: "3px 12px", borderRadius: 6, textDecoration: "none",
+                }}
+              >
+                Watch Replay
+              </Link>
+              <Link
+                to={`/share/${id}`}
+                style={{
+                  fontFamily: "var(--disp)", fontSize: 12, fontWeight: 700, color: "#06210C",
+                  background: "var(--v-ac)", padding: "4px 12px", borderRadius: 6, textDecoration: "none",
+                }}
+              >
+                Share Result
+              </Link>
+            </span>
           )}
         </div>
       )}

@@ -1,4 +1,4 @@
-import type { DailyView, Language, LeaderboardRow, MatchHistoryEntry, MatchMode, MatchRecord, MatchStateView, PublicProfile, RunResult } from "@arena/shared";
+import type { DailyView, Language, LeaderboardRow, MatchHistoryEntry, MatchMode, MatchRecord, MatchReplay, MatchStateView, PublicProfile, RunResult } from "@arena/shared";
 
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
@@ -230,6 +230,8 @@ export const api = {
   match: (id: string): Promise<MatchStateView> => req(`/matches/${id}`),
 
   publicMatch: (id: string): Promise<MatchStateView> => req(`/matches/${id}/public`),
+
+  matchReplay: (id: string): Promise<MatchReplay> => req(`/matches/${id}/replay`),
 
   matchHeartbeat: (id: string): Promise<{ ok: boolean }> =>
     req(`/matches/${id}/heartbeat`, { method: "POST", body: "{}" }),

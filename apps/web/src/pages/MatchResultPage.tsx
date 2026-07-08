@@ -82,6 +82,12 @@ export function MatchResultPage() {
               {copied ? "Copied!" : "Copy Link"}
             </button>
           </div>
+
+          {match && (
+            <Link to={`/replay/${match.id}`} style={{ marginTop: 18, color: "var(--v-ac)", fontFamily: "var(--disp)", fontWeight: 700, fontSize: 14, textDecoration: "none" }}>
+              Watch the full replay →
+            </Link>
+          )}
         </>
       )}
     </div>
