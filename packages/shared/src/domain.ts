@@ -135,6 +135,60 @@ export interface DailyView {
   calendar: CalendarDay[] | null;
 }
 
+// ── Match replay / post-match "game review" ────────────────────────────────
+export interface ReplayPlayer {
+  userId: string;
+  handle: string;
+  rating: number;
+  placement: number | null;
+  roundWins: number;
+  eliminatedRound: number | null;
+  forfeited: boolean;
+  ratingBefore: number | null;
+  ratingAfter: number | null;
+}
+
+export interface ReplayRoundEntry {
+  userId: string;
+  handle: string;
+  /** Total submissions this player made on this round's problem. */
+  attempts: number;
+  solved: boolean;
+  /** Ms from match start to this player's first accepted submission. */
+  solvedAtMs: number | null;
+  /** The first player to solve this round. */
+  firstSolver: boolean;
+}
+
+export interface ReplayRound {
+  round: number;
+  problem: { slug: string; title: string; difficulty: Difficulty; ratingValue: number } | null;
+  entries: ReplayRoundEntry[];
+}
+
+/** One submission on the chronological match feed. */
+export interface ReplayEvent {
+  /** Ms from match start. */
+  atMs: number;
+  userId: string;
+  handle: string;
+  round: number;
+  verdict: string;
+  accepted: boolean;
+}
+
+export interface MatchReplay {
+  id: string;
+  mode: MatchMode;
+  totalRounds: number;
+  startedAt: string;
+  endedAt: string | null;
+  durationMs: number | null;
+  players: ReplayPlayer[];
+  rounds: ReplayRound[];
+  timeline: ReplayEvent[];
+}
+
 export interface MatchProblemView {
   id: string;
   slug: string;

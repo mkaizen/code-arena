@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { joinQueue, leaveQueue, queueStatus, getMatchState, recordHeartbeat, MODE_CONFIG } from "../match/engine.js";
+import { getMatchReplay } from "../match/replay.js";
 import { prisma } from "../db.js";
 import type { MatchHistoryEntry, MatchMode } from "@arena/shared";
 
@@ -79,5 +80,14 @@ export async function matchRoutes(app: FastifyInstance) {
     const state = await getMatchState(id);
     if (!state || state.status !== "FINISHED") return reply.code(404).send({ error: "not found" });
     return state;
+  });
+
+  // Public, unauthenticated: a finished match reconstructed as a round-by-round
+  // "game review" + chronological submission feed for the /replay/:id page.
+  app.get("/matches/:id/replay", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const replay = await getMatchReplay(id);
+    if (!replay) return reply.code(404).send({ error: "not found" });
+    return replay;
   });
 }

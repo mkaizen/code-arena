@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, Link } from "react-router-dom";
 import { RECRUITER_THRESHOLD, tierOf, type MatchHistoryEntry, type MatchRecord } from "@arena/shared";
 import { TopBar } from "../components/TopBar.js";
 import { api, type Submission } from "../api.js";
@@ -273,11 +273,14 @@ export function ProfilePage() {
                 const delta = m.ratingBefore != null && m.ratingAfter != null ? m.ratingAfter - m.ratingBefore : null;
                 const place = m.placement != null ? (m.mode === "DUEL" ? (m.won ? "Win" : "Loss") : `#${m.placement} / ${m.playerCount}`) : "—";
                 return (
-                  <div
+                  <Link
                     key={m.matchId}
+                    to={`/replay/${m.matchId}`}
+                    title="Watch the replay"
                     style={{
                       display: "grid", gridTemplateColumns: "90px 1fr 90px 70px", gap: 8, padding: "10px 16px", alignItems: "center",
                       borderBottom: i < matches.length - 1 ? "1px solid var(--line-soft)" : "none", fontSize: 13,
+                      textDecoration: "none",
                     }}
                   >
                     <span style={{ fontFamily: "var(--disp)", fontSize: 11, fontWeight: 700, color: m.mode === "DUEL" ? "var(--v-tle)" : "var(--v-ac)" }}>
@@ -292,7 +295,7 @@ export function ProfilePage() {
                     <span style={{ color: "var(--txt-3)", fontSize: 11, textAlign: "right" }}>
                       {m.endedAt ? timeAgo(m.endedAt) : ""}
                     </span>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
