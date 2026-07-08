@@ -4,6 +4,7 @@ import Editor from "@monaco-editor/react";
 import { type Language } from "@arena/shared";
 import { TopBar } from "../components/TopBar.js";
 import { api, type Problem, type Submission } from "../api.js";
+import type { ProblemLeaderboard } from "@arena/shared";
 import { useAuth } from "../ctx/AuthContext.js";
 import { useWs } from "../hooks/useWs.js";
 import { loadDraft, saveDraft } from "../draft.js";
@@ -47,6 +48,30 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+function LeaderColumn({ title, rows, me }: { title: string; rows: { handle: string; metric: string; language: Language }[]; me?: string }) {
+  return (
+    <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 8, overflow: "hidden" }}>
+      <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--line-soft)", fontSize: 11, fontWeight: 700, color: "var(--txt-2)", fontFamily: "var(--disp)" }}>
+        {title}
+      </div>
+      {rows.length === 0 ? (
+        <div style={{ color: "var(--txt-3)", fontSize: 12, padding: "10px 12px" }}>No solves yet.</div>
+      ) : rows.map((r, i) => {
+        const mine = r.handle === me;
+        return (
+          <div key={`${r.handle}-${i}`} style={{ display: "grid", gridTemplateColumns: "18px 1fr auto", gap: 6, alignItems: "center", padding: "6px 12px", borderBottom: i < rows.length - 1 ? "1px solid var(--line-soft)" : "none", fontSize: 12, background: mine ? "var(--panel-2)" : "transparent" }}>
+            <span style={{ color: i === 0 ? "var(--v-tle)" : "var(--txt-3)", fontFamily: "var(--mono)", fontWeight: 700 }}>{i + 1}</span>
+            <Link to={`/u/${encodeURIComponent(r.handle)}`} style={{ fontFamily: "var(--mono)", color: mine ? "var(--v-ac)" : "var(--txt-2)", fontWeight: mine ? 700 : 500, textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={LANG_LABELS[r.language] ?? r.language}>
+              {r.handle}
+            </Link>
+            <span style={{ fontFamily: "var(--mono)", color: "var(--txt)", fontWeight: 600 }}>{r.metric}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ProblemPage() {
   const { slug } = useParams<{ slug: string }>();
   const { user } = useAuth();
@@ -66,6 +91,7 @@ export function ProblemPage() {
   // Onboarding nudge shown to logged-out visitors at peak intent: "submit" when
   // they try to submit, "solved" the moment their run passes every sample.
   const [signupNudge, setSignupNudge] = useState<null | "submit" | "solved">(null);
+  const [board, setBoard] = useState<ProblemLeaderboard | null>(null);
   const run = useRun(problem?.id, { poll: !user });
 
   useEffect(() => {
@@ -74,6 +100,7 @@ export function ProblemPage() {
     api.problem(slug)
       .then((p) => { setProblem(p); setLoading(false); })
       .catch((e: Error) => { setError(e.message); setLoading(false); });
+    api.problemLeaderboard(slug).then(setBoard).catch(() => {});
   }, [slug]);
 
   useEffect(() => {
@@ -130,6 +157,10 @@ export function ProblemPage() {
           },
           ...prev,
         ]);
+        // A new accepted solve may change the speed/brevity boards.
+        if (ev.result.verdict === "ACCEPTED" && slug) {
+          api.problemLeaderboard(slug).then(setBoard).catch(() => {});
+        }
       }
     }
   });
@@ -308,6 +339,32 @@ export function ProblemPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Speed & brevity leaderboards */}
+            {board && (board.fastest.length > 0 || board.shortest.length > 0) && (
+              <div style={{ marginTop: 28 }}>
+                <h3 style={{ fontFamily: "var(--disp)", fontSize: 14, fontWeight: 600, color: "var(--txt-3)", marginBottom: 10 }}>
+                  Leaderboard
+                </h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <LeaderColumn
+                    title="⚡ Fastest runtime"
+                    rows={board.fastest.map((r) => ({ handle: r.handle, metric: `${r.timeMs}ms`, language: r.language }))}
+                    me={user?.handle}
+                  />
+                  <LeaderColumn
+                    title="✂️ Shortest code"
+                    rows={board.shortest.map((r) => ({ handle: r.handle, metric: `${r.chars} ch`, language: r.language }))}
+                    me={user?.handle}
+                  />
+                </div>
+                {user && !submissions.some((s) => s.verdict === "ACCEPTED") && (
+                  <div style={{ color: "var(--txt-3)", fontSize: 12, marginTop: 10 }}>
+                    Solve it to claim your spot — the fastest and shortest accepted solutions rank here.
+                  </div>
+                )}
               </div>
             )}
           </div>
