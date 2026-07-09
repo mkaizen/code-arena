@@ -18,9 +18,3 @@ ALTER TABLE "GhostRun" ADD CONSTRAINT "GhostRun_problemId_fkey" FOREIGN KEY ("pr
 
 -- AddForeignKey
 ALTER TABLE "GhostRun" ADD CONSTRAINT "GhostRun_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
-npm notice
-npm notice New major version of npm available! 10.9.7 -> 11.18.0
-npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.18.0
-npm notice To update run: npm install -g npm@11.18.0
-npm notice
