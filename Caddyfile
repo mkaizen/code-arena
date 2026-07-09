@@ -19,9 +19,17 @@
 		reverse_proxy api:8080
 	}
 
-	# SPA: serve static assets, fall back to index.html for client-side routes.
+	# SPA + prerendered pages. If a prerendered clean-URL page exists
+	# (e.g. /problems/two-sum → /srv/problems/two-sum.html from prerender.mjs),
+	# rewrite to it — before try_files, so the enclosing directory can't match
+	# and trigger a trailing-slash redirect. Otherwise serve the asset if it
+	# exists, else fall back to the SPA shell for client-side routes.
 	handle {
 		root * /srv
+		@prerendered {
+			file {path}.html
+		}
+		rewrite @prerendered {path}.html
 		try_files {path} /index.html
 		file_server
 	}
