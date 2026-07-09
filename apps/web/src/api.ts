@@ -69,6 +69,7 @@ export interface Sample {
 
 export interface Problem extends ProblemSummary {
   statement: string;
+  editorial: string | null;
   timeMs: number;
   memoryKb: number;
   samples: Sample[];
@@ -88,6 +89,7 @@ export interface AdminProblemDetail {
   slug: string;
   title: string;
   statement: string;
+  editorial: string | null;
   difficulty: "easy" | "med" | "hard";
   ratingValue: number;
   tags: string[];
@@ -183,7 +185,7 @@ export const api = {
 
   // Admin routes
   adminCreateProblem: (body: {
-    slug: string; title: string; statement: string;
+    slug: string; title: string; statement: string; editorial?: string;
     difficulty: "easy" | "med" | "hard"; ratingValue: number; tags: string[];
     timeMs: number; memoryKb: number;
     samples: { input: string; output: string }[];
@@ -196,7 +198,7 @@ export const api = {
   adminGetProblem: (id: string): Promise<AdminProblemDetail> => req(`/admin/problems/${id}`),
 
   adminUpdateProblem: (id: string, body: {
-    slug: string; title: string; statement: string;
+    slug: string; title: string; statement: string; editorial?: string;
     difficulty: "easy" | "med" | "hard"; ratingValue: number; tags: string[];
     timeMs: number; memoryKb: number;
     samples: { input: string; output: string }[];

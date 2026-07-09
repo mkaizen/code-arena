@@ -312,6 +312,21 @@ export function ProblemPage() {
               </div>
             )}
 
+            {/* Editorial — kept in the DOM (crawlable) but collapsed behind a
+                spoiler toggle so it doesn't give the solution away by default. */}
+            {problem.editorial && (
+              <details style={{ marginTop: 28, border: "1px solid var(--line)", borderRadius: 8, background: "var(--panel)", padding: "0 16px" }}>
+                <summary style={{ cursor: "pointer", padding: "12px 0", fontFamily: "var(--disp)", fontSize: 14, fontWeight: 600, color: "var(--v-tle)", listStyle: "none" }}>
+                  📖 Editorial — solution walkthrough (spoiler)
+                </summary>
+                <div
+                  className="editorial"
+                  dangerouslySetInnerHTML={{ __html: sanitizeStatement(problem.editorial) }}
+                  style={{ color: "var(--txt-2)", fontSize: 13, lineHeight: 1.8, padding: "4px 0 16px" }}
+                />
+              </details>
+            )}
+
             {/* Submission history */}
             {submissions.length > 0 && (
               <div style={{ marginTop: 28 }}>

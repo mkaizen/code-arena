@@ -50,12 +50,31 @@ interface ProblemSeed {
   slug: string;
   title: string;
   statement: string;
+  editorial?: string;
   difficulty: "easy" | "med" | "hard";
   ratingValue: number;
   tags: string[];
   samples: { input: string; output: string }[];
   tests: { input: string; output: string }[];
 }
+
+// Editorials for the marquee interview-question problems — solution
+// walkthroughs that add indexable, long-tail SEO depth to those pages. Keyed by
+// slug and merged into the bank at seed time (also updated on re-seed).
+const EDITORIALS: Record<string, string> = {
+  "two-sum":
+    "<h3>Approach</h3><p>The brute-force solution checks every pair of numbers in <code>O(n²)</code> time. We can do better with a hash map. As we scan the array once, for each value <code>x</code> we ask: have we already seen its complement <code>target − x</code>? If so, we've found the pair; if not, we record <code>x</code> and its index and move on.</p><h3>Why it works</h3><p>By storing each number's index as we go, the complement lookup is <code>O(1)</code>, so a single pass answers the question. Because we check for the complement <em>before</em> inserting the current element, we never pair an element with itself.</p><pre><code>seen = {}\nfor i, x in enumerate(nums):\n    if target - x in seen:\n        return [seen[target - x], i]\n    seen[x] = i</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n) — one pass. <strong>Space:</strong> O(n) for the hash map.</p>",
+  "valid-parentheses":
+    "<h3>Approach</h3><p>Bracket matching is the canonical use case for a <strong>stack</strong>. Scan left to right: push every opening bracket. On a closing bracket, the most recently opened bracket must be its match — so pop the stack and compare. If it doesn't match (or the stack is empty), the string is invalid.</p><h3>Key insight</h3><p>Valid nesting is <em>last-opened, first-closed</em> — exactly LIFO order, which is what a stack models. At the end, a valid string leaves the stack empty; anything left over means an unclosed bracket.</p><pre><code>pairs = {')':'(', ']':'[', '}':'{'}\nstack = []\nfor c in s:\n    if c in '([{': stack.append(c)\n    elif not stack or stack.pop() != pairs[c]:\n        return False\nreturn not stack</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(n) in the worst case (all opening brackets).</p>",
+  "best-time-to-buy-and-sell-stock":
+    "<h3>Approach</h3><p>You want the largest <code>price[j] − price[i]</code> with <code>j &gt; i</code>. A single pass suffices: track the <strong>minimum price seen so far</strong>, and at each day compute the profit if you sold today (today's price minus that running minimum), keeping the best.</p><h3>Why one pass works</h3><p>The best sell day only depends on the cheapest buy day <em>before</em> it. By carrying the running minimum forward, every day already knows the optimal buy price to its left, so no nested loop is needed.</p><pre><code>min_price = infinity\nbest = 0\nfor p in prices:\n    min_price = min(min_price, p)\n    best = max(best, p - min_price)\nreturn best</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1).</p>",
+  "contains-duplicate":
+    "<h3>Approach</h3><p>Add each number to a hash set as you go. If a number is already in the set, you've found a duplicate. If you finish the array without a collision, every value was unique.</p><h3>Alternative</h3><p>Sorting first makes duplicates adjacent, so a single scan comparing neighbours also works — that's O(n log n) time but O(1) extra space if you may modify the input. The hash-set method trades space for speed.</p><pre><code>seen = set()\nfor x in nums:\n    if x in seen: return True\n    seen.add(x)\nreturn False</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(n).</p>",
+  "valid-palindrome":
+    "<h3>Approach</h3><p>Use two pointers, one at each end. Skip any non-alphanumeric characters, compare the two characters case-insensitively, then move both inward. If any pair differs, it's not a palindrome; if the pointers cross, it is.</p><h3>Why two pointers</h3><p>A palindrome reads the same forwards and backwards, so the k-th character from the front must equal the k-th from the back. Comparing from both ends toward the middle checks exactly those constraints in a single O(n) pass with no extra string allocations.</p><pre><code>i, j = 0, len(s) - 1\nwhile i &lt; j:\n    while i &lt; j and not s[i].isalnum(): i += 1\n    while i &lt; j and not s[j].isalnum(): j -= 1\n    if s[i].lower() != s[j].lower(): return False\n    i, j = i + 1, j - 1\nreturn True</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1).</p>",
+  "climbing-stairs":
+    "<h3>Approach</h3><p>To reach step <code>n</code> your last move was either a single step (from <code>n−1</code>) or a double step (from <code>n−2</code>). So the number of ways satisfies <code>ways(n) = ways(n−1) + ways(n−2)</code> — the Fibonacci recurrence.</p><h3>From recursion to O(1) space</h3><p>Naïve recursion recomputes the same subproblems exponentially. Since each value only needs the previous two, we can iterate upward keeping just two running totals instead of a full table.</p><pre><code>a, b = 1, 1  # ways(0), ways(1)\nfor _ in range(n):\n    a, b = b, a + b\nreturn a</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1).</p>",
+};
 
 const PROBLEMS: ProblemSeed[] = [
   {
@@ -225,9 +244,10 @@ async function main() {
   // bank half-populated. Re-running also self-heals any problem an earlier
   // partial run left pointing at a placeholder tests key.
   const problemIds: string[] = [];
-  let nCreated = 0, nRepaired = 0, nSkipped = 0, nFailed = 0;
+  let nCreated = 0, nRepaired = 0, nSkipped = 0, nFailed = 0, nEditorials = 0;
   for (const p of PROBLEMS) {
     try {
+      const editorial = p.editorial ?? EDITORIALS[p.slug] ?? null;
       const existing = await prisma.problem.findUnique({ where: { slug: p.slug } });
       if (existing) {
         problemIds.push(existing.id);
@@ -241,6 +261,11 @@ async function main() {
         } else {
           nSkipped++;
         }
+        // Backfill/refresh editorials on existing problems (idempotent).
+        if (editorial && existing.editorial !== editorial) {
+          await prisma.problem.update({ where: { id: existing.id }, data: { editorial } });
+          nEditorials++;
+        }
         continue;
       }
       const created = await prisma.problem.create({
@@ -248,6 +273,7 @@ async function main() {
           slug: p.slug,
           title: p.title,
           statement: p.statement,
+          editorial,
           difficulty: p.difficulty,
           ratingValue: p.ratingValue,
           tags: p.tags,
@@ -269,7 +295,7 @@ async function main() {
       console.error(`FAILED to seed problem ${p.slug}: ${err instanceof Error ? err.message : err}`);
     }
   }
-  console.log(`problems: ${nCreated} created, ${nRepaired} repaired, ${nSkipped} already present, ${nFailed} failed (of ${PROBLEMS.length} total)`);
+  console.log(`problems: ${nCreated} created, ${nRepaired} repaired, ${nSkipped} already present, ${nEditorials} editorials set, ${nFailed} failed (of ${PROBLEMS.length} total)`);
 
   // ── Live contest ──────────────────────────────────────────────────────────
   // Always reset start time so re-running seed gives a fresh live contest.

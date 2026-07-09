@@ -107,6 +107,7 @@ model Problem {
   slug        String     @unique
   title       String
   statement   String     // markdown/HTML
+  editorial   String?    // optional solution write-up (HTML); indexable SEO depth
   difficulty  Difficulty
   ratingValue Int        // numeric difficulty (FR-5)
   tags        String[]   // FR-5
