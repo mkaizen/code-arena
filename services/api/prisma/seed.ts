@@ -174,6 +174,88 @@ const EDITORIALS: Record<string, string> = {
     "<p><strong>Decimal to Binary</strong> converts a non-negative integer to its base-2 representation — the inverse of binary-to-decimal.</p><h3>Approach</h3><p>Repeatedly divide by 2, collecting the remainders; those are the binary digits produced least-significant first, so reverse them at the end. Treat 0 as a special case.</p><pre><code>if n == 0: return '0'\nbits = []\nwhile n:\n    bits.append(str(n % 2))\n    n //= 2\nreturn ''.join(reversed(bits))</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(log n). <strong>Space:</strong> O(log n).</p>",
   "gcd-array":
     "<p><strong>GCD of an Array</strong> extends the pairwise greatest common divisor to a whole list — a number-theory problem built on the Euclidean algorithm.</p><h3>Approach</h3><p>The GCD is associative: <code>gcd(a, b, c) = gcd(gcd(a, b), c)</code>. Fold the array carrying a running GCD — it only ever shrinks, and reaching 1 lets you stop early.</p><pre><code>from math import gcd\ng = 0\nfor x in nums:\n    g = gcd(g, x)\n    if g == 1: break\nreturn g</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n log(max value)). <strong>Space:</strong> O(1).</p>",
+  "sum-of-two":
+    "<p><strong>Sum of Two</strong> is the simplest warm-up: read two integers and print their sum. The one gotcha is range — two values near 10⁹ sum past 32-bit limits, so use a 64-bit integer type (Python and JavaScript widen automatically).</p><pre><code>a, b = map(int, input().split())\nprint(a + b)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(1). <strong>Space:</strong> O(1).</p>",
+  "hello-name":
+    "<p><strong>Greeting</strong> is a first-program exercise in reading input and formatting output: read a name and print <code>Hello, &lt;name&gt;!</code>. It's all about string interpolation and getting the punctuation exactly right.</p><pre><code>name = input()\nprint(f'Hello, {name}!')</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(n).</p>",
+  "count-vowels":
+    "<p><strong>Count the Vowels</strong> is a basic string-scanning task: count how many characters are vowels, case-insensitively. Put the vowels in a set for O(1) membership tests and scan once.</p><pre><code>vowels = set('aeiouAEIOU')\nprint(sum(1 for c in s if c in vowels))</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1).</p>",
+  "sort-array":
+    "<p><strong>Sort the Array</strong> asks you to output the integers in non-decreasing order — a direct use of your language's built-in sort.</p><h3>Note</h3><p>Library sorts (Timsort, introsort) are O(n log n) and heavily optimized; hand-rolling a sort is rarely worthwhile outside of learning the algorithms themselves.</p><pre><code>nums.sort()\nprint(*nums)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n log n). <strong>Space:</strong> O(n) or O(1) depending on the sort.</p>",
+  "array-sum":
+    "<p><strong>Array Sum</strong> totals all the integers in a list. Accumulate in a single pass, and keep the total in a 64-bit integer since many large values can overflow 32 bits.</p><pre><code>print(sum(nums))</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1).</p>",
+  "max-of-three":
+    "<p><strong>Max of Three</strong> returns the largest of three integers — a first look at comparisons. Chained <code>max</code> calls (or a variadic built-in max) read most clearly and avoid nested if-statements.</p><pre><code>print(max(a, b, c))</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(1). <strong>Space:</strong> O(1).</p>",
+  "even-or-odd":
+    "<p><strong>Even or Odd</strong> tests a number's parity with the modulo operator: <code>n % 2 == 0</code> means even (and it works for negatives). For very large values, checking the last bit with <code>n &amp; 1</code> is an equivalent, fast alternative.</p><pre><code>print('Even' if n % 2 == 0 else 'Odd')</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(1). <strong>Space:</strong> O(1).</p>",
+  "count-words":
+    "<p><strong>Count Words</strong> returns the number of whitespace-separated words in a line. Splitting on whitespace — which collapses runs of spaces — and taking the length is the cleanest approach.</p><pre><code>print(len(line.split()))</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(n).</p>",
+  "digit-sum":
+    "<p><strong>Sum of Digits</strong> adds up a number's decimal digits. Peel them off with <code>% 10</code> and <code>// 10</code>, or iterate the string form and sum the digit values.</p><pre><code>total = 0\nwhile n:\n    total += n % 10\n    n //= 10\nprint(total)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(d) in the number of digits. <strong>Space:</strong> O(1).</p>",
+  "factorial":
+    "<p><strong>Factorial</strong> computes <code>n! = 1·2·…·n</code>, with <code>0! = 1</code>. Multiply iteratively. Even <code>20!</code> exceeds 32 bits, so use a 64-bit (or arbitrary-precision) integer.</p><pre><code>result = 1\nfor i in range(2, n+1):\n    result *= i\nprint(result)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1).</p>",
+  "palindrome-check":
+    "<p><strong>Palindrome Check</strong> tests whether a string reads the same forwards and backwards, character for character. Compare it to its reverse, or use two pointers converging from both ends.</p><pre><code>print('YES' if s == s[::-1] else 'NO')</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1) with the two-pointer version. (Unlike Valid Palindrome, this checks the raw string without ignoring case or punctuation.)</p>",
+  "min-of-array":
+    "<p><strong>Minimum of an Array</strong> finds the smallest value in one pass, tracking a running minimum — exactly what the built-in <code>min</code> does.</p><pre><code>print(min(nums))</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1).</p>",
+  "multiply-two":
+    "<p><strong>Multiply Two</strong> prints the product of two integers. The subtlety is range: two values up to 10⁹ multiply to about 10¹⁸, which needs a 64-bit integer to hold.</p><pre><code>print(a * b)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(1). <strong>Space:</strong> O(1).</p>",
+  "absolute-value":
+    "<p><strong>Absolute Value</strong> returns a number's magnitude without its sign — negate it when negative, otherwise leave it. The built-in <code>abs</code> is the idiomatic choice.</p><pre><code>print(n if n &gt;= 0 else -n)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(1). <strong>Space:</strong> O(1).</p>",
+  "last-digit":
+    "<p><strong>Last Digit</strong> extracts the ones digit of a number, ignoring its sign: take the absolute value modulo 10.</p><pre><code>print(abs(n) % 10)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(1). <strong>Space:</strong> O(1).</p>",
+  "to-uppercase":
+    "<p><strong>To Uppercase</strong> converts every letter in a line to uppercase while leaving digits and punctuation untouched — a one-liner with a built-in, or a manual map subtracting the ASCII case offset (32) from lowercase letters.</p><pre><code>print(line.upper())</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(n).</p>",
+  "is-leap-year":
+    "<p><strong>Leap Year</strong> applies the Gregorian rule: a year is a leap year if it's divisible by 4, except centuries, which must also be divisible by 400. So 2000 qualifies but 1900 does not.</p><pre><code>leap = year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)\nprint('YES' if leap else 'NO')</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(1). <strong>Space:</strong> O(1).</p>",
+  "count-evens":
+    "<p><strong>Count Even Numbers</strong> tallies how many array values are even. Scan once, testing each with <code>x % 2 == 0</code>.</p><pre><code>print(sum(1 for x in nums if x % 2 == 0))</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1).</p>",
+  "sum-range":
+    "<p><strong>Sum of a Range</strong> adds every integer from <code>a</code> to <code>b</code> inclusive. Looping works, but the arithmetic-series formula gives it in O(1): <code>(a + b) · (b − a + 1) / 2</code>.</p><pre><code>print((a + b) * (b - a + 1) // 2)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(1) with the formula. <strong>Space:</strong> O(1).</p>",
+  "char-count":
+    "<p><strong>Character Count</strong> counts how many times a given character appears in a string — a single scan tallying matches, or a built-in count method.</p><pre><code>print(s.count(ch))</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1).</p>",
+  "two-sum-target":
+    "<p><strong>Two Sum Exists</strong> is the yes/no variant of Two Sum: does some pair of numbers add up to the target? Keep seen values in a hash set; for each <code>x</code>, if <code>target − x</code> was already seen, a pair exists.</p><pre><code>seen = set()\nfound = False\nfor x in nums:\n    if target - x in seen:\n        found = True; break\n    seen.add(x)\nprint('YES' if found else 'NO')</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(n). (The classic Two Sum returns the pair's indices; here only existence is needed.)</p>",
+  "cart-total":
+    "<p><strong>Shopping Cart Total</strong> sums item prices given in cents. Accumulate in one pass and keep the total in a 64-bit integer. Working in integer cents rather than floating-point dollars avoids rounding errors.</p><pre><code>print(sum(prices))</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1).</p>",
+  "bulk-discount":
+    "<p><strong>Apply a Discount</strong> reduces a price by a whole-percent discount, rounding down. Compute <code>price · (100 − d) / 100</code> with integer division to stay exact in cents.</p><pre><code>print(price * (100 - d) // 100)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(1). <strong>Space:</strong> O(1).</p>",
+  "sales-tax":
+    "<p><strong>Add Sales Tax</strong> adds a whole-percent tax to a price, rounding the tax down. Compute the tax as <code>price · r / 100</code> with integer division and add it back — all in integer cents to avoid floating-point drift.</p><pre><code>print(price + price * r // 100)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(1). <strong>Space:</strong> O(1).</p>",
+  "passing-students":
+    "<p><strong>Passing Students</strong> counts how many exam scores reach the passing mark (60). A single scan with one comparison does it.</p><pre><code>print(sum(1 for s in scores if s &gt;= 60))</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1).</p>",
+  "class-average":
+    "<p><strong>Class Average</strong> computes the mean score, rounded down. Sum the scores and use integer division by the count.</p><pre><code>print(sum(scores) // len(scores))</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1).</p>",
+  "temperature-swing":
+    "<p><strong>Temperature Swing</strong> reports the spread between the hottest and coldest reading — the maximum minus the minimum. A single pass can track both extremes at once.</p><pre><code>print(max(temps) - min(temps))</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1).</p>",
+  "low-stock-alert":
+    "<p><strong>Low Stock Alert</strong> counts how many products fall below a restock threshold. Scan the stock levels, counting values strictly less than the threshold.</p><pre><code>print(sum(1 for x in stock if x &lt; threshold))</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1).</p>",
+  "pagination-pages":
+    "<p><strong>Pagination</strong> computes how many fixed-size pages are needed to show every item — a ceiling division. Avoid floats: <code>(total + size − 1) // size</code> rounds up exactly and yields 0 when there are no items.</p><pre><code>print((total + size - 1) // size)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(1). <strong>Space:</strong> O(1).</p>",
+  "unique-visitors":
+    "<p><strong>Unique Visitors</strong> counts the distinct IDs in a day's log — a direct use of a hash set, whose size after inserting every ID is the answer.</p><pre><code>print(len(set(ids)))</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(n).</p>",
+  "gc-content":
+    "<p><strong>GC Content</strong> reports the percentage of a DNA strand that is <code>G</code> or <code>C</code>, rounded down — a common bioinformatics measure. Count the G/C bases and scale by 100 over the length with integer division.</p><pre><code>gc = sum(1 for c in dna if c in 'GC')\nprint(100 * gc // len(dna))</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1).</p>",
+  "top-word":
+    "<p><strong>Most Common Word</strong> finds the highest-frequency word, breaking ties alphabetically. Count words with a hash map, then choose the best — the smallest word on a tie.</p><pre><code>from collections import Counter\ncounts = Counter(words)\nbest = min(counts, key=lambda w: (-counts[w], w))\nprint(best)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(k) for k distinct words.</p>",
+  "distinct-words":
+    "<p><strong>Distinct Words</strong> counts how many unique words appear in a line (case-sensitive). Split into words and put them in a set — its size is the answer.</p><pre><code>print(len(set(line.split())))</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(n).</p>",
+  "duration-to-seconds":
+    "<p><strong>Parse a Timestamp</strong> converts <code>HH:MM:SS</code> into a total number of seconds. Split on the colons and combine: <code>hours·3600 + minutes·60 + seconds</code>.</p><pre><code>h, m, s = map(int, text.split(':'))\nprint(h*3600 + m*60 + s)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(1). <strong>Space:</strong> O(1).</p>",
+  "format-duration":
+    "<p><strong>Format a Video Length</strong> is the inverse: turn a second count into <code>H:MM:SS</code>, zero-padding minutes and seconds to two digits. Use integer division and modulo to peel off hours, then minutes, then seconds.</p><pre><code>h = total // 3600\nm = (total % 3600) // 60\ns = total % 60\nprint(f'{h}:{m:02d}:{s:02d}')</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(1). <strong>Space:</strong> O(1).</p>",
+  "leaderboard-ranking":
+    "<p><strong>Leaderboard Ranking</strong> orders players by score (highest first), breaking ties alphabetically — a custom multi-key sort.</p><h3>Approach</h3><p>Sort by a composite key: descending score, then ascending name. Most languages let you sort by a tuple such as <code>(-score, name)</code>.</p><pre><code>players.sort(key=lambda p: (-p.score, p.name))\nfor p in players:\n    print(p.name)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n log n). <strong>Space:</strong> O(n).</p>",
+  "grade-histogram":
+    "<p><strong>Grade Distribution</strong> buckets scores into letter grades A–F and reports the counts. Map each score to a bucket with a short chain of threshold comparisons and tally.</p><pre><code>b = [0]*5  # A B C D F\nfor s in scores:\n    if s &gt;= 90: b[0] += 1\n    elif s &gt;= 80: b[1] += 1\n    elif s &gt;= 70: b[2] += 1\n    elif s &gt;= 60: b[3] += 1\n    else: b[4] += 1\nprint(*b)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1).</p>",
+  "win-streak":
+    "<p><strong>Longest Win Streak</strong> finds the longest run of consecutive <code>W</code>s in a season string — a classic run-length scan. Keep a current-streak counter that resets on every loss, tracking the maximum seen.</p><pre><code>best = cur = 0\nfor c in s:\n    cur = cur + 1 if c == 'W' else 0\n    best = max(best, cur)\nprint(best)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1).</p>",
+  "csv-column-sum":
+    "<p><strong>Sum a Spreadsheet Column</strong> adds the values in one column of comma-separated rows. Split each row on commas, take the k-th field, convert it to a number, and accumulate.</p><pre><code>total = 0\nfor row in rows:\n    total += int(row.split(',')[k])\nprint(total)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n × cols). <strong>Space:</strong> O(cols) per row.</p>",
+  "bracket-depth":
+    "<p><strong>Maximum Nesting Depth</strong> reports how deeply brackets nest. Track a running depth: increment on each opening bracket, decrement on each closing one, and record the peak.</p><pre><code>depth = peak = 0\nfor c in s:\n    if c in '([{':\n        depth += 1; peak = max(peak, depth)\n    elif c in ')]}':\n        depth -= 1\nprint(peak)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(n). <strong>Space:</strong> O(1) — no stack is needed when you only want the depth.</p>",
+  "spend-threshold":
+    "<p><strong>Spend and Save</strong> applies a flat discount once the cart total reaches a threshold: spend at least 1000 cents to take 100 cents off. A single conditional handles it.</p><pre><code>print(total - 100 if total &gt;= 1000 else total)</code></pre><h3>Complexity</h3><p><strong>Time:</strong> O(1). <strong>Space:</strong> O(1).</p>",
 };
 
 const PROBLEMS: ProblemSeed[] = [
