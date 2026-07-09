@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+# Interactive/authed surfaces with no standalone SEO value.
+Disallow: /admin
+Disallow: /race/
+Disallow: /auth/
+
+Sitemap: https://codearena.space/sitemap.xml

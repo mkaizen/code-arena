@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useSeo } from "../hooks/useSeo.js";
 import { tierOf, type PublicProfile } from "@arena/shared";
 import { TopBar } from "../components/TopBar.js";
 import { api } from "../api.js";
@@ -43,6 +44,14 @@ export function UserProfilePage() {
 
   const tier = profile ? tierOf(profile.rating) : null;
   const isMe = !!profile && user?.handle === profile.handle;
+
+  useSeo({
+    title: profile ? `${profile.handle} (${profile.rating})` : handle ?? "Profile",
+    description: profile
+      ? `${profile.handle} — rating ${profile.rating}${tier ? `, ${tier.name}` : ""}, ${profile.solved} problems solved on Code Arena.`
+      : undefined,
+    path: handle ? `/u/${encodeURIComponent(handle)}` : undefined,
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "var(--ink)" }}>

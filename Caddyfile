@@ -13,6 +13,12 @@
 		reverse_proxy api:8080
 	}
 
+	# Dynamic sitemap lives at the site root (crawler convention) but is served
+	# by the API so it always reflects the current problem bank.
+	handle /sitemap.xml {
+		reverse_proxy api:8080
+	}
+
 	# SPA: serve static assets, fall back to index.html for client-side routes.
 	handle {
 		root * /srv

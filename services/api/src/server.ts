@@ -15,6 +15,7 @@ import { matchRoutes } from "./routes/matches.js";
 import { userRoutes } from "./routes/users.js";
 import { dailyRoutes } from "./routes/daily.js";
 import { ghostRoutes } from "./routes/ghost.js";
+import { seoRoutes } from "./routes/seo.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { wsRoutes } from "./ws.js";
 import { startVerdictSubscriber } from "./leaderboard/verdictSub.js";
@@ -61,6 +62,7 @@ async function main() {
   await app.register(userRoutes);
   await app.register(dailyRoutes);
   await app.register(ghostRoutes);
+  await app.register(seoRoutes);
   await app.register(notificationRoutes);
   await app.register(wsRoutes);
 
