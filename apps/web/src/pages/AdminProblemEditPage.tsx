@@ -44,6 +44,7 @@ export function AdminProblemEditPage() {
   const [slug, setSlug] = useState("");
   const [title, setTitle] = useState("");
   const [statement, setStatement] = useState("");
+  const [editorial, setEditorial] = useState("");
   const [difficulty, setDifficulty] = useState<"easy" | "med" | "hard">("easy");
   const [ratingValue, setRatingValue] = useState(1200);
   const [tags, setTags] = useState("");
@@ -62,7 +63,7 @@ export function AdminProblemEditPage() {
     if (!id) return;
     api.adminGetProblem(id)
       .then((p) => {
-        setSlug(p.slug); setTitle(p.title); setStatement(p.statement);
+        setSlug(p.slug); setTitle(p.title); setStatement(p.statement); setEditorial(p.editorial ?? "");
         setDifficulty(p.difficulty); setRatingValue(p.ratingValue); setTags(p.tags.join(", "));
         setTimeMs(p.timeMs); setMemoryKb(p.memoryKb); setTestCount(p.testCount);
         setSamples(p.samples.length ? p.samples : [{ input: "", output: "" }]);
@@ -78,7 +79,7 @@ export function AdminProblemEditPage() {
     setSaving(true);
     try {
       const result = await api.adminUpdateProblem(id, {
-        slug, title, statement, difficulty, ratingValue,
+        slug, title, statement, editorial: editorial.trim() || undefined, difficulty, ratingValue,
         tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
         timeMs, memoryKb, samples,
       });
@@ -111,6 +112,8 @@ export function AdminProblemEditPage() {
           </div>
 
           <div><label style={labelStyle}>Statement (HTML)</label><textarea value={statement} onChange={(e) => setStatement(e.target.value)} rows={8} required style={{ ...inputStyle, fontFamily: "var(--mono)", fontSize: 13, resize: "vertical" }} /></div>
+
+          <div><label style={labelStyle}>Editorial (HTML, optional — solution write-up shown behind a spoiler toggle)</label><textarea value={editorial} onChange={(e) => setEditorial(e.target.value)} rows={8} placeholder="<p>Approach…</p>" style={{ ...inputStyle, fontFamily: "var(--mono)", fontSize: 13, resize: "vertical" }} /></div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12 }}>
             <div><label style={labelStyle}>Difficulty</label>

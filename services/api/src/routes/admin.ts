@@ -46,6 +46,7 @@ const problemBody = z.object({
   slug: z.string().min(2).max(64).regex(/^[a-z0-9-]+$/),
   title: z.string().min(2).max(128),
   statement: z.string().min(1),
+  editorial: z.string().max(40_000).optional(),
   difficulty: z.enum(["easy", "med", "hard"]),
   ratingValue: z.number().int().min(800).max(3500),
   tags: z.array(z.string()).default([]),
@@ -59,6 +60,7 @@ const problemUpdateBody = z.object({
   slug: z.string().min(2).max(64).regex(/^[a-z0-9-]+$/),
   title: z.string().min(2).max(128),
   statement: z.string().min(1),
+  editorial: z.string().max(40_000).optional(),
   difficulty: z.enum(["easy", "med", "hard"]),
   ratingValue: z.number().int().min(800).max(3500),
   tags: z.array(z.string()).default([]),
@@ -93,6 +95,7 @@ export async function adminRoutes(app: FastifyInstance) {
         slug: b.slug,
         title: b.title,
         statement: b.statement,
+        editorial: b.editorial ?? null,
         difficulty: b.difficulty as any,
         ratingValue: b.ratingValue,
         tags: b.tags,
@@ -136,7 +139,7 @@ export async function adminRoutes(app: FastifyInstance) {
     });
     if (!p) return reply.code(404).send({ error: "not found" });
     return {
-      id: p.id, slug: p.slug, title: p.title, statement: p.statement,
+      id: p.id, slug: p.slug, title: p.title, statement: p.statement, editorial: p.editorial,
       difficulty: p.difficulty, ratingValue: p.ratingValue, tags: p.tags,
       timeMs: p.timeMs, memoryKb: p.memoryKb, testCount: p.testCount,
       samples: p.samples.map((s) => ({ input: s.input, output: s.output })),
@@ -159,6 +162,7 @@ export async function adminRoutes(app: FastifyInstance) {
           slug: b.slug,
           title: b.title,
           statement: b.statement,
+          editorial: b.editorial ?? null,
           difficulty: b.difficulty as any,
           ratingValue: b.ratingValue,
           tags: b.tags,
