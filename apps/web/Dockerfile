@@ -16,6 +16,9 @@ RUN pnpm install --frozen-lockfile
 
 COPY packages/shared packages/shared
 COPY apps/web apps/web
+# The prerender step (below) reads the canonical problem data from the seed to
+# bake SEO content into static per-problem HTML.
+COPY services/api/prisma/seed.ts services/api/prisma/seed.ts
 
 # Baked at build time. The compose file passes https://$DOMAIN/api so REST hits
 # /api/* and the WS client derives wss://$DOMAIN/api/ws — both stripped to root
@@ -27,7 +30,10 @@ ARG VITE_GITHUB_CLIENT_ID=
 ARG VITE_GOOGLE_CLIENT_ID=
 ENV VITE_GITHUB_CLIENT_ID=$VITE_GITHUB_CLIENT_ID
 ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
-RUN pnpm --filter @arena/shared build && pnpm --filter @arena/web build
+# Build the SPA, then prerender per-problem HTML (SSG) for SEO.
+RUN pnpm --filter @arena/shared build \
+  && pnpm --filter @arena/web build \
+  && node apps/web/prerender.mjs
 
 FROM caddy:2-alpine
 COPY --from=build /app/apps/web/dist /srv
