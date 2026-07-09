@@ -4,6 +4,7 @@ import { tierOf } from "@arena/shared";
 import { TopBar } from "../components/TopBar.js";
 import { api, type ProblemSummary } from "../api.js";
 import { useAuth } from "../ctx/AuthContext.js";
+import { useSeo } from "../hooks/useSeo.js";
 
 type Difficulty = "all" | "easy" | "med" | "hard";
 
@@ -30,6 +31,12 @@ export function ProblemsPage() {
   const [diff, setDiff] = useState<Difficulty>("all");
   const [activeTag, setActiveTag] = useState<string>("");
   const navigate = useNavigate();
+
+  useSeo({
+    title: "Practice Problems",
+    description: "Browse Code Arena's problem bank — classic interview questions and algorithm challenges across easy, medium, and hard, each with a live judge and speed leaderboards.",
+    path: "/problems",
+  });
 
   useEffect(() => {
     setLoading(true);

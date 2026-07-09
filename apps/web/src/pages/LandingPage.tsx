@@ -1,5 +1,6 @@
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../ctx/AuthContext.js";
+import { useSeo } from "../hooks/useSeo.js";
 
 function TermLine({ delay, dim, children }: { delay: number; dim?: boolean; children: React.ReactNode }) {
   return (
@@ -67,6 +68,8 @@ const eyebrow: React.CSSProperties = {
 export function LandingPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  useSeo({ path: "/" }); // default homepage title/description
 
   if (user) return <Navigate to="/contests" replace />;
 

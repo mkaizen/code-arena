@@ -12,6 +12,7 @@ import { STARTERS, LANG_LABELS, MONACO_LANG } from "../starters.js";
 import { useRun } from "../hooks/useRun.js";
 import { RunResults } from "../components/RunResults.js";
 import { sanitizeStatement } from "../sanitize.js";
+import { useSeo, metaFromHtml } from "../hooks/useSeo.js";
 import type { ServerEvent } from "@arena/shared";
 
 function verdictColor(verdict: string): string {
@@ -93,6 +94,14 @@ export function ProblemPage() {
   const [signupNudge, setSignupNudge] = useState<null | "submit" | "solved">(null);
   const [board, setBoard] = useState<ProblemLeaderboard | null>(null);
   const run = useRun(problem?.id, { poll: !user });
+
+  useSeo({
+    title: problem ? problem.title : "Loading…",
+    description: problem
+      ? `Solve “${problem.title}” (${problem.difficulty === "easy" ? "Easy" : problem.difficulty === "med" ? "Medium" : "Hard"}) on Code Arena. ${metaFromHtml(problem.statement, 110)}`
+      : undefined,
+    path: slug ? `/problems/${slug}` : undefined,
+  });
 
   useEffect(() => {
     if (!slug) return;
