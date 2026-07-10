@@ -7,9 +7,12 @@
 // SPA — so the snapshot is purely what crawlers and no-JS clients see in the
 // initial HTML; interactive users get the full app a moment later. Content is
 // sourced from services/api/prisma/seed.ts (the canonical problem data).
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import ReactMarkdown from "react-markdown";
 
 const WEB_DIR = fileURLToPath(new URL(".", import.meta.url));
 const DIST = join(WEB_DIR, "dist");
@@ -86,4 +89,50 @@ write("problems", render({
   snapshot: listSnapshot,
 }));
 
-console.log(`prerendered ${PROBLEMS.length} problem pages + problem index`);
+// ── Blog: render each markdown post's body to HTML (identical to the client's
+//    react-markdown output) and bake it into the initial HTML for SEO. ────────
+function parseFrontmatter(text) {
+  const m = text.match(/^---\s*\n([\s\S]*?)\n---\s*\n?/);
+  if (!m) return { meta: {}, body: text };
+  const meta = {};
+  for (const line of m[1].split("\n")) {
+    const kv = line.match(/^(\w+):\s*(.*)$/);
+    if (kv) meta[kv[1]] = kv[2].trim().replace(/^["']|["']$/g, "");
+  }
+  return { meta, body: text.slice(m[0].length) };
+}
+
+const BLOG_DIR = join(WEB_DIR, "public/content/blog");
+let nPosts = 0;
+if (existsSync(BLOG_DIR)) {
+  const posts = [];
+  for (const file of readdirSync(BLOG_DIR).filter((f) => f.endsWith(".md")).sort()) {
+    const slug = file.replace(/\.md$/, "");
+    const { meta, body } = parseFrontmatter(readFileSync(join(BLOG_DIR, file), "utf8"));
+    const bodyHtml = renderToStaticMarkup(React.createElement(ReactMarkdown, null, body));
+    posts.push({ slug, meta });
+    const title = `${meta.title || slug} — Code Arena`;
+    const description = meta.description || stripHtml(bodyHtml).slice(0, 150);
+    const snapshot =
+      `<main style="max-width:740px;margin:0 auto;padding:24px">` +
+      (meta.date || meta.author ? `<p>${esc(meta.date || "")}${meta.date && meta.author ? " · " : ""}${esc(meta.author || "")}</p>` : "") +
+      `<article class="blog-article">${bodyHtml}</article>` +
+      `</main>`;
+    write(`blog/${slug}`, render({ title, description, path: `/blog/${slug}`, snapshot }));
+    nPosts++;
+  }
+
+  const blogList =
+    `<main style="max-width:780px;margin:0 auto;padding:24px">` +
+    `<h1>Engineering Blog</h1><p>Deep dives on how Code Arena is built.</p><ul>` +
+    posts.map((p) => `<li><a href="/blog/${esc(p.slug)}">${esc(p.meta.title || p.slug)}</a>${p.meta.description ? " — " + esc(p.meta.description) : ""}</li>`).join("") +
+    `</ul></main>`;
+  write("blog", render({
+    title: "Engineering Blog — Code Arena",
+    description: "Engineering deep-dives from the team building Code Arena — real-time judging, Docker sandboxing, WebSockets, and competitive-programming infrastructure.",
+    path: "/blog",
+    snapshot: blogList,
+  }));
+}
+
+console.log(`prerendered ${PROBLEMS.length} problem pages + problem index + ${nPosts} blog post(s) + blog index`);
