@@ -24,6 +24,8 @@ export async function seoRoutes(app: FastifyInstance) {
       { loc: `${base}/problems`, priority: "0.9", changefreq: "daily" },
       { loc: `${base}/daily`, priority: "0.8", changefreq: "daily" },
       { loc: `${base}/leaderboard`, priority: "0.6", changefreq: "daily" },
+      { loc: `${base}/blog`, priority: "0.6", changefreq: "weekly" },
+      { loc: `${base}/blog/scaling-the-arena`, priority: "0.6", changefreq: "monthly" },
     ];
 
     const urls = [
