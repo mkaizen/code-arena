@@ -26,3 +26,8 @@ services/api/prisma/*.db
 
 # Local DB backups (see backup service)
 /backups/
+pnpm-lock.yaml
+pnpm-lock.yaml
+package-lock.json
+pnpm-lock.yaml
+pnpm-lock.yaml
