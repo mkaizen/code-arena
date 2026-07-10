@@ -1,42 +1,63 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from "react-router-dom";
+import { TopBar } from "../components/TopBar.js";
+import { useSeo } from "../hooks/useSeo.js";
 
-// In a real app, you might fetch this from your Fastify API or a static JSON manifest
+// Add new posts here; the markdown body lives in public/content/blog/<slug>.md.
 const posts = [
   {
-    slug: 'scaling-the-arena',
-    title: 'Building Code Arena: Scaling WebSockets & Docker Sandboxes',
-    date: '2026-07-14',
-    author: 'Matthew',
-    description: 'How we decoupled API spikes from our execution engine using BullMQ, Redis, and dynamic Docker cgroups.'
-  }
+    slug: "scaling-the-arena",
+    title: "Building Code Arena: Scaling WebSockets & Docker Sandboxes",
+    date: "2026-07-14",
+    author: "Matthew",
+    description:
+      "How we decoupled API spikes from our execution engine using BullMQ, Redis, and dynamic Docker cgroups.",
+  },
 ];
 
-export const BlogPage: React.FC = () => {
+export function BlogPage() {
+  useSeo({
+    title: "Engineering Blog",
+    description: "Engineering deep-dives from the team building Code Arena — real-time judging, Docker sandboxing, WebSockets, and competitive-programming infrastructure.",
+    path: "/blog",
+  });
+
   return (
-    <div className="max-w-4xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-      <h1 className="text-4xl font-extrabold text-white mb-8">Engineering Blog</h1>
-      <div className="grid gap-8">
-        {posts.map((post) => (
-          <article key={post.slug} className="bg-gray-800 p-6 rounded-lg shadow-md border border-gray-700">
-            <div className="text-sm text-gray-400 mb-2">
-              {post.date} • By {post.author}
-            </div>
-            <h2 className="text-2xl font-bold text-blue-400 mb-3">
-              <Link to={`/blog/${post.slug}`} className="hover:underline">
-                {post.title}
-              </Link>
-            </h2>
-            <p className="text-gray-300 mb-4">{post.description}</p>
-            <Link 
-              to={`/blog/${post.slug}`} 
-              className="text-blue-500 hover:text-blue-400 font-semibold text-sm uppercase tracking-wider"
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "var(--ink)" }}>
+      <TopBar />
+      <main style={{ flex: 1, maxWidth: 780, width: "100%", margin: "0 auto", padding: "40px 20px" }}>
+        <h1 style={{ fontFamily: "var(--disp)", fontSize: 30, fontWeight: 700, color: "var(--txt)", marginBottom: 8 }}>
+          Engineering <span style={{ color: "var(--v-ac)" }}>Blog</span>
+        </h1>
+        <p style={{ color: "var(--txt-2)", fontSize: 15, marginBottom: 32 }}>
+          Deep dives on how Code Arena is built.
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {posts.map((post) => (
+            <Link
+              key={post.slug}
+              to={`/blog/${post.slug}`}
+              style={{
+                display: "block", textDecoration: "none",
+                background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "22px 24px",
+              }}
             >
-              Read full post &rarr;
+              <div style={{ fontSize: 12, color: "var(--txt-3)", fontFamily: "var(--mono)", marginBottom: 8 }}>
+                {post.date} · {post.author}
+              </div>
+              <h2 style={{ fontFamily: "var(--disp)", fontSize: 20, fontWeight: 700, color: "var(--txt)", margin: "0 0 8px" }}>
+                {post.title}
+              </h2>
+              <p style={{ color: "var(--txt-2)", fontSize: 14, lineHeight: 1.6, margin: "0 0 12px" }}>
+                {post.description}
+              </p>
+              <span style={{ color: "var(--v-ac)", fontFamily: "var(--disp)", fontWeight: 700, fontSize: 13 }}>
+                Read full post →
+              </span>
             </Link>
-          </article>
-        ))}
-      </div>
+          ))}
+        </div>
+      </main>
     </div>
   );
-};
+}

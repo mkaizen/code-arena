@@ -51,6 +51,7 @@ export function TopBar() {
           { to: "/problems", label: "Problems" },
           { to: "/battle", label: "Battle Royale" },
           { to: "/leaderboard", label: "Leaderboard" },
+          { to: "/blog", label: "Blog" },
           ...(user?.role === "ADMIN" || user?.role === "SETTER" ? [{ to: "/admin", label: "Admin" }] : []),
         ].map(({ to, label }) => (
           <Link
