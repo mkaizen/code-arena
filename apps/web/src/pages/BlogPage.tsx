@@ -10,7 +10,7 @@ const posts = [
     date: "2026-07-14",
     author: "Matthew",
     description:
-      "How we decoupled API spikes from our execution engine using BullMQ, Redis, and dynamic Docker cgroups.",
+      "A deep dive into the architecture: BullMQ submission queues, a hardened Docker + cgroups sandbox, Redis pub/sub verdict streaming over per-user WebSockets, and the real-time Battle Royale round engine.",
   },
 ];
 
