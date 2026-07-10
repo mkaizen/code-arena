@@ -20,6 +20,8 @@ import { BattlePage } from "./pages/BattlePage.js";
 import { BattleMatchPage } from "./pages/BattleMatchPage.js";
 import { MatchResultPage } from "./pages/MatchResultPage.js";
 import { MatchReplayPage } from "./pages/MatchReplayPage.js";
+import { BlogPage } from './pages/BlogPage';
+import { BlogPostPage } from './pages/BlogPostPage';
 import { DailyPage } from "./pages/DailyPage.js";
 import { RacePage } from "./pages/RacePage.js";
 import { PageViewTracker } from "./components/PageViewTracker.js";
@@ -53,6 +55,8 @@ export function App() {
           <Route path="/admin/problems/:id/edit" element={<AdminProblemEditPage />} />
           <Route path="/admin/contests/new" element={<AdminContestNewPage />} />
           <Route path="/admin/contests/finalize" element={<AdminContestFinalizePage />} />
+          <Route path="/blog" element={<BlogPage />} />
+          <Route path="/blog/:slug" element={<BlogPostPage />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
