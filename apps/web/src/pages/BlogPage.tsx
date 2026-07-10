@@ -5,6 +5,14 @@ import { useSeo } from "../hooks/useSeo.js";
 // Add new posts here; the markdown body lives in public/content/blog/<slug>.md.
 const posts = [
   {
+    slug: "designing-a-fair-elo-system",
+    title: "Designing a Fair Elo System for Coding Contests",
+    date: "2026-07-21",
+    author: "Matthew",
+    description:
+      "Classic Elo is built for two players. How Code Arena generalizes it to rate N-player contests and real-time matches fairly — expected rank, geometric-mean targeting, damping, and a zero-sum correction.",
+  },
+  {
     slug: "scaling-the-arena",
     title: "Building Code Arena: Scaling WebSockets & Docker Sandboxes",
     date: "2026-07-14",
