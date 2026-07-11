@@ -4,6 +4,7 @@ import { redis } from "../redis.js";
 import { broadcast, sendToUser } from "../ws.js";
 import { prisma } from "../db.js";
 import { recordAccepted, getLeaderboard, isFrozen, ensureFreezeSnapshot } from "./freeze.js";
+import { scoreStanding } from "./scoring.js";
 import { onAccepted as onMatchAccepted } from "../match/engine.js";
 import { recordDailySolve } from "../daily.js";
 import type { JudgeResult, ScoringModel } from "@arena/shared";
@@ -28,7 +29,6 @@ async function claim(key: string, ttlSec = 120): Promise<boolean> {
 async function computeStanding(userId: string, contestId: string) {
   const contest = await prisma.contest.findUnique({ where: { id: contestId } });
   if (!contest) return { solved: 0, penalty: 0 };
-  const startMs = contest.startsAt.getTime();
 
   const subs = await prisma.submission.findMany({
     where: { userId, contestId },
@@ -36,24 +36,7 @@ async function computeStanding(userId: string, contestId: string) {
     select: { problemId: true, verdict: true, createdAt: true },
   });
 
-  const perProblem = new Map<string, { tries: number; solvedAt: number | null }>();
-  for (const s of subs) {
-    if (!perProblem.has(s.problemId)) perProblem.set(s.problemId, { tries: 0, solvedAt: null });
-    const p = perProblem.get(s.problemId)!;
-    if (p.solvedAt !== null) continue;
-    if (s.verdict === "ACCEPTED") p.solvedAt = s.createdAt.getTime();
-    else p.tries++;
-  }
-
-  let solved = 0;
-  let penalty = 0;
-  for (const p of perProblem.values()) {
-    if (p.solvedAt !== null) {
-      solved++;
-      penalty += Math.floor((p.solvedAt - startMs) / 60_000) + p.tries * 20;
-    }
-  }
-  return { solved, penalty };
+  return scoreStanding(subs, contest.startsAt.getTime());
 }
 
 export function startVerdictSubscriber(): void {
