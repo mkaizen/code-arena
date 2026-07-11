@@ -16,6 +16,7 @@ import { AdminProblemsPage } from "./pages/AdminProblemsPage.js";
 import { AdminProblemEditPage } from "./pages/AdminProblemEditPage.js";
 import { AdminContestNewPage } from "./pages/AdminContestNewPage.js";
 import { AdminContestFinalizePage } from "./pages/AdminContestFinalizePage.js";
+import { AdminPlagiarismPage } from "./pages/AdminPlagiarismPage.js";
 import { BattlePage } from "./pages/BattlePage.js";
 import { BattleMatchPage } from "./pages/BattleMatchPage.js";
 import { MatchResultPage } from "./pages/MatchResultPage.js";
@@ -55,6 +56,7 @@ export function App() {
           <Route path="/admin/problems/:id/edit" element={<AdminProblemEditPage />} />
           <Route path="/admin/contests/new" element={<AdminContestNewPage />} />
           <Route path="/admin/contests/finalize" element={<AdminContestFinalizePage />} />
+          <Route path="/admin/plagiarism" element={<AdminPlagiarismPage />} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/:slug" element={<BlogPostPage />} />
         </Routes>
