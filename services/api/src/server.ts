@@ -17,7 +17,7 @@ import { dailyRoutes } from "./routes/daily.js";
 import { ghostRoutes } from "./routes/ghost.js";
 import { seoRoutes } from "./routes/seo.js";
 import { notificationRoutes } from "./routes/notifications.js";
-import { wsRoutes } from "./ws.js";
+import { wsRoutes, startWsBus } from "./ws.js";
 import { startVerdictSubscriber } from "./leaderboard/verdictSub.js";
 import { sweepOverdueMatches, sweepForfeits } from "./match/engine.js";
 import { sweepContestReminders, sweepStreakNudges } from "./mail/notifications.js";
@@ -66,6 +66,9 @@ async function main() {
   await app.register(notificationRoutes);
   await app.register(wsRoutes);
 
+  // Subscribe to the WS fan-out bus before anything can emit, so events emitted
+  // during startup (and by other replicas) reach this node's sockets.
+  startWsBus();
   startVerdictSubscriber();
   // Self-heals stuck rounds if a setTimeout was lost (e.g. API restart), and
   // forfeits players who have abandoned an active match.

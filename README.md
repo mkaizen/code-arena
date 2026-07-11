@@ -118,7 +118,7 @@ Still open before MVP:
 - [x] Admin routes for problems/contests + post-contest rating finalization
 - [x] Judge→API verdict push via Redis pub/sub (live verdict + leaderboard)
 - [ ] cgroup-based memory accounting in the sandbox (currently time/exit-code based)
-- [ ] Multi-node WebSocket fan-out (single-process pub/sub today)
+- [x] Multi-node WebSocket fan-out (Redis `arena:ws` bus; every replica delivers to its own sockets)
 - [ ] A setter UI for the problem bank (FR-7 versioning) — API exists, no UI yet
 - [ ] OAuth callback page in the web app (`/auth/callback/:provider`)
 - [ ] Notification delivery (email/in-app reminders, FR-26)

@@ -1,5 +1,6 @@
 import IORedis from "ioredis";
 import { env } from "../env.js";
+import { redis } from "../redis.js";
 import { broadcast, sendToUser } from "../ws.js";
 import { prisma } from "../db.js";
 import { recordAccepted, getLeaderboard, isFrozen, ensureFreezeSnapshot } from "./freeze.js";
@@ -10,6 +11,18 @@ import type { JudgeResult, ScoringModel } from "@arena/shared";
 interface VerdictMsg {
   submissionId: string;
   result: JudgeResult;
+}
+
+/**
+ * Redis pub/sub delivers each judge message to EVERY subscribed api replica.
+ * The DB side-effects here (rating standings, match resolution, daily streaks)
+ * and the resulting WS publish must happen exactly once, so the first node to
+ * claim a message processes it and the rest bail. TTL is a safety net: if the
+ * claimant crashes mid-handler the key expires and a later retry can re-run.
+ */
+async function claim(key: string, ttlSec = 120): Promise<boolean> {
+  const res = await redis.set(key, "1", "EX", ttlSec, "NX");
+  return res === "OK";
 }
 
 async function computeStanding(userId: string, contestId: string) {
@@ -57,11 +70,15 @@ export function startVerdictSubscriber(): void {
       // Run results (test-against-samples) go only to the user who ran them.
       if (ch === "arena:runs") {
         const { runId, userId, result } = JSON.parse(msg);
-        if (userId) sendToUser(userId, { type: "run_result", runId, result });
+        if (userId && (await claim(`arena:run-done:${runId}`))) {
+          sendToUser(userId, { type: "run_result", runId, result });
+        }
         return;
       }
 
       const { submissionId, result } = JSON.parse(msg) as VerdictMsg;
+      // One node owns each verdict's side-effects + fan-out; the others no-op.
+      if (!(await claim(`arena:verdict-done:${submissionId}`))) return;
 
       const submission = await prisma.submission.findUnique({
         where: { id: submissionId },
