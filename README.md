@@ -1,16 +1,25 @@
 # Code Arena
 
-A competitive coding contest platform — timed contests, sandboxed automated judging, live leaderboards, and a rating system. Built for individual developers and students.
+A competitive coding platform — sandboxed automated judging, live leaderboards, and a rating system, wrapped in several ways to compete. Built for individual developers and students.
+
+Ways to play:
+
+- **Contests** — timed rounds with a live, freezable ICPC-style leaderboard.
+- **Battle** — live matchmade matches: **Duel** (1v1, best-of-3) and **Royale** (6-player elimination ladder), with replays and shareable result cards.
+- **Daily** — a featured problem each day with solve streaks and a calendar.
+- **Race** — time-attack against a "ghost": a recorded past run by another user, server-timed so the clock can't be faked.
+- **Practice** — the full problem bank, plus a global all-time leaderboard and an engineering blog.
 
 > Full requirements live in [`docs/Code_Arena_Project_Document.docx`](docs/Code_Arena_Project_Document.docx). An interactive front-end prototype of the contest loop is at [`docs/prototype.html`](docs/prototype.html).
 
 ## Architecture
 
 ```
-apps/web        React + Vite + Monaco editor — contest UI, wired to API + WS
-services/api     Fastify + Prisma + BullMQ producer + Redis leaderboard + WS push
+apps/web        React + Vite + Monaco editor — contest/battle/daily/race UI, wired to API + WS
+services/api     Fastify + Prisma + BullMQ producer + Redis leaderboard + live match engine
+                 + email notifications, WS fan-out over a Redis bus
 services/judge   BullMQ worker — Docker sandbox, per-language recipes, S3 test reads
-packages/shared  @arena/shared — verdicts, domain types, rating-tier colors
+packages/shared  @arena/shared — verdicts, domain types, match/ghost views, rating-tier colors
 ```
 
 | Concern | Tech |
@@ -100,29 +109,44 @@ Code is annotated with the `FR-`/`NFR-` IDs it implements. Highlights:
 - **FR-12 / FR-19** live leaderboard + freeze enforcement — `leaderboard/freeze.ts`
 - **FR-14 / NFR-3** sandboxed execution — `services/judge/src/sandbox.ts`
 - **FR-15** standard verdicts + failing-case indicator — `packages/shared/src/verdicts.ts`
+- **FR-19** live real-time delivery, multi-node fan-out over Redis — `services/api/src/ws.ts`
 - **FR-21 / NFR-6** deterministic rating recompute — `rating/elo.ts`
+- **FR-26** email reminders + streak nudges, one-click unsubscribe — `mail/notifications.ts`
 
-## Status: open work picked up this round
+## Status
 
-All five scaffold TODOs are now implemented:
+The MVP is built end-to-end — auth, judging, all four play modes, admin
+tooling, notifications, and multi-node real-time delivery are in place.
 
-- [x] Password hashing (Argon2id) and OAuth authorization-code exchange
-- [x] Object-storage reads for hidden test-case bundles
-- [x] Leaderboard freeze enforcement (snapshot at freeze window)
-- [x] Rating recompute algorithm (Codeforces-style seed/Elo)
-- [x] Contest-window validation on submit
+**Done:**
 
-Still open before MVP:
-
-- [x] Seed script for an admin user, demo problems, and a live contest
-- [x] Admin routes for problems/contests + post-contest rating finalization
+- [x] Auth — email/password (Argon2id) + GitHub/Google OAuth, with the
+      `/auth/callback/:provider` page in the web app
+- [x] Judging — sandboxed execution, object-storage reads for hidden test
+      bundles, standard verdicts + failing-case indicator
+- [x] cgroup-based peak-memory accounting in the sandbox (cgroup v2
+      `memory.peak`, with v1 fallback) — `services/judge/src/sandbox.ts`
+- [x] Contests — window validation on submit, live leaderboard, freeze
+      snapshot at the freeze window
+- [x] Rating — deterministic Codeforces-style seed/Elo recompute +
+      post-contest finalization
+- [x] Battle — live matchmade Duel (1v1 bo3) and Royale (6-player
+      elimination) with replays and shareable result cards
+- [x] Daily challenge with solve streaks, and Race (time-attack vs. a
+      recorded ghost run)
+- [x] Admin setter UI for the problem bank and contests
+- [x] Seed script — admin user, demo problems, and a live contest
 - [x] Judge→API verdict push via Redis pub/sub (live verdict + leaderboard)
-- [ ] cgroup-based memory accounting in the sandbox (currently time/exit-code based)
-- [x] Multi-node WebSocket fan-out (Redis `arena:ws` bus; every replica delivers to its own sockets)
-- [ ] A setter UI for the problem bank (FR-7 versioning) — API exists, no UI yet
-- [ ] OAuth callback page in the web app (`/auth/callback/:provider`)
-- [ ] Notification delivery (email/in-app reminders, FR-26)
-- [ ] Plagiarism/duplicate-detection signals (NFR-4)
+- [x] Notification delivery — email contest reminders and streak nudges,
+      with one-click unsubscribe (`mail/notifications.ts`)
+- [x] Multi-node WebSocket fan-out — every outbound event routes through a
+      Redis `arena:ws` bus so each replica delivers to its own sockets
+      (`services/api/src/ws.ts`)
+
+**Still open:**
+
+- [ ] Plagiarism / duplicate-detection signals (NFR-4)
+- [ ] Problem-bank versioning history in the setter UI (FR-7)
 
 ## License
 
