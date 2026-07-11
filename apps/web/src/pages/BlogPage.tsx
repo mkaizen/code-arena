@@ -5,6 +5,22 @@ import { useSeo } from "../hooks/useSeo.js";
 // Add new posts here; the markdown body lives in public/content/blog/<slug>.md.
 const posts = [
   {
+    slug: "generating-prisma-migrations-offline",
+    title: "Generating Prisma Migrations Offline, Without a Database",
+    date: "2026-07-28",
+    author: "Matthew",
+    description:
+      "Generate migration SQL with no database using migrate diff and --from-schema-datamodel — why it beats --from-migrations, and a subtle gotcha that can silently corrupt a migration and break production.",
+  },
+  {
+    slug: "measuring-peak-memory-with-cgroups",
+    title: "Measuring a Program's True Peak Memory with cgroups",
+    date: "2026-07-24",
+    author: "Matthew",
+    description:
+      "Get a program's exact peak memory — not an estimate — by reading the kernel's own cgroup high-water mark (memory.peak), with cgroup v1 fallbacks, from inside a Docker sandbox.",
+  },
+  {
     slug: "designing-a-fair-elo-system",
     title: "Designing a Fair Elo System for Coding Contests",
     date: "2026-07-21",
