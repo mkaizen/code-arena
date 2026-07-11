@@ -5,6 +5,22 @@ import { useSeo } from "../hooks/useSeo.js";
 // Add new posts here; the markdown body lives in public/content/blog/<slug>.md.
 const posts = [
   {
+    slug: "the-dependency-diet",
+    title: "The Dependency Diet: Building Features Without the Bloat",
+    date: "2026-08-04",
+    author: "Matthew",
+    description:
+      "Reach for a new npm package last, not first. Real examples from Code Arena — canvas share cards, email over fetch, kernel memory accounting, no CSS framework — and the rule of thumb for when to add a dependency anyway.",
+  },
+  {
+    slug: "shipping-one-small-pr-at-a-time",
+    title: "Shipping a Platform One Small PR at a Time",
+    date: "2026-07-31",
+    author: "Matthew",
+    description:
+      "The development workflow behind Code Arena: small single-purpose pull requests, an always-deployable main, verify-before-merge, and strict branch discipline.",
+  },
+  {
     slug: "generating-prisma-migrations-offline",
     title: "Generating Prisma Migrations Offline, Without a Database",
     date: "2026-07-28",
