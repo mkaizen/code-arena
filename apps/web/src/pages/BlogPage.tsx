@@ -5,6 +5,22 @@ import { useSeo } from "../hooks/useSeo.js";
 // Add new posts here; the markdown body lives in public/content/blog/<slug>.md.
 const posts = [
   {
+    slug: "catching-copied-code-with-winnowing",
+    title: "Catching Copied Code: Structural Plagiarism Detection with Winnowing",
+    date: "2026-08-11",
+    author: "Matthew",
+    description:
+      "How Code Arena flags copied contest submissions with a MOSS-style pipeline — tokenizing away formatting and variable names, hashing k-grams, winnowing to a compact fingerprint, and scoring with containment so padding can't hide a copy.",
+  },
+  {
+    slug: "fanning-out-websockets-across-a-cluster",
+    title: "One Emit, Every Node: Fanning Out WebSockets Across a Cluster",
+    date: "2026-08-07",
+    author: "Matthew",
+    description:
+      "Scaling the real-time layer past a single API process — routing every WebSocket event through a Redis bus so a socket on one node receives an event emitted on another, and a SET NX claim that makes judge side-effects fire exactly once cluster-wide.",
+  },
+  {
     slug: "the-dependency-diet",
     title: "The Dependency Diet: Building Features Without the Bloat",
     date: "2026-08-04",
