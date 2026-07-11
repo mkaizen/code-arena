@@ -57,6 +57,26 @@ export interface PlagiarismProblemReport {
   pairs: PlagiarismPair[];
 }
 
+/** Problem-bank version history (FR-7). */
+export interface ProblemVersionSummary {
+  version: number;
+  title: string;
+  editorHandle: string | null;
+  createdAt: string;
+}
+
+export interface ProblemVersionDetail extends ProblemVersionSummary {
+  statement: string;
+  editorial: string | null;
+  difficulty: string;
+  ratingValue: number;
+  tags: string[];
+  timeMs: number;
+  memoryKb: number;
+  testCount: number;
+  samples: { input: string; output: string }[];
+}
+
 export interface LeaderboardRow {
   rank: number;
   userId: string;

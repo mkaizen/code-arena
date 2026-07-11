@@ -125,6 +125,35 @@ model Problem {
   submissions     Submission[]
   dailyChallenges DailyChallenge[]
   ghostRuns       GhostRun[]
+  versions        ProblemVersion[]
+}
+
+// FR-7: an immutable snapshot of a problem's editable definition at a given
+// version. One row is written for the pre-edit state on every update (and on
+// restore), so setters can see the edit history and roll back. Hidden judge
+// tests live in object storage and are replaced in place, so only their count
+// is snapshotted here — the statement, metadata, and samples are the versioned
+// definition.
+model ProblemVersion {
+  id           String     @id @default(cuid())
+  problem      Problem    @relation(fields: [problemId], references: [id])
+  problemId    String
+  version      Int        // the version number this snapshot represents
+  title        String
+  statement    String
+  editorial    String?
+  difficulty   Difficulty
+  ratingValue  Int
+  tags         String[]
+  timeMs       Int
+  memoryKb     Int
+  samples      Json       // [{ input, output }] captured at this version
+  testCount    Int
+  editorHandle String?    // who made the edit that superseded this version
+  createdAt    DateTime   @default(now()) // when this version was superseded
+
+  @@unique([problemId, version])
+  @@index([problemId, createdAt])
 }
 
 model Sample {

@@ -11,6 +11,8 @@ import { env } from "../env.js";
 import { recomputeRatings } from "../rating/elo.js";
 import { findSimilarPairs, type CodeDoc } from "../plagiarism/detect.js";
 import type { PlagiarismProblemReport } from "@arena/shared";
+import { Difficulty } from "@prisma/client";
+import { snapshotData, restoreData, parseSamples, type VersionableProblem, type StoredVersion } from "../problems/versioning.js";
 
 async function requireAdmin(req: FastifyRequest, reply: FastifyReply) {
   try {
@@ -85,6 +87,20 @@ const contestBody = z.object({
   })).default([]),
 });
 
+/** A live problem row with its samples, as loaded for a version snapshot. */
+type ProblemWithSamples = VersionableProblem & { id: string; samples: { input: string; output: string }[] };
+
+/** Prisma create input that snapshots a problem's current state (FR-7). */
+function versionSnapshotInput(existing: ProblemWithSamples, editorHandle: string | null) {
+  const snap = snapshotData(existing, editorHandle);
+  return {
+    problemId: existing.id,
+    ...snap,
+    difficulty: snap.difficulty as Difficulty,
+    samples: snap.samples as unknown as object, // JSON column
+  };
+}
+
 export async function adminRoutes(app: FastifyInstance) {
   // ── Problems ────────────────────────────────────────────────────────────────
 
@@ -153,10 +169,16 @@ export async function adminRoutes(app: FastifyInstance) {
   app.put("/admin/problems/:id", { onRequest: [requireAdmin] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const b = problemUpdateBody.parse(req.body);
-    const existing = await prisma.problem.findUnique({ where: { id } });
+    const existing = await prisma.problem.findUnique({
+      where: { id },
+      include: { samples: { orderBy: { ordinal: "asc" } } },
+    });
     if (!existing) return reply.code(404).send({ error: "not found" });
+    const editor = await prisma.user.findUnique({ where: { id: req.user.sub }, select: { handle: true } });
 
     await prisma.$transaction([
+      // FR-7: snapshot the pre-edit state as its version before overwriting.
+      prisma.problemVersion.create({ data: versionSnapshotInput(existing, editor?.handle ?? null) }),
       prisma.sample.deleteMany({ where: { problemId: id } }),
       prisma.problem.update({
         where: { id },
@@ -192,6 +214,77 @@ export async function adminRoutes(app: FastifyInstance) {
     }));
     await prisma.problem.update({ where: { id }, data: { testsKey, testCount: tests.length } });
     return { ok: true };
+  });
+
+  // ── Problem version history (FR-7) ────────────────────────────────────────────
+
+  // List past versions, newest first. The current live version is not included
+  // here — it's shown by the editor from the live problem itself.
+  app.get("/admin/problems/:id/versions", { onRequest: [requireAdmin] }, async (req) => {
+    const { id } = req.params as { id: string };
+    const versions = await prisma.problemVersion.findMany({
+      where: { problemId: id },
+      orderBy: { version: "desc" },
+      select: { version: true, title: true, editorHandle: true, createdAt: true },
+    });
+    return versions.map((v) => ({
+      version: v.version,
+      title: v.title,
+      editorHandle: v.editorHandle,
+      createdAt: v.createdAt.toISOString(),
+    }));
+  });
+
+  // Full content of one past version, for viewing/diffing.
+  app.get("/admin/problems/:id/versions/:version", { onRequest: [requireAdmin] }, async (req, reply) => {
+    const { id, version } = req.params as { id: string; version: string };
+    const v = await prisma.problemVersion.findUnique({
+      where: { problemId_version: { problemId: id, version: Number(version) } },
+    });
+    if (!v) return reply.code(404).send({ error: "version not found" });
+    return {
+      version: v.version, title: v.title, editorHandle: v.editorHandle, createdAt: v.createdAt.toISOString(),
+      statement: v.statement, editorial: v.editorial, difficulty: v.difficulty, ratingValue: v.ratingValue,
+      tags: v.tags, timeMs: v.timeMs, memoryKb: v.memoryKb, testCount: v.testCount, samples: parseSamples(v.samples),
+    };
+  });
+
+  // Restore a past version onto the live problem. The current state is
+  // snapshotted first (a restore is itself an edit), then the target version's
+  // statement/metadata/samples are applied and the version bumped. Hidden judge
+  // tests are not restored — they live in object storage and are replaced in
+  // place — so restoring an old definition keeps the current test bundle.
+  app.post("/admin/problems/:id/versions/:version/restore", { onRequest: [requireAdmin] }, async (req, reply) => {
+    const { id, version } = req.params as { id: string; version: string };
+    const target = await prisma.problemVersion.findUnique({
+      where: { problemId_version: { problemId: id, version: Number(version) } },
+    });
+    if (!target) return reply.code(404).send({ error: "version not found" });
+
+    const existing = await prisma.problem.findUnique({
+      where: { id },
+      include: { samples: { orderBy: { ordinal: "asc" } } },
+    });
+    if (!existing) return reply.code(404).send({ error: "not found" });
+    const editor = await prisma.user.findUnique({ where: { id: req.user.sub }, select: { handle: true } });
+
+    const restoredSamples = parseSamples(target.samples);
+    const rd = restoreData({ ...target, samples: restoredSamples } as StoredVersion);
+
+    await prisma.$transaction([
+      prisma.problemVersion.create({ data: versionSnapshotInput(existing, editor?.handle ?? null) }),
+      prisma.sample.deleteMany({ where: { problemId: id } }),
+      prisma.problem.update({
+        where: { id },
+        data: {
+          ...rd,
+          difficulty: rd.difficulty as Difficulty,
+          version: { increment: 1 },
+          samples: { create: restoredSamples.map((s, i) => ({ input: s.input, output: s.output, ordinal: i })) },
+        },
+      }),
+    ]);
+    return { ok: true, restoredFrom: Number(version) };
   });
 
   // ── Contests ─────────────────────────────────────────────────────────────────
