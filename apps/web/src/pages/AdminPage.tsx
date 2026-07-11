@@ -18,6 +18,7 @@ export function AdminPage() {
     { to: "/admin/problems/new", title: "Create Problem", desc: "Write a new problem, add sample I/O and test cases." },
     { to: "/admin/contests/new", title: "Create Contest", desc: "Schedule a new rated or unrated contest." },
     { to: "/admin/contests/finalize", title: "Finalize Ratings", desc: "Run Elo recompute for a finished contest." },
+    { to: "/admin/plagiarism", title: "Similarity Scan", desc: "Flag structurally similar submission pairs in a contest for review." },
   ];
 
   return (

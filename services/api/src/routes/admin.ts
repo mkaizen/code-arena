@@ -9,6 +9,8 @@ import { prisma } from "../db.js";
 import { s3 } from "../storage.js";
 import { env } from "../env.js";
 import { recomputeRatings } from "../rating/elo.js";
+import { findSimilarPairs, type CodeDoc } from "../plagiarism/detect.js";
+import type { PlagiarismProblemReport } from "@arena/shared";
 
 async function requireAdmin(req: FastifyRequest, reply: FastifyReply) {
   try {
@@ -309,5 +311,48 @@ export async function adminRoutes(app: FastifyInstance) {
     ]);
 
     return { finalized: deltas.length, changes: deltas };
+  });
+
+  // Plagiarism/duplicate-detection signals for a contest (NFR-4). For each
+  // problem, compare one representative submission per user (their latest) and
+  // surface structurally-similar pairs for a human to review. This is a signal,
+  // not a verdict — nothing is actioned automatically.
+  app.get("/admin/contests/:id/plagiarism", { onRequest: [requireAdmin] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { threshold } = req.query as { threshold?: string };
+    const minScore = threshold ? Math.min(Math.max(Number(threshold), 0), 1) : undefined;
+
+    const contest = await prisma.contest.findUnique({
+      where: { id },
+      include: { problems: { include: { problem: { select: { id: true, slug: true, title: true } } } } },
+    });
+    if (!contest) return reply.code(404).send({ error: "not found" });
+
+    const submissions = await prisma.submission.findMany({
+      where: { contestId: id },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, userId: true, problemId: true, source: true, user: { select: { handle: true } } },
+    });
+
+    // Latest submission per (problem, user) is that user's representative.
+    const repByProblem = new Map<string, Map<string, CodeDoc>>();
+    for (const s of submissions) {
+      let perUser = repByProblem.get(s.problemId);
+      if (!perUser) { perUser = new Map(); repByProblem.set(s.problemId, perUser); }
+      perUser.set(s.userId, { submissionId: s.id, userId: s.userId, handle: s.user.handle, source: s.source });
+    }
+
+    const reports: PlagiarismProblemReport[] = contest.problems.map((cp) => {
+      const docs = [...(repByProblem.get(cp.problemId)?.values() ?? [])];
+      return {
+        problemId: cp.problem.id,
+        slug: cp.problem.slug,
+        title: cp.problem.title,
+        submissionsCompared: docs.length,
+        pairs: findSimilarPairs(docs, minScore !== undefined ? { threshold: minScore } : {}),
+      };
+    });
+
+    return { contestId: id, name: contest.name, reports };
   });
 }

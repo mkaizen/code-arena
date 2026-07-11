@@ -28,6 +28,35 @@ export type ServerEvent =
   | { type: "match_found"; matchId: string; playerIds: string[] }
   | { type: "match_state"; match: MatchStateView };
 
+/**
+ * Plagiarism/duplicate-detection signals (NFR-4). A `PlagiarismPair` is two
+ * submissions by different users whose structural fingerprints overlap enough
+ * to warrant a human look — it is a signal, never a verdict.
+ */
+export interface PlagiarismParty {
+  userId: string;
+  handle: string;
+  submissionId: string;
+}
+
+export interface PlagiarismPair {
+  a: PlagiarismParty;
+  b: PlagiarismParty;
+  /** Overlap of the smaller fingerprint set, 0..1 (1 = one fully contains the other). */
+  similarity: number;
+  /** Number of shared fingerprints backing the score. */
+  sharedFingerprints: number;
+}
+
+export interface PlagiarismProblemReport {
+  problemId: string;
+  slug: string;
+  title: string;
+  /** Distinct users whose submissions were compared for this problem. */
+  submissionsCompared: number;
+  pairs: PlagiarismPair[];
+}
+
 export interface LeaderboardRow {
   rank: number;
   userId: string;

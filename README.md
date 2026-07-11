@@ -112,6 +112,7 @@ Code is annotated with the `FR-`/`NFR-` IDs it implements. Highlights:
 - **FR-19** live real-time delivery, multi-node fan-out over Redis — `services/api/src/ws.ts`
 - **FR-21 / NFR-6** deterministic rating recompute — `rating/elo.ts`
 - **FR-26** email reminders + streak nudges, one-click unsubscribe — `mail/notifications.ts`
+- **NFR-4** plagiarism/duplicate-detection via structural fingerprinting — `plagiarism/fingerprint.ts`
 
 ## Status
 
@@ -142,10 +143,12 @@ tooling, notifications, and multi-node real-time delivery are in place.
 - [x] Multi-node WebSocket fan-out — every outbound event routes through a
       Redis `arena:ws` bus so each replica delivers to its own sockets
       (`services/api/src/ws.ts`)
+- [x] Plagiarism / duplicate-detection signals — MOSS-style structural
+      fingerprinting, surfaced per contest in the admin Similarity Scan
+      (`services/api/src/plagiarism/`)
 
 **Still open:**
 
-- [ ] Plagiarism / duplicate-detection signals (NFR-4)
 - [ ] Problem-bank versioning history in the setter UI (FR-7)
 
 ## License

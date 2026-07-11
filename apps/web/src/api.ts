@@ -1,4 +1,10 @@
-import type { DailyView, GhostEvent, GhostFinishResponse, GhostStartResponse, Language, LeaderboardRow, MatchHistoryEntry, MatchMode, MatchRecord, MatchReplay, MatchStateView, ProblemLeaderboard, PublicProfile, RunResult } from "@arena/shared";
+import type { DailyView, GhostEvent, GhostFinishResponse, GhostStartResponse, Language, LeaderboardRow, MatchHistoryEntry, MatchMode, MatchRecord, MatchReplay, MatchStateView, PlagiarismProblemReport, ProblemLeaderboard, PublicProfile, RunResult } from "@arena/shared";
+
+export interface PlagiarismReport {
+  contestId: string;
+  name: string;
+  reports: PlagiarismProblemReport[];
+}
 
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
@@ -217,6 +223,9 @@ export const api = {
 
   adminFinalizeContest: (id: string): Promise<{ finalized: number; changes: { userId: string; before: number; after: number }[] }> =>
     req(`/admin/contests/${id}/finalize`, { method: "POST" }),
+
+  adminContestPlagiarism: (id: string, threshold?: number): Promise<PlagiarismReport> =>
+    req(`/admin/contests/${id}/plagiarism${threshold !== undefined ? `?threshold=${threshold}` : ""}`),
 
   // Real-time matches (Battle Royale + 1v1 Duel)
   queueForMatch: (mode: MatchMode): Promise<{ matched: boolean; matchId?: string; count: number; capacity: number }> =>
