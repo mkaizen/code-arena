@@ -1,4 +1,4 @@
-import type { DailyView, GhostEvent, GhostFinishResponse, GhostStartResponse, Language, LeaderboardRow, MatchHistoryEntry, MatchMode, MatchRecord, MatchReplay, MatchStateView, PlagiarismProblemReport, ProblemLeaderboard, PublicProfile, RunResult } from "@arena/shared";
+import type { DailyView, GhostEvent, GhostFinishResponse, GhostStartResponse, Language, LeaderboardRow, MatchHistoryEntry, MatchMode, MatchRecord, MatchReplay, MatchStateView, PlagiarismProblemReport, ProblemLeaderboard, ProblemVersionDetail, ProblemVersionSummary, PublicProfile, RunResult } from "@arena/shared";
 
 export interface PlagiarismReport {
   contestId: string;
@@ -213,6 +213,15 @@ export const api = {
 
   adminReplaceTests: (id: string, tests: { input: string; output: string }[]): Promise<{ ok: boolean }> =>
     req(`/admin/problems/${id}/tests`, { method: "PUT", body: JSON.stringify({ tests }) }),
+
+  adminProblemVersions: (id: string): Promise<ProblemVersionSummary[]> =>
+    req(`/admin/problems/${id}/versions`),
+
+  adminProblemVersion: (id: string, version: number): Promise<ProblemVersionDetail> =>
+    req(`/admin/problems/${id}/versions/${version}`),
+
+  adminRestoreProblemVersion: (id: string, version: number): Promise<{ ok: boolean; restoredFrom: number }> =>
+    req(`/admin/problems/${id}/versions/${version}/restore`, { method: "POST" }),
 
   adminCreateContest: (body: {
     name: string; startsAt: string; durationSec: number;

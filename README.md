@@ -108,6 +108,7 @@ Code is annotated with the `FR-`/`NFR-` IDs it implements. Highlights:
 - **FR-10 / NFR-4** contest-window validation, server clock authoritative — `routes/submissions.ts`
 - **FR-12 / FR-19** live leaderboard + freeze enforcement — `leaderboard/freeze.ts`
 - **FR-14 / NFR-3** sandboxed execution — `services/judge/src/sandbox.ts`
+- **FR-7** problem-bank version history + restore — `problems/versioning.ts`, `routes/admin.ts`
 - **FR-15** standard verdicts + failing-case indicator — `packages/shared/src/verdicts.ts`
 - **FR-19** live real-time delivery, multi-node fan-out over Redis — `services/api/src/ws.ts`
 - **FR-21 / NFR-6** deterministic rating recompute — `rating/elo.ts`
@@ -146,10 +147,11 @@ tooling, notifications, and multi-node real-time delivery are in place.
 - [x] Plagiarism / duplicate-detection signals — MOSS-style structural
       fingerprinting, surfaced per contest in the admin Similarity Scan
       (`services/api/src/plagiarism/`)
+- [x] Problem-bank versioning history (FR-7) — each edit snapshots the prior
+      definition; setters can view and restore past versions from the problem
+      editor (`services/api/src/problems/versioning.ts`)
 
-**Still open:**
-
-- [ ] Problem-bank versioning history in the setter UI (FR-7)
+The MVP feature set is complete. 🎉
 
 ## License
 
