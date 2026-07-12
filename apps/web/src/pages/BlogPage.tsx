@@ -6,11 +6,11 @@ import { useSeo } from "../hooks/useSeo.js";
 const posts = [
   {
     slug: "sizing-a-100-player-battle-royale",
-    title: "How Beefy a Server Does a 100-Player Battle Royale Need?",
+    title: "Sizing a 100-Player Battle Royale: Scale the Judge, Not the Sockets",
     date: "2026-08-18",
     author: "Matthew",
     description:
-      "A capacity-planning deep dive for scaling Battle Royale from 6 players to 100 — grounded in the real judge constants (2s limits, 256MB sandboxes, one core per container) to derive judge-seconds per submission, round-1 load, and a concrete server spec.",
+      "Scaling a real-time coding Battle Royale from 6 players to 100 isn't a networking problem — it's a judging problem. Working from the real sandbox limits (2s, 256MB, one core per container) to judge-seconds per submission, round-1 load, and a concrete server spec.",
   },
   {
     slug: "catching-copied-code-with-winnowing",
