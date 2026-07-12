@@ -5,6 +5,14 @@ import { useSeo } from "../hooks/useSeo.js";
 // Add new posts here; the markdown body lives in public/content/blog/<slug>.md.
 const posts = [
   {
+    slug: "sizing-a-100-player-battle-royale",
+    title: "How Beefy a Server Does a 100-Player Battle Royale Need?",
+    date: "2026-08-18",
+    author: "Matthew",
+    description:
+      "A capacity-planning deep dive for scaling Battle Royale from 6 players to 100 — grounded in the real judge constants (2s limits, 256MB sandboxes, one core per container) to derive judge-seconds per submission, round-1 load, and a concrete server spec.",
+  },
+  {
     slug: "catching-copied-code-with-winnowing",
     title: "Catching Copied Code: Structural Plagiarism Detection with Winnowing",
     date: "2026-08-11",
