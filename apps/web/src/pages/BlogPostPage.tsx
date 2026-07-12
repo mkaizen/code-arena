@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { TopBar } from "../components/TopBar.js";
+import { ShareButtons } from "../components/ShareButtons.js";
 import { useSeo } from "../hooks/useSeo.js";
 
 interface Frontmatter {
@@ -76,6 +77,7 @@ export function BlogPostPage() {
             <article className="blog-article">
               <ReactMarkdown>{body}</ReactMarkdown>
             </article>
+            <ShareButtons title={meta.title ?? "Code Arena Engineering Blog"} url={`https://codearena.space/blog/${slug}`} />
           </>
         )}
       </main>
