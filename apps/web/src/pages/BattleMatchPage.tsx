@@ -7,6 +7,7 @@ import { useAuth } from "../ctx/AuthContext.js";
 import { useWs } from "../hooks/useWs.js";
 import { loadDraft, saveDraft } from "../draft.js";
 import { STARTERS, LANG_LABELS, MONACO_LANG } from "../starters.js";
+import { starterFor } from "../problemStarters.js";
 import { useRun } from "../hooks/useRun.js";
 import { RunResults } from "../components/RunResults.js";
 import { sanitizeStatement } from "../sanitize.js";
@@ -157,7 +158,7 @@ export function BattleMatchPage() {
 
   function getSource(): string {
     if (!problem) return STARTERS[lang];
-    return loadDraft(problem.slug, lang) ?? STARTERS[lang];
+    return loadDraft(problem.slug, lang) ?? starterFor(problem.slug, lang);
   }
   const [source, setSourceState] = useState(getSource);
   useEffect(() => { setSourceState(getSource()); }, [problem?.slug, lang]);
@@ -170,7 +171,7 @@ export function BattleMatchPage() {
   function handleReset() {
     if (!problem) return;
     if (!window.confirm("Reset to the starter code? Your current code will be discarded.")) return;
-    setSource(STARTERS[lang]);
+    setSource(starterFor(problem.slug, lang));
   }
 
   function handleRun() {

@@ -9,6 +9,7 @@ import { useRun } from "../hooks/useRun.js";
 import { RunResults } from "../components/RunResults.js";
 import { loadDraft, saveDraft } from "../draft.js";
 import { STARTERS, LANG_LABELS, MONACO_LANG } from "../starters.js";
+import { starterFor } from "../problemStarters.js";
 import { sanitizeStatement } from "../sanitize.js";
 import { TopBar } from "../components/TopBar.js";
 
@@ -72,7 +73,7 @@ export function RacePage() {
 
   useEffect(() => {
     if (!problem) return;
-    setSource(loadDraft(problem.slug, lang) ?? STARTERS[lang]);
+    setSource(loadDraft(problem.slug, lang) ?? starterFor(problem.slug, lang));
   }, [problem, lang]);
 
   // Tick the race clock.
