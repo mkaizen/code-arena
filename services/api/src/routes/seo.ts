@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { BLOG_POSTS } from "@arena/shared";
 import { prisma } from "../db.js";
 import { env } from "../env.js";
 
@@ -25,11 +26,14 @@ export async function seoRoutes(app: FastifyInstance) {
       { loc: `${base}/daily`, priority: "0.8", changefreq: "daily" },
       { loc: `${base}/leaderboard`, priority: "0.6", changefreq: "daily" },
       { loc: `${base}/blog`, priority: "0.6", changefreq: "weekly" },
-      { loc: `${base}/blog/scaling-the-arena`, priority: "0.6", changefreq: "monthly" },
     ];
 
     const urls = [
       ...staticUrls.map((u) => `  <url><loc>${xmlEscape(u.loc)}</loc><changefreq>${u.changefreq}</changefreq><priority>${u.priority}</priority></url>`),
+      // Every blog post (single source of truth: BLOG_POSTS in @arena/shared).
+      ...BLOG_POSTS.map((post) =>
+        `  <url><loc>${xmlEscape(`${base}/blog/${post.slug}`)}</loc><lastmod>${xmlEscape(post.date)}</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>`,
+      ),
       ...problems.map((p) =>
         `  <url><loc>${xmlEscape(`${base}/problems/${p.slug}`)}</loc><lastmod>${p.createdAt.toISOString().slice(0, 10)}</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>`,
       ),
