@@ -8,6 +8,27 @@
 
     <link rel="canonical" href="https://codearena.space/" />
 
+    <!-- Site-level structured data (helps search + answer engines identify the
+         site and cite it). Per-page schema is injected by prerender.mjs. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Code Arena",
+        "url": "https://codearena.space",
+        "logo": "https://codearena.space/og-image.png",
+        "description": "A competitive-programming practice platform with real-time judging, 1v1 duels, elimination matches, ghost racing, and a bank of classic coding-interview problems."
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Code Arena",
+        "url": "https://codearena.space"
+      }
+    </script>
+
     <!-- Open Graph / social preview -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Code Arena — Solve. Duel. Climb." />

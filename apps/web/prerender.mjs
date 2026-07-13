@@ -30,12 +30,74 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 const stripHtml = (h) => h.replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/gi, " ").replace(/\s+/g, " ").trim();
 const diffLabel = (d) => (d === "easy" ? "Easy" : d === "med" ? "Medium" : "Hard");
 
+// One-line pitch reused across the JSON-LD, llms.txt, and page copy.
+const INTRO =
+  "Code Arena is a competitive-programming practice platform with real-time judging: " +
+  "1v1 duels, six-player elimination matches, ghost races against past solvers, and a bank " +
+  "of classic coding-interview problems. Every problem has a statement, worked examples, a " +
+  "live judge across six languages, and a solution editorial.";
+
+// Publisher/provider entity shared by every schema.org block.
+const ORG = { "@type": "Organization", name: "Code Arena", url: SITE, logo: `${SITE}/og-image.png` };
+
+// Serialize JSON-LD for embedding in HTML. Escaping "<" as < keeps the
+// JSON valid while making it impossible for any string value (e.g. one that
+// contains "</script>") to break out of the surrounding <script> tag.
+const ldScript = (objs) =>
+  objs.map((o) => `<script type="application/ld+json">${JSON.stringify(o).replace(/</g, "\\u003c")}</script>`).join("");
+
+const crumbs = (items) => ({
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: items.map((it, i) => ({ "@type": "ListItem", position: i + 1, name: it.name, item: it.url })),
+});
+
+// HTML → readable plain text with paragraph breaks preserved, for llms-full.txt.
+function htmlToText(html) {
+  return html
+    .replace(/<\/(p|h[1-6]|pre|li|ul|ol|div|section)>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "\n- ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<sup>(.*?)<\/sup>/gi, "^$1")
+    .replace(/<sub>(.*?)<\/sub>/gi, "$1")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&le;/g, "≤").replace(/&ge;/g, "≥").replace(/&times;/g, "×")
+    .replace(/&middot;/g, "·").replace(/&rarr;/g, "→").replace(/&ndash;/g, "–")
+    .replace(/&lfloor;/g, "⌊").replace(/&rfloor;/g, "⌋").replace(/&nbsp;/g, " ")
+    .replace(/&[a-z]+;/gi, " ")
+    .split("\n").map((l) => l.replace(/[ \t]+/g, " ").trim()).join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+// Collapse HTML to a single clean line (entities decoded, superscripts kept as
+// "^"), clipped to n chars at a word boundary — for citable description/answer
+// fields where the entity-dropping stripHtml would mangle "10⁹" into "10 9".
+function oneLine(html, n) {
+  const text = htmlToText(html).replace(/\s*\n\s*/g, " ").replace(/\s+/g, " ").trim();
+  if (!n || text.length <= n) return text;
+  const cut = text.slice(0, n);
+  return cut.slice(0, cut.lastIndexOf(" ")).trim() + "…";
+}
+
+// Pull a "Time … / Space …" complexity line out of an editorial, if present —
+// the kind of self-contained fact answer engines quote directly.
+function complexityOf(editorialHtml) {
+  const text = stripHtml(editorialHtml);
+  const time = text.match(/Time:\s*(O\([^)]*\)[^.]*)/i);
+  const space = text.match(/Space:\s*(O\([^)]*\)[^.]*)/i);
+  if (!time && !space) return null;
+  return [time && `Time ${time[1].trim()}`, space && `Space ${space[1].trim()}`].filter(Boolean).join("; ");
+}
+
 /** Swap a single-line meta/title/link value in the template. */
 function setMeta(html, pattern, replacement) {
   return html.replace(pattern, replacement);
 }
 
-function render({ title, description, path, snapshot }) {
+function render({ title, description, path, snapshot, jsonLd }) {
   const url = `${SITE}${path}`;
   let html = template;
   html = setMeta(html, /<title>[\s\S]*?<\/title>/, `<title>${esc(title)}</title>`);
@@ -47,6 +109,7 @@ function render({ title, description, path, snapshot }) {
   html = setMeta(html, /(<meta property="og:url" content=")[^"]*(")/, `$1${esc(url)}$2`);
   html = setMeta(html, /(<link rel="canonical" href=")[^"]*(")/, `$1${esc(url)}$2`);
   html = html.replace('<div id="root"></div>', `<div id="root">${snapshot}</div>`);
+  if (jsonLd && jsonLd.length) html = html.replace("</head>", `${ldScript(jsonLd)}</head>`);
   return html;
 }
 
@@ -72,7 +135,49 @@ for (const p of PROBLEMS) {
     (editorial ? `<section><h2>Editorial</h2>${editorial}</section>` : "") +
     `<p><a href="/problems/${esc(p.slug)}">Open ${esc(p.title)} in Code Arena →</a></p>` +
     `</main>`;
-  write(`problems/${p.slug}`, render({ title, description, path: `/problems/${p.slug}`, snapshot }));
+
+  // Structured data: a practice problem is a LearningResource; the editorial
+  // answers "how do you solve X?" as an FAQPage so answer engines can lift it.
+  const learning = {
+    "@context": "https://schema.org",
+    "@type": "LearningResource",
+    name: p.title,
+    url: `${SITE}/problems/${p.slug}`,
+    description: oneLine(p.statement, 300),
+    learningResourceType: "Coding practice problem",
+    educationalLevel: diffLabel(p.difficulty),
+    educationalUse: "practice",
+    ...(p.tags?.length ? { teaches: p.tags, keywords: p.tags.join(", ") } : {}),
+    inLanguage: "en",
+    isAccessibleForFree: true,
+    provider: ORG,
+    publisher: ORG,
+  };
+  const faq = [];
+  if (editorial) {
+    faq.push({
+      "@type": "Question",
+      name: `How do you solve ${p.title}?`,
+      acceptedAnswer: { "@type": "Answer", text: oneLine(editorial, 600) },
+    });
+    const cx = complexityOf(editorial);
+    if (cx) faq.push({
+      "@type": "Question",
+      name: `What is the time and space complexity of ${p.title}?`,
+      acceptedAnswer: { "@type": "Answer", text: cx },
+    });
+  }
+  const jsonLd = [
+    learning,
+    crumbs([
+      { name: "Home", url: `${SITE}/` },
+      { name: "Problems", url: `${SITE}/problems` },
+      { name: p.title, url: `${SITE}/problems/${p.slug}` },
+    ]),
+  ];
+  if (faq.length) jsonLd.push({ "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faq });
+
+  write(`problems/${p.slug}`, render({ title, description, path: `/problems/${p.slug}`, snapshot, jsonLd }));
 }
 
 // ── Problem index (internal linking + crawl discovery) ─────────────────────
@@ -87,6 +192,30 @@ write("problems", render({
   description: "Browse Code Arena's problem bank — classic interview questions and algorithm challenges across easy, medium, and hard, each with a live judge, editorial, and speed leaderboards.",
   path: "/problems",
   snapshot: listSnapshot,
+  jsonLd: [
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: "Practice Problems",
+      url: `${SITE}/problems`,
+      description: "Code Arena's bank of classic coding-interview and algorithm problems.",
+      isPartOf: { "@type": "WebSite", name: "Code Arena", url: SITE },
+      mainEntity: {
+        "@type": "ItemList",
+        numberOfItems: PROBLEMS.length,
+        itemListElement: PROBLEMS.map((p, i) => ({
+          "@type": "ListItem",
+          position: i + 1,
+          name: p.title,
+          url: `${SITE}/problems/${p.slug}`,
+        })),
+      },
+    },
+    crumbs([
+      { name: "Home", url: `${SITE}/` },
+      { name: "Problems", url: `${SITE}/problems` },
+    ]),
+  ],
 }));
 
 // ── Blog: render each markdown post's body to HTML (identical to the client's
@@ -103,14 +232,13 @@ function parseFrontmatter(text) {
 }
 
 const BLOG_DIR = join(WEB_DIR, "public/content/blog");
-let nPosts = 0;
+const posts = [];
 if (existsSync(BLOG_DIR)) {
-  const posts = [];
   for (const file of readdirSync(BLOG_DIR).filter((f) => f.endsWith(".md")).sort()) {
     const slug = file.replace(/\.md$/, "");
     const { meta, body } = parseFrontmatter(readFileSync(join(BLOG_DIR, file), "utf8"));
     const bodyHtml = renderToStaticMarkup(React.createElement(ReactMarkdown, null, body));
-    posts.push({ slug, meta });
+    posts.push({ slug, meta, body });
     const title = `${meta.title || slug} — Code Arena`;
     const description = meta.description || stripHtml(bodyHtml).slice(0, 150);
     const snapshot =
@@ -118,8 +246,29 @@ if (existsSync(BLOG_DIR)) {
       (meta.date || meta.author ? `<p>${esc(meta.date || "")}${meta.date && meta.author ? " · " : ""}${esc(meta.author || "")}</p>` : "") +
       `<article class="blog-article">${bodyHtml}</article>` +
       `</main>`;
-    write(`blog/${slug}`, render({ title, description, path: `/blog/${slug}`, snapshot }));
-    nPosts++;
+    const posting = {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      headline: meta.title || slug,
+      description,
+      url: `${SITE}/blog/${slug}`,
+      mainEntityOfPage: `${SITE}/blog/${slug}`,
+      ...(meta.date ? { datePublished: meta.date, dateModified: meta.date } : {}),
+      author: { "@type": "Person", name: meta.author || "Code Arena" },
+      publisher: ORG,
+      inLanguage: "en",
+    };
+    write(`blog/${slug}`, render({
+      title, description, path: `/blog/${slug}`, snapshot,
+      jsonLd: [
+        posting,
+        crumbs([
+          { name: "Home", url: `${SITE}/` },
+          { name: "Blog", url: `${SITE}/blog` },
+          { name: meta.title || slug, url: `${SITE}/blog/${slug}` },
+        ]),
+      ],
+    }));
   }
 
   const blogList =
@@ -132,7 +281,61 @@ if (existsSync(BLOG_DIR)) {
     description: "Engineering deep-dives from the team building Code Arena — real-time judging, Docker sandboxing, WebSockets, and competitive-programming infrastructure.",
     path: "/blog",
     snapshot: blogList,
+    jsonLd: [
+      {
+        "@context": "https://schema.org",
+        "@type": "Blog",
+        name: "Engineering Blog",
+        url: `${SITE}/blog`,
+        publisher: ORG,
+        blogPost: posts.map((p) => ({
+          "@type": "BlogPosting",
+          headline: p.meta.title || p.slug,
+          url: `${SITE}/blog/${p.slug}`,
+          ...(p.meta.date ? { datePublished: p.meta.date } : {}),
+        })),
+      },
+      crumbs([
+        { name: "Home", url: `${SITE}/` },
+        { name: "Blog", url: `${SITE}/blog` },
+      ]),
+    ],
   }));
 }
 
-console.log(`prerendered ${PROBLEMS.length} problem pages + problem index + ${nPosts} blog post(s) + blog index`);
+// ── llms.txt / llms-full.txt (llmstxt.org) ─────────────────────────────────
+// A curated, machine-readable index of the site's content for LLMs and
+// answer engines: llms.txt links every problem + post; llms-full.txt inlines
+// the full statement and editorial text so a model can cite without crawling.
+let llms = `# Code Arena\n\n> ${INTRO}\n\n`;
+llms += `- Site: ${SITE}\n- Problems: ${SITE}/problems\n- Blog: ${SITE}/blog\n\n`;
+llms += `## Problems\n\n`;
+for (const p of PROBLEMS) {
+  const tags = p.tags?.length ? ` · ${p.tags.join(", ")}` : "";
+  llms += `- [${p.title}](${SITE}/problems/${p.slug}): ${diffLabel(p.difficulty)}${tags}. ${oneLine(p.statement, 110)}\n`;
+}
+if (posts.length) {
+  llms += `\n## Blog\n\n`;
+  for (const p of posts) llms += `- [${p.meta.title || p.slug}](${SITE}/blog/${p.slug})${p.meta.description ? `: ${p.meta.description}` : ""}\n`;
+}
+writeFileSync(join(DIST, "llms.txt"), llms);
+
+let full = `# Code Arena — Full Content Export\n\n${INTRO}\n\nURL: ${SITE}\n\n# Problems (${PROBLEMS.length})\n\n`;
+for (const p of PROBLEMS) {
+  full += `## ${p.title} (${diffLabel(p.difficulty)})\nURL: ${SITE}/problems/${p.slug}\n`;
+  if (p.tags?.length) full += `Tags: ${p.tags.join(", ")}\n`;
+  full += `\n${htmlToText(p.statement)}\n`;
+  if (EDITORIALS[p.slug]) full += `\n### Editorial\n${htmlToText(EDITORIALS[p.slug])}\n`;
+  full += `\n---\n\n`;
+}
+if (posts.length) {
+  full += `# Blog\n\n`;
+  for (const p of posts) {
+    full += `## ${p.meta.title || p.slug}\nURL: ${SITE}/blog/${p.slug}\n`;
+    if (p.meta.date || p.meta.author) full += `${p.meta.date || ""}${p.meta.date && p.meta.author ? " · " : ""}${p.meta.author || ""}\n`;
+    full += `\n${p.body.trim()}\n\n---\n\n`;
+  }
+}
+writeFileSync(join(DIST, "llms-full.txt"), full);
+
+console.log(`prerendered ${PROBLEMS.length} problem pages + problem index + ${posts.length} blog post(s) + blog index; wrote llms.txt (${(llms.length / 1024).toFixed(1)}kb) + llms-full.txt (${(full.length / 1024).toFixed(1)}kb)`);
