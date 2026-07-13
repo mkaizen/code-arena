@@ -7,6 +7,7 @@ import { useAuth } from "../ctx/AuthContext.js";
 import { useWs } from "../hooks/useWs.js";
 import { loadDraft, saveDraft } from "../draft.js";
 import { STARTERS, LANG_LABELS, MONACO_LANG } from "../starters.js";
+import { starterFor } from "../problemStarters.js";
 import { useRun } from "../hooks/useRun.js";
 import { RunResults } from "../components/RunResults.js";
 import { sanitizeStatement } from "../sanitize.js";
@@ -169,7 +170,7 @@ export function ContestPage() {
       setActiveProblem(p);
       const k = `${cp.slug}:${lang}`;
       if (sources[k] === undefined) {
-        setSources((s) => ({ ...s, [k]: loadDraft(cp.slug, lang) ?? STARTERS[lang] }));
+        setSources((s) => ({ ...s, [k]: loadDraft(cp.slug, lang) ?? starterFor(cp.slug, lang) }));
       }
     }).catch(() => {}).finally(() => setLoadingProblem(false));
   }
@@ -177,7 +178,7 @@ export function ContestPage() {
   function getSource(): string {
     if (!activeProblem) return STARTERS[lang];
     const k = `${activeProblem.slug}:${lang}`;
-    return sources[k] ?? loadDraft(activeProblem.slug, lang) ?? STARTERS[lang];
+    return sources[k] ?? loadDraft(activeProblem.slug, lang) ?? starterFor(activeProblem.slug, lang);
   }
 
   function setSource(val: string) {
@@ -190,7 +191,7 @@ export function ContestPage() {
   function handleReset() {
     if (!activeProblem) return;
     if (!window.confirm("Reset to the starter code? Your current code will be discarded.")) return;
-    setSource(STARTERS[lang]);
+    setSource(starterFor(activeProblem.slug, lang));
   }
 
   async function handleSubmit() {

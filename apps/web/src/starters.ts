@@ -9,10 +9,13 @@ export const MONACO_LANG: Record<Language, string> = {
 };
 
 /**
- * Per-language starter templates. Each one compiles and runs as-is, sets up
- * fast/buffered stdin+stdout, and leaves a clear spot for the solution. They
- * read all of stdin and echo it back so a fresh submission is a no-op WA
- * rather than a crash — replace the marked section with your logic.
+ * Generic per-language starter templates. Each one compiles and runs as-is,
+ * sets up fast/buffered stdin+stdout, and leaves a clear spot for the solution
+ * — a fresh submission produces no output (a no-op WA) rather than a crash.
+ *
+ * These are the fallback used for any problem without a tailored spec; most
+ * problems get input-specific starters from `problemStarters.ts` via
+ * `starterFor()`.
  */
 export const STARTERS: Record<Language, string> = {
   cpp: `#include <bits/stdc++.h>
