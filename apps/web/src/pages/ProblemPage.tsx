@@ -481,17 +481,6 @@ export function ProblemPage() {
                 Custom input
               </label>
               <div style={{ flex: 1 }} />
-              <Link
-                to={`/race/${problem.slug}`}
-                title="Race a ghost — solve against the clock and a past solver"
-                style={{
-                  background: "transparent", color: "var(--v-tle)", fontWeight: 700, fontSize: 12,
-                  padding: "5px 12px", border: "1px solid var(--v-tle)", borderRadius: 6,
-                  fontFamily: "var(--disp)", textDecoration: "none",
-                }}
-              >
-                ⚡ Race
-              </Link>
               <button
                 onClick={handleReset}
                 title="Reset to starter code"

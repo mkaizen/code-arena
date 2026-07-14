@@ -204,33 +204,6 @@ export interface ProblemLeaderboard {
   shortest: BrevityRow[];
 }
 
-// ── Ghost racing (race a replay of a past solve) ────────────────────────────
-export interface GhostEvent {
-  /** Ms from race start. */
-  offsetMs: number;
-  verdict: string;
-}
-
-/** The past solve you're racing against. */
-export interface GhostView {
-  handle: string;
-  totalMs: number;
-  events: GhostEvent[];
-}
-
-export interface GhostStartResponse {
-  raceId: string;
-  ghost: GhostView | null;
-}
-
-export interface GhostFinishResponse {
-  /** Your wall-clock start→solve time, measured server-side. */
-  totalMs: number;
-  ghost: GhostView | null;
-  /** Whether you beat the ghost; null when there was no ghost to race. */
-  beat: boolean | null;
-}
-
 // ── Match replay / post-match "game review" ────────────────────────────────
 export interface ReplayPlayer {
   userId: string;

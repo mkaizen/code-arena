@@ -1,4 +1,4 @@
-import type { DailyView, GhostEvent, GhostFinishResponse, GhostStartResponse, Language, LeaderboardRow, MatchHistoryEntry, MatchMode, MatchRecord, MatchReplay, MatchStateView, PlagiarismProblemReport, ProblemLeaderboard, ProblemVersionDetail, ProblemVersionSummary, PublicProfile, RunResult } from "@arena/shared";
+import type { DailyView, Language, LeaderboardRow, MatchHistoryEntry, MatchMode, MatchRecord, MatchReplay, MatchStateView, PlagiarismProblemReport, ProblemLeaderboard, ProblemVersionDetail, ProblemVersionSummary, PublicProfile, RunResult } from "@arena/shared";
 
 export interface PlagiarismReport {
   contestId: string;
@@ -265,10 +265,4 @@ export const api = {
     req(`/users/${encodeURIComponent(handle)}`),
 
   daily: (): Promise<DailyView> => req("/daily"),
-
-  ghostStart: (problemId: string): Promise<GhostStartResponse> =>
-    req("/ghost/start", { method: "POST", body: JSON.stringify({ problemId }) }),
-
-  ghostFinish: (raceId: string, events: GhostEvent[]): Promise<GhostFinishResponse> =>
-    req("/ghost/finish", { method: "POST", body: JSON.stringify({ raceId, events }) }),
 };

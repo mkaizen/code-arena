@@ -2,7 +2,7 @@ import { useEffect } from "react";
 
 const SITE = "Code Arena";
 const DEFAULT_DESC =
-  "Real-time 1v1 duels, six-player elimination matches, ghost racing, and a large problem bank — every accepted solution moves your rating.";
+  "Real-time 1v1 duels, six-player elimination matches, and a large problem bank — every accepted solution moves your rating.";
 
 function upsertMeta(selector: string, attr: "name" | "property", key: string, content: string) {
   let el = document.head.querySelector<HTMLMetaElement>(selector);
