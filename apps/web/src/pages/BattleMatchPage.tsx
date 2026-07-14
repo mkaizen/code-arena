@@ -129,6 +129,8 @@ export function BattleMatchPage() {
   const isMobile = useMediaQuery("(max-width: 820px)");
   const [mobileTab, setMobileTab] = useState<"problem" | "code" | "players">("problem");
   const [feed, setFeed] = useState<MatchActivity[]>([]);
+  const [showCustom, setShowCustom] = useState(false);
+  const [customInput, setCustomInput] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -191,7 +193,7 @@ export function BattleMatchPage() {
 
   function handleRun() {
     if (!problem) return;
-    run.start(lang, source);
+    run.start(lang, source, showCustom && customInput.trim() ? customInput : undefined);
   }
 
   const myPlayer = match?.players.find((p) => p.userId === user?.id) ?? null;
@@ -403,6 +405,10 @@ export function BattleMatchPage() {
                 >
                   {(Object.entries(LANG_LABELS) as [Language, string][]).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
+                <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--txt-3)", cursor: "pointer" }}>
+                  <input type="checkbox" checked={showCustom} onChange={(e) => setShowCustom(e.target.checked)} />
+                  Custom input
+                </label>
                 <div style={{ flex: 1 }} />
                 <button
                   onClick={handleReset}
@@ -432,6 +438,18 @@ export function BattleMatchPage() {
                   Submit
                 </button>
               </div>
+
+              {showCustom && (isMobile ? mobileTab === "code" : true) && (
+                <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--line)", background: "var(--panel)", flexShrink: 0 }}>
+                  <textarea
+                    value={customInput}
+                    onChange={(e) => setCustomInput(e.target.value)}
+                    placeholder="Custom stdin for ▶ Run (leave blank to use the samples)…"
+                    rows={2}
+                    style={{ width: "100%", boxSizing: "border-box", background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--txt)", fontFamily: "var(--mono)", fontSize: 12, padding: "6px 8px", resize: "vertical" }}
+                  />
+                </div>
+              )}
 
               <div
                 style={{
