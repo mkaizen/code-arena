@@ -3,7 +3,7 @@ import { broadcast, sendToUsers } from "../ws.js";
 import { recomputeRatings } from "../rating/elo.js";
 import { winsToClinch, placementsByElimination, placementsByScore } from "./rules.js";
 import { isRecruiter } from "../referrals.js";
-import { botRoundPlan, personaFor, pickOpponents } from "./bots.js";
+import { botRoundPlan, personaFor, pickOpponents, BOT_ROSTER, botEmail } from "./bots.js";
 import type { MatchMode, MatchPlayerView, MatchProblemView, MatchStateView } from "@arena/shared";
 
 /**
@@ -171,6 +171,20 @@ export async function queueStatus(userId: string): Promise<{
 }
 
 /**
+ * Ensure the bot roster exists in the DB. Lazily provisions it on first use so
+ * practice matches work even if the seed script was never run against this
+ * database. Idempotent and race-safe: skipDuplicates keys off the unique email.
+ */
+async function ensureBotsProvisioned(): Promise<void> {
+  const have = await prisma.user.count({ where: { isBot: true } });
+  if (have >= BOT_ROSTER.length) return;
+  await prisma.user.createMany({
+    data: BOT_ROSTER.map((b) => ({ handle: b.handle, email: botEmail(b.handle), isBot: true, rating: b.rating })),
+    skipDuplicates: true,
+  });
+}
+
+/**
  * Start an unrated practice match: the human against seeded bots picked to
  * bracket their rating. No queue, no waiting — it begins immediately, and the
  * bots play the rounds out on their own timers.
@@ -190,6 +204,7 @@ export async function startPracticeMatch(
   const me = await prisma.user.findUnique({ where: { id: userId }, select: { rating: true } });
   if (!me) throw new Error("user not found");
 
+  await ensureBotsProvisioned();
   const allBots = await prisma.user.findMany({ where: { isBot: true }, select: { id: true, rating: true } });
   if (allBots.length === 0) throw new Error("no practice bots are available");
   const opponents = pickOpponents(me.rating, allBots, cfg.capacity - 1);

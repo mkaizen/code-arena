@@ -10,15 +10,14 @@ this once after shipping it to production. ~5 minutes.
    start (see `services/api/Dockerfile`), so a normal redeploy/rebuild applies
    `20260713000000_bot_practice_matches` automatically. No manual step needed.
 
-2. **Seed the bots.** The 16 practice bots come from the seed script (idempotent
-   upserts, safe to re-run):
+2. **Bots.** The 16 practice bots are provisioned **lazily on the first practice
+   match** (`ensureBotsProvisioned` in `services/api/src/match/engine.ts`), so no
+   manual step is required. You can still create them up front via the seed
+   (idempotent) if you prefer:
 
    ```bash
    docker compose --env-file .env.prod -f docker-compose.prod.yml --profile seed up seed
    ```
-
-   Without this you'll get **"no practice bots are available"** when starting a
-   practice match.
 
 ## Checklist
 
@@ -49,8 +48,9 @@ If all seven pass, the feature is healthy.
 
 ## If something's off
 
-- **"no practice bots are available"** → the seed didn't run; re-run the seed
-  profile above.
+- **"no practice bots are available"** → shouldn't happen now that bots
+  self-provision, but if it does the deploy predates that fix — run the seed
+  profile above, or redeploy.
 - **Bots never solve / all solve instantly** → check the API logs for
   `bot action error`; the per-round scheduler arms `setTimeout`s, so a crash in
   `botSubmit` would surface there.

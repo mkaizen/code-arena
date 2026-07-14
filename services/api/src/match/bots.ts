@@ -7,6 +7,35 @@
  * database, a judge, or wall-clock timers.
  */
 
+/**
+ * The practice-bot roster: handles + ratings spanning the tiers so a player of
+ * any level can be bracketed with a believable field. This is the single source
+ * of truth — the seed script and the engine's lazy self-provisioning both use it.
+ */
+export const BOT_ROSTER: { handle: string; rating: number }[] = [
+  { handle: "SyntaxSeedling", rating: 820 },
+  { handle: "OffByOneOllie", rating: 980 },
+  { handle: "PrintfPaula", rating: 1080 },
+  { handle: "LoopLarry", rating: 1180 },
+  { handle: "BruteForceBecca", rating: 1280 },
+  { handle: "RecursionRhea", rating: 1380 },
+  { handle: "GreedyGus", rating: 1470 },
+  { handle: "PointerPete", rating: 1560 },
+  { handle: "HashmapHana", rating: 1650 },
+  { handle: "DynamicDeepa", rating: 1740 },
+  { handle: "SegfaultSam", rating: 1830 },
+  { handle: "BinarySearchBo", rating: 1920 },
+  { handle: "GraphGwen", rating: 2010 },
+  { handle: "BitwiseBjorn", rating: 2110 },
+  { handle: "AsymptoteAva", rating: 2220 },
+  { handle: "OptimalOskar", rating: 2340 },
+];
+
+/** The email a bot is provisioned under (unique, never a real inbox). */
+export function botEmail(handle: string): string {
+  return `bot+${handle.toLowerCase()}@codearena.local`;
+}
+
 /** A bot's temperament, which nudges reliability and pace. Derived, stably, from its identity. */
 export type BotPersona = "steady" | "grinder" | "speedster" | "shaky";
 
