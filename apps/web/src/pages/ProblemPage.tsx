@@ -11,6 +11,7 @@ import { loadDraft, saveDraft } from "../draft.js";
 import { STARTERS, LANG_LABELS, MONACO_LANG } from "../starters.js";
 import { starterFor } from "../problemStarters.js";
 import { useRun } from "../hooks/useRun.js";
+import { useMediaQuery } from "../hooks/useMediaQuery.js";
 import { RunResults } from "../components/RunResults.js";
 import { sanitizeStatement } from "../sanitize.js";
 import { useSeo, metaFromHtml } from "../hooks/useSeo.js";
@@ -97,6 +98,8 @@ export function ProblemPage() {
   const run = useRun(problem?.id, { poll: !user });
   const submitRef = useRef<() => void>(() => {});
   const runRef = useRef<() => void>(() => {});
+  const isMobile = useMediaQuery("(max-width: 820px)");
+  const [mobilePane, setMobilePane] = useState<"problem" | "code">("problem");
 
   useSeo({
     title: problem ? problem.title : "Loading…",
@@ -221,7 +224,7 @@ export function ProblemPage() {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--ink)", overflow: "hidden" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100dvh", background: "var(--ink)", overflow: "hidden" }}>
       <TopBar />
 
       {loading && (
@@ -237,13 +240,41 @@ export function ProblemPage() {
       )}
 
       {!loading && !error && problem && (
-        <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", minHeight: 0 }}>
+        <div
+          style={{
+            flex: 1, minHeight: 0,
+            ...(isMobile
+              ? { display: "flex", flexDirection: "column" }
+              : { display: "grid", gridTemplateColumns: "1fr 1fr" }),
+          }}
+        >
+          {/* Mobile-only Problem / Code tab switcher */}
+          {isMobile && (
+            <div style={{ display: "flex", flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--panel)" }}>
+              {(["problem", "code"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setMobilePane(t)}
+                  style={{
+                    flex: 1, padding: "11px 0", fontFamily: "var(--disp)", fontWeight: 700, fontSize: 13,
+                    background: mobilePane === t ? "var(--panel-2)" : "transparent",
+                    color: mobilePane === t ? "var(--txt)" : "var(--txt-3)",
+                    border: "none", borderBottom: `2px solid ${mobilePane === t ? "var(--v-ac)" : "transparent"}`,
+                    cursor: "pointer",
+                  }}
+                >
+                  {t === "problem" ? "Problem" : "Code"}
+                </button>
+              ))}
+            </div>
+          )}
           {/* Left: Problem statement */}
           <div
             style={{
-              borderRight: "1px solid var(--line)",
+              borderRight: isMobile ? "none" : "1px solid var(--line)",
               overflow: "auto",
               padding: "20px 24px",
+              ...(isMobile ? { flex: 1, minHeight: 0, display: mobilePane === "problem" ? "block" : "none" } : {}),
             }}
           >
             <h1 style={{ fontFamily: "var(--disp)", fontSize: 22, fontWeight: 700, color: "var(--txt)", marginBottom: 6 }}>
@@ -406,13 +437,22 @@ export function ProblemPage() {
           </div>
 
           {/* Right: Editor + console */}
-          <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
+          <div
+            style={{
+              display: isMobile && mobilePane !== "code" ? "none" : "flex",
+              flexDirection: "column",
+              minHeight: 0,
+              ...(isMobile ? { flex: 1 } : {}),
+            }}
+          >
             {/* Toolbar */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
+                rowGap: 6,
+                flexWrap: "wrap",
                 padding: "8px 12px",
                 borderBottom: "1px solid var(--line)",
                 background: "var(--panel)",
@@ -538,6 +578,7 @@ export function ProblemPage() {
                   minimap: { enabled: false },
                   scrollBeyondLastLine: false,
                   padding: { top: 8, bottom: 8 },
+                  automaticLayout: true,
                 }}
               />
             </div>
