@@ -510,6 +510,37 @@ async function main() {
   });
   console.log(`admin user: admin@codearena.dev / password123`);
 
+  // ── Practice bots ─────────────────────────────────────────────────────────
+  // Seeded opponents for unrated practice matches. Ratings span the tiers so a
+  // player of any level can be bracketed with a believable field. They have no
+  // password (never a real login) and are excluded from leaderboards + ratings.
+  const BOTS: { handle: string; rating: number }[] = [
+    { handle: "SyntaxSeedling", rating: 820 },
+    { handle: "OffByOneOllie", rating: 980 },
+    { handle: "PrintfPaula", rating: 1080 },
+    { handle: "LoopLarry", rating: 1180 },
+    { handle: "BruteForceBecca", rating: 1280 },
+    { handle: "RecursionRhea", rating: 1380 },
+    { handle: "GreedyGus", rating: 1470 },
+    { handle: "PointerPete", rating: 1560 },
+    { handle: "HashmapHana", rating: 1650 },
+    { handle: "DynamicDeepa", rating: 1740 },
+    { handle: "SegfaultSam", rating: 1830 },
+    { handle: "BinarySearchBo", rating: 1920 },
+    { handle: "GraphGwen", rating: 2010 },
+    { handle: "BitwiseBjorn", rating: 2110 },
+    { handle: "AsymptoteAva", rating: 2220 },
+    { handle: "OptimalOskar", rating: 2340 },
+  ];
+  for (const b of BOTS) {
+    await prisma.user.upsert({
+      where: { email: `bot+${b.handle.toLowerCase()}@codearena.local` },
+      update: { isBot: true, rating: b.rating },
+      create: { handle: b.handle, email: `bot+${b.handle.toLowerCase()}@codearena.local`, isBot: true, rating: b.rating },
+    });
+  }
+  console.log(`practice bots: ${BOTS.length}`);
+
   // ── Problems ──────────────────────────────────────────────────────────────
   // Each problem is isolated in its own try/catch so a single failure (e.g. a
   // transient object-storage error) can't abort the whole seed and leave the

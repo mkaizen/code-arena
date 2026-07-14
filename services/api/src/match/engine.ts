@@ -3,6 +3,7 @@ import { broadcast, sendToUsers } from "../ws.js";
 import { recomputeRatings } from "../rating/elo.js";
 import { winsToClinch, placementsByElimination, placementsByScore } from "./rules.js";
 import { isRecruiter } from "../referrals.js";
+import { botRoundPlan, personaFor, pickOpponents } from "./bots.js";
 import type { MatchMode, MatchPlayerView, MatchProblemView, MatchStateView } from "@arena/shared";
 
 /**
@@ -25,6 +26,15 @@ const FORFEIT_GRACE_MS = 30_000;
 // funnel through the transition functions under the same lock).
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 const locks = new Map<string, Promise<unknown>>();
+// Practice matches schedule each bot's think/submit/solve actions as timers;
+// they're tracked per match so a round change or finish can cancel the ones
+// that haven't fired yet (a bot must never "solve" a round that already moved on).
+const botTimers = new Map<string, ReturnType<typeof setTimeout>[]>();
+
+function clearBotTimers(matchId: string): void {
+  for (const t of botTimers.get(matchId) ?? []) clearTimeout(t);
+  botTimers.delete(matchId);
+}
 
 function withLock<T>(matchId: string, fn: () => Promise<T>): Promise<T> {
   const prev = locks.get(matchId) ?? Promise.resolve();
@@ -39,9 +49,13 @@ function clearMatchTimer(matchId: string): void {
     clearTimeout(t);
     timers.delete(matchId);
   }
+  // Round transitions cancel any of this round's bot actions that haven't
+  // fired; the next round schedules its own (botSubmit also re-checks the round).
+  clearBotTimers(matchId);
 }
 
 function forgetMatchSoon(matchId: string): void {
+  clearBotTimers(matchId);
   setTimeout(() => {
     timers.delete(matchId);
     locks.delete(matchId);
@@ -156,6 +170,53 @@ export async function queueStatus(userId: string): Promise<{
   };
 }
 
+/**
+ * Start an unrated practice match: the human against seeded bots picked to
+ * bracket their rating. No queue, no waiting — it begins immediately, and the
+ * bots play the rounds out on their own timers.
+ */
+export async function startPracticeMatch(
+  userId: string,
+  mode: MatchMode,
+): Promise<{ matchId: string }> {
+  // Already mid-match (duplicate click / reconnect) — send them back in.
+  const live = await prisma.matchPlayer.findFirst({
+    where: { userId, match: { status: "ACTIVE" } },
+    select: { matchId: true },
+  });
+  if (live) return { matchId: live.matchId };
+
+  const cfg = MODE_CONFIG[mode];
+  const me = await prisma.user.findUnique({ where: { id: userId }, select: { rating: true } });
+  if (!me) throw new Error("user not found");
+
+  const allBots = await prisma.user.findMany({ where: { isBot: true }, select: { id: true, rating: true } });
+  if (allBots.length === 0) throw new Error("no practice bots are available");
+  const opponents = pickOpponents(me.rating, allBots, cfg.capacity - 1);
+
+  const problems = await pickProblems(mode);
+  if (problems.length < 2) throw new Error("not enough problems available to start a match");
+
+  const now = new Date();
+  const match = await prisma.match.create({
+    data: {
+      mode,
+      practice: true,
+      roundDurationSec: cfg.roundDurationSec,
+      players: {
+        create: [
+          { userId, lastSeenAt: now },
+          ...opponents.map((b) => ({ userId: b.id, lastSeenAt: now })),
+        ],
+      },
+      problems: { create: problems.map((p, i) => ({ problemId: p.id, round: i })) },
+    },
+  });
+
+  await withLock(match.id, () => _beginRound(match.id, 0));
+  return { matchId: match.id };
+}
+
 async function loadProblemForRound(matchId: string, round: number): Promise<MatchProblemView | null> {
   const mp = await prisma.matchProblem.findUnique({
     where: { matchId_round: { matchId, round } },
@@ -191,7 +252,7 @@ async function earliestSolver(matchId: string, round: number, roundStartedAt: Da
 export async function getMatchState(matchId: string): Promise<MatchStateView | null> {
   const match = await prisma.match.findUnique({
     where: { id: matchId },
-    include: { players: { include: { user: { select: { handle: true, rating: true } } } } },
+    include: { players: { include: { user: { select: { handle: true, rating: true, isBot: true } } } } },
   });
   if (!match) return null;
 
@@ -207,6 +268,7 @@ export async function getMatchState(matchId: string): Promise<MatchStateView | n
       userId: p.userId,
       handle: p.user.handle,
       rating: p.user.rating,
+      isBot: p.user.isBot,
       status: p.status as MatchPlayerView["status"],
       solvedCurrentRound: solved.has(p.userId),
       eliminatedRound: p.eliminatedRound,
@@ -234,6 +296,7 @@ export async function getMatchState(matchId: string): Promise<MatchStateView | n
     roundEndsAt: isActive ? new Date(match.roundStartedAt.getTime() + match.roundDurationSec * 1000).toISOString() : null,
     problem,
     players,
+    practice: match.practice,
   };
 }
 
@@ -256,6 +319,81 @@ async function _beginRound(matchId: string, round: number): Promise<void> {
   }, match.roundDurationSec * 1000);
   timer.unref?.();
   timers.set(matchId, timer);
+
+  if (match.practice) await scheduleBotsForRound(matchId, round, match.roundDurationSec);
+}
+
+/**
+ * Schedule every alive bot's play for the round: some wrong attempts, then
+ * (maybe) an accepted solve at a skill-appropriate time. Each action is a timer
+ * that re-validates the match is still on this exact round before touching the
+ * DB, so a bot can never act on a round that already advanced.
+ */
+async function scheduleBotsForRound(matchId: string, round: number, roundDurationSec: number): Promise<void> {
+  const problem = await loadProblemForRound(matchId, round);
+  if (!problem) return;
+  const bots = await prisma.matchPlayer.findMany({
+    where: { matchId, status: "ALIVE", user: { isBot: true } },
+    include: { user: { select: { id: true, handle: true, rating: true } } },
+  });
+
+  const scheduled: ReturnType<typeof setTimeout>[] = [];
+  const arm = (delayMs: number, fn: () => Promise<void>) => {
+    const t = setTimeout(() => {
+      fn().catch((err) => console.error("bot action error", err));
+    }, Math.max(0, delayMs));
+    t.unref?.();
+    scheduled.push(t);
+  };
+
+  for (const bot of bots) {
+    const persona = personaFor(bot.user.id);
+    const plan = botRoundPlan(bot.user.rating, problem.ratingValue, roundDurationSec, persona);
+    for (const wrongAt of plan.wrongAtMs) {
+      arm(wrongAt, () => botSubmit(matchId, round, bot.user.id, problem.id, "WRONG_ANSWER"));
+    }
+    if (plan.solves && plan.solveAtMs != null) {
+      arm(plan.solveAtMs, () => botSubmit(matchId, round, bot.user.id, problem.id, "ACCEPTED"));
+    }
+  }
+  // Replace (not append) — the previous round's pending timers were cleared on transition.
+  botTimers.set(matchId, scheduled);
+}
+
+/**
+ * A bot "submits". Guarded: only writes if the match is still ACTIVE and on the
+ * same round the action was scheduled for. An accepted submission then drives
+ * the same round engine a human's solve would.
+ */
+async function botSubmit(
+  matchId: string,
+  round: number,
+  botId: string,
+  problemId: string,
+  verdict: "ACCEPTED" | "WRONG_ANSWER",
+): Promise<void> {
+  const match = await prisma.match.findUnique({ where: { id: matchId }, select: { status: true, round: true } });
+  if (!match || match.status !== "ACTIVE" || match.round !== round) return;
+  const player = await prisma.matchPlayer.findUnique({
+    where: { matchId_userId: { matchId, userId: botId } },
+    select: { status: true },
+  });
+  if (!player || player.status !== "ALIVE") return;
+
+  await prisma.submission.create({
+    data: {
+      userId: botId,
+      problemId,
+      matchId,
+      language: "cpp",
+      source: "// practice bot",
+      verdict,
+      rated: false,
+      // No real timing — leaves bots off the fastest-runtime board too.
+      judgedAt: new Date(),
+    },
+  });
+  if (verdict === "ACCEPTED") await onAccepted(matchId);
 }
 
 /**
@@ -264,6 +402,8 @@ async function _beginRound(matchId: string, round: number): Promise<void> {
  * Placement ties share a rank, so a duel draw is a no-op wash — as it should be.
  */
 async function _applyMatchRatings(matchId: string): Promise<void> {
+  const match = await prisma.match.findUnique({ where: { id: matchId }, select: { practice: true } });
+  if (match?.practice) return; // practice matches are unrated — nobody's ladder moves
   const players = await prisma.matchPlayer.findMany({
     where: { matchId },
     include: { user: { select: { rating: true } } },
@@ -448,8 +588,12 @@ async function _forfeitStale(matchId: string): Promise<void> {
   if (!match || match.status !== "ACTIVE") return;
 
   const cutoff = Date.now() - FORFEIT_GRACE_MS;
-  const alive = await prisma.matchPlayer.findMany({ where: { matchId, status: "ALIVE" } });
-  const stale = alive.filter((p) => (p.lastSeenAt?.getTime() ?? 0) < cutoff);
+  const alive = await prisma.matchPlayer.findMany({
+    where: { matchId, status: "ALIVE" },
+    include: { user: { select: { isBot: true } } },
+  });
+  // Bots have no heartbeat — they never forfeit.
+  const stale = alive.filter((p) => !p.user.isBot && (p.lastSeenAt?.getTime() ?? 0) < cutoff);
   if (stale.length === 0) return;
 
   const staleIds = stale.map((p) => p.userId);

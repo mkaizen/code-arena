@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { joinQueue, leaveQueue, queueStatus, getMatchState, recordHeartbeat, MODE_CONFIG } from "../match/engine.js";
+import { joinQueue, leaveQueue, queueStatus, getMatchState, recordHeartbeat, startPracticeMatch, MODE_CONFIG } from "../match/engine.js";
 import { getMatchReplay } from "../match/replay.js";
 import { prisma } from "../db.js";
 import type { MatchHistoryEntry, MatchMode } from "@arena/shared";
@@ -23,6 +23,17 @@ export async function matchRoutes(app: FastifyInstance) {
   app.delete("/matches/queue", { onRequest: [app.authenticate] }, async (req) => {
     await leaveQueue(req.user.sub);
     return { ok: true };
+  });
+
+  // Start an unrated practice match against bots — no queue, begins immediately.
+  app.post("/matches/practice", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { mode } = queueBody.parse(req.body ?? {});
+    try {
+      const { matchId } = await startPracticeMatch(req.user.sub, mode);
+      return { matchId };
+    } catch (err) {
+      return reply.code(503).send({ error: (err as Error).message });
+    }
   });
 
   app.get("/matches/queue/status", { onRequest: [app.authenticate] }, async (req) => {
