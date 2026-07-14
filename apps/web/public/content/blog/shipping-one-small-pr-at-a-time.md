@@ -1,6 +1,6 @@
 ---
 title: "Shipping a Platform One Small PR at a Time"
-date: "2026-07-31"
+date: "2026-06-23"
 author: "Matthew"
 description: "The development workflow behind Code Arena: small, single-purpose pull requests, an always-deployable main, verify-before-merge, and strict branch discipline — how a whole platform got built in slices that each ship on their own."
 ---

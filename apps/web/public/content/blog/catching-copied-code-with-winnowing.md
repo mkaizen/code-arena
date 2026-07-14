@@ -1,6 +1,6 @@
 ---
 title: "Catching Copied Code: Structural Plagiarism Detection with Winnowing"
-date: "2026-08-11"
+date: "2026-07-04"
 author: "Matthew"
 description: "How Code Arena flags copied contest submissions with a MOSS-style pipeline — tokenizing away formatting and variable names, hashing k-grams, winnowing to a compact fingerprint, and scoring with containment so padding doesn't hide a copy."
 ---

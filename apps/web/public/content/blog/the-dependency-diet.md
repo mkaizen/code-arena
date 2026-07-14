@@ -1,6 +1,6 @@
 ---
 title: "The Dependency Diet: Building Features Without the Bloat"
-date: "2026-08-04"
+date: "2026-06-27"
 author: "Matthew"
 description: "A running theme in Code Arena's development: reach for a new npm package last, not first. Real examples — canvas share cards, email over fetch, kernel memory accounting, no CSS framework — and when we did add a dependency anyway."
 ---

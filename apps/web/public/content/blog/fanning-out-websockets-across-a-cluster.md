@@ -1,6 +1,6 @@
 ---
 title: "One Emit, Every Node: Fanning Out WebSockets Across a Cluster"
-date: "2026-08-07"
+date: "2026-06-30"
 author: "Matthew"
 description: "Scaling Code Arena's real-time layer past a single API process — routing every WebSocket event through a Redis bus so a socket on node A receives an event emitted on node B, and using a SET NX claim to make judge side-effects fire exactly once cluster-wide."
 ---
