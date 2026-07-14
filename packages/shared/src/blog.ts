@@ -17,6 +17,14 @@ export interface BlogPost {
 
 export const BLOG_POSTS: BlogPost[] = [
   {
+    slug: "polishing-game-feel-in-a-coding-arena",
+    title: "Polishing Game Feel in a Coding Arena",
+    date: "2026-08-21",
+    author: "Matthew",
+    description:
+      "The small, no-new-logic changes that make a real-time coding match feel good to play: editor keyboard shortcuts (and the stale-closure trap they hide), a verdict flash, an auto-scrolling console, and telling the player why a button is disabled.",
+  },
+  {
     slug: "sizing-a-100-player-battle-royale",
     title: "Sizing a 100-Player Battle Royale: Scale the Judge, Not the Sockets",
     date: "2026-08-18",
