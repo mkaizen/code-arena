@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import Editor from "@monaco-editor/react";
+import Editor, { type OnMount } from "@monaco-editor/react";
 import type { Language, ServerEvent, GhostView, GhostEvent, GhostFinishResponse } from "@arena/shared";
 import { api, type Problem } from "../api.js";
 import { useAuth } from "../ctx/AuthContext.js";
@@ -65,6 +65,8 @@ export function RacePage() {
   const pendingId = useRef<string | null>(null);
   const finishing = useRef(false);
   const run = useRun(problem?.id);
+  const submitRef = useRef<() => void>(() => {});
+  const runRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!slug) return;
@@ -135,6 +137,19 @@ export function RacePage() {
     }
   }
 
+  function handleRun() {
+    if (problem && phase === "racing" && !run.running) run.start(lang, source);
+  }
+
+  // Route Monaco's editor-scoped commands through refs so they always call the
+  // latest handlers rather than a stale mount-time closure.
+  submitRef.current = handleSubmit;
+  runRef.current = handleRun;
+  const handleEditorMount: OnMount = (editor, m) => {
+    editor.addCommand(m.KeyMod.CtrlCmd | m.KeyCode.Enter, () => submitRef.current());
+    editor.addCommand(m.KeyMod.CtrlCmd | m.KeyMod.Shift | m.KeyCode.Enter, () => runRef.current());
+  };
+
   if (!user) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--ink)", display: "flex", flexDirection: "column" }}>
@@ -165,8 +180,8 @@ export function RacePage() {
         {phase === "ready" && <button onClick={startRace} style={btn("var(--v-ac)", "#06210C")}>▶ Start Race</button>}
         {phase === "racing" && (
           <>
-            <button onClick={() => { if (problem) run.start(lang, source); }} disabled={run.running} style={btn("var(--panel-2)", "var(--txt)")}>{run.running ? "Running…" : "▶ Run"}</button>
-            <button onClick={handleSubmit} style={btn("var(--v-ac)", "#06210C")}>Submit</button>
+            <button onClick={handleRun} disabled={run.running} title="Run against sample cases (⌘/Ctrl+Shift+Enter)" style={btn("var(--panel-2)", "var(--txt)")}>{run.running ? "Running…" : "▶ Run"}</button>
+            <button onClick={handleSubmit} title="Submit for judging (⌘/Ctrl+Enter)" style={btn("var(--v-ac)", "#06210C")}>Submit</button>
           </>
         )}
       </div>
@@ -218,7 +233,7 @@ export function RacePage() {
               </select>
             </div>
             <div style={{ flex: 1, minHeight: 0 }}>
-              <Editor height="100%" theme="vs-dark" language={MONACO_LANG[lang]} value={source} onChange={(v) => setSrc(v ?? "")}
+              <Editor height="100%" theme="vs-dark" language={MONACO_LANG[lang]} value={source} onChange={(v) => setSrc(v ?? "")} onMount={handleEditorMount}
                 options={{ fontSize: 13, fontFamily: "'JetBrains Mono', ui-monospace, monospace", minimap: { enabled: false }, scrollBeyondLastLine: false, padding: { top: 8, bottom: 8 }, readOnly: phase !== "racing" }} />
             </div>
             <div style={{ height: 150, borderTop: "1px solid var(--line)", background: "var(--panel)", overflow: "auto", padding: "8px 12px", flexShrink: 0 }}>
