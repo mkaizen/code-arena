@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import Editor from "@monaco-editor/react";
+import Editor, { type OnMount } from "@monaco-editor/react";
 import { tierOf, type ServerEvent, type Language, type MatchPlayerView, type MatchStateView, type JudgeResult } from "@arena/shared";
 import { api, type Problem } from "../api.js";
 import { useAuth } from "../ctx/AuthContext.js";
@@ -120,6 +120,11 @@ export function BattleMatchPage() {
   const pendingSubmissions = useRef<Set<string>>(new Set());
   const prevRound = useRef<number | null>(null);
   const run = useRun(problem?.id);
+  const [flash, setFlash] = useState<"ok" | "bad" | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const consoleRef = useRef<HTMLDivElement>(null);
+  const submitRef = useRef<() => void>(() => {});
+  const runRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!id) return;
@@ -151,8 +156,12 @@ export function BattleMatchPage() {
     } else if (ev.type === "verdict" && pendingSubmissions.current.has(ev.submissionId)) {
       pendingSubmissions.current.delete(ev.submissionId);
       setConsole((c) => [...c, { type: "verdict", verdict: ev.result.verdict, result: ev.result }]);
+      setFlash(ev.result.verdict === "ACCEPTED" ? "ok" : "bad");
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+      flashTimer.current = setTimeout(() => setFlash(null), 1100);
     }
   }, [id, run.onEvent]);
+  useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current); }, []);
 
   useWs(handleWsEvent);
 
@@ -205,6 +214,22 @@ export function BattleMatchPage() {
       setConsole((c) => [...c, { type: "error", message: (e as Error).message }]);
     }
   }
+
+  // Keep the latest handlers reachable from Monaco's editor-scoped commands,
+  // which capture their closure once at mount time.
+  submitRef.current = handleSubmit;
+  runRef.current = handleRun;
+
+  const handleEditorMount: OnMount = (editor, m) => {
+    editor.addCommand(m.KeyMod.CtrlCmd | m.KeyCode.Enter, () => submitRef.current());
+    editor.addCommand(m.KeyMod.CtrlCmd | m.KeyMod.Shift | m.KeyCode.Enter, () => runRef.current());
+  };
+
+  // Follow the console as new submissions and verdicts arrive.
+  useEffect(() => {
+    const el = consoleRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [console_, run.running, run.result]);
 
   if (loadError) {
     return (
@@ -289,6 +314,11 @@ export function BattleMatchPage() {
           You were eliminated in Round {(myPlayer?.eliminatedRound ?? 0) + 1} — spectating.
         </div>
       )}
+      {!finished && !eliminated && match.status === "ACTIVE" && myPlayer?.solvedCurrentRound && (
+        <div style={{ padding: "10px 20px", background: "rgba(63,185,80,0.08)", borderBottom: "1px solid rgba(63,185,80,0.2)", color: "var(--v-ac)", fontSize: 13, fontWeight: 600, textAlign: "center" }}>
+          Solved ✓ — waiting for the round to end. You can keep refining your solution.
+        </div>
+      )}
 
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
         {/* Center: problem + editor */}
@@ -341,7 +371,7 @@ export function BattleMatchPage() {
                 <button
                   onClick={handleRun}
                   disabled={run.running || !problem}
-                  title="Run against sample cases"
+                  title="Run against sample cases (⌘/Ctrl+Shift+Enter)"
                   style={{ background: "var(--panel-2)", color: "var(--txt)", fontWeight: 600, fontSize: 12, padding: "5px 14px", border: "1px solid var(--line)", borderRadius: 6, cursor: run.running ? "not-allowed" : "pointer", fontFamily: "var(--disp)", opacity: run.running ? 0.7 : 1 }}
                 >
                   {run.running ? "Running…" : "▶ Run"}
@@ -349,6 +379,7 @@ export function BattleMatchPage() {
                 <button
                   onClick={handleSubmit}
                   disabled={!canSubmit}
+                  title={canSubmit ? "Submit for judging (⌘/Ctrl+Enter)" : finished ? "The match is over" : eliminated ? "You've been eliminated" : "You can't submit right now"}
                   style={{
                     background: canSubmit ? "var(--v-ac)" : "var(--panel-2)", color: canSubmit ? "#06210C" : "var(--txt-3)",
                     fontWeight: 700, fontSize: 12, padding: "5px 14px", border: "none", borderRadius: 6,
@@ -359,13 +390,19 @@ export function BattleMatchPage() {
                 </button>
               </div>
 
-              <div style={{ flex: 1, minHeight: 0 }}>
+              <div
+                style={{
+                  flex: 1, minHeight: 0, transition: "box-shadow 0.15s ease",
+                  boxShadow: flash === "ok" ? "inset 0 0 0 2px var(--v-ac)" : flash === "bad" ? "inset 0 0 0 2px var(--v-wa)" : "none",
+                }}
+              >
                 <Editor
                   height="100%"
                   theme="vs-dark"
                   language={MONACO_LANG[lang]}
                   value={source}
                   onChange={(v) => setSource(v ?? "")}
+                  onMount={handleEditorMount}
                   options={{
                     fontSize: 13, fontFamily: "'JetBrains Mono', ui-monospace, monospace",
                     minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbersMinChars: 3,
@@ -374,14 +411,14 @@ export function BattleMatchPage() {
                 />
               </div>
 
-              <div style={{ height: 130, borderTop: "1px solid var(--line)", background: "var(--panel)", overflow: "auto", padding: "8px 12px", flexShrink: 0 }}>
+              <div ref={consoleRef} style={{ height: 130, borderTop: "1px solid var(--line)", background: "var(--panel)", overflow: "auto", padding: "8px 12px", flexShrink: 0 }}>
                 <div style={{ fontSize: 10, letterSpacing: "0.08em", color: "var(--txt-3)", marginBottom: 6, fontWeight: 600 }}>CONSOLE</div>
                 {(run.running || run.result) && (
                   <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid var(--line-soft)" }}>
                     <RunResults result={run.result} running={run.running} />
                   </div>
                 )}
-                {console_.length === 0 && !run.result && !run.running && <div style={{ color: "var(--txt-3)", fontSize: 12 }}>No submissions yet. ▶ Run tests against the samples.</div>}
+                {console_.length === 0 && !run.result && !run.running && <div style={{ color: "var(--txt-3)", fontSize: 12 }}>No submissions yet. ▶ Run the samples (⌘/Ctrl+Shift+Enter) or Submit (⌘/Ctrl+Enter).</div>}
                 {console_.map((entry, i) => (
                   <div key={i} style={{ marginBottom: 4, fontFamily: "var(--mono)", fontSize: 12 }}>
                     {entry.type === "error" ? (

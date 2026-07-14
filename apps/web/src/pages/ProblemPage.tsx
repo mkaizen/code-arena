@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import Editor from "@monaco-editor/react";
+import Editor, { type OnMount } from "@monaco-editor/react";
 import { type Language } from "@arena/shared";
 import { TopBar } from "../components/TopBar.js";
 import { api, type Problem, type Submission } from "../api.js";
@@ -95,6 +95,8 @@ export function ProblemPage() {
   const [signupNudge, setSignupNudge] = useState<null | "submit" | "solved">(null);
   const [board, setBoard] = useState<ProblemLeaderboard | null>(null);
   const run = useRun(problem?.id, { poll: !user });
+  const submitRef = useRef<() => void>(() => {});
+  const runRef = useRef<() => void>(() => {});
 
   useSeo({
     title: problem ? problem.title : "Loading…",
@@ -208,6 +210,15 @@ export function ProblemPage() {
     setBottomTab("run");
     run.start(lang, source, showCustom && customInput.trim() ? customInput : undefined);
   }
+
+  // Editor-scoped commands capture their closure once at mount, so route them
+  // through refs that always point at the latest handlers.
+  submitRef.current = handleSubmit;
+  runRef.current = handleRun;
+  const handleEditorMount: OnMount = (editor, m) => {
+    editor.addCommand(m.KeyMod.CtrlCmd | m.KeyCode.Enter, () => submitRef.current());
+    editor.addCommand(m.KeyMod.CtrlCmd | m.KeyMod.Shift | m.KeyCode.Enter, () => runRef.current());
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--ink)", overflow: "hidden" }}>
@@ -461,7 +472,7 @@ export function ProblemPage() {
               <button
                 onClick={handleRun}
                 disabled={run.running}
-                title="Run against sample cases"
+                title="Run against sample cases (⌘/Ctrl+Shift+Enter)"
                 style={{
                   background: "var(--panel-2)",
                   color: "var(--txt)",
@@ -479,6 +490,7 @@ export function ProblemPage() {
               </button>
               <button
                 onClick={handleSubmit}
+                title="Submit for judging (⌘/Ctrl+Enter)"
                 style={{
                   background: "var(--v-ac)",
                   color: "#06210C",
@@ -519,6 +531,7 @@ export function ProblemPage() {
                   setSource(val);
                   if (problem) saveDraft(problem.slug, lang, val);
                 }}
+                onMount={handleEditorMount}
                 options={{
                   fontSize: 13,
                   fontFamily: "'JetBrains Mono', ui-monospace, monospace",
