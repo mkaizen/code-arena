@@ -26,7 +26,20 @@ export type ServerEvent =
   | { type: "contest"; contestId: string; state: "upcoming" | "live" | "ended" }
   | { type: "queue_update"; mode: MatchMode; count: number; capacity: number }
   | { type: "match_found"; matchId: string; playerIds: string[] }
-  | { type: "match_state"; match: MatchStateView };
+  | { type: "match_state"; match: MatchStateView }
+  | { type: "match_activity"; matchId: string; event: MatchActivity };
+
+/** One line of the live match feed: who just submitted, and how it went. */
+export interface MatchActivity {
+  handle: string;
+  isBot: boolean;
+  /** The submission's verdict (ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, …). */
+  verdict: string;
+  /** 0-based round the submission was made in. */
+  round: number;
+  /** ISO timestamp the verdict landed. */
+  at: string;
+}
 
 /**
  * Plagiarism/duplicate-detection signals (NFR-4). A `PlagiarismPair` is two
