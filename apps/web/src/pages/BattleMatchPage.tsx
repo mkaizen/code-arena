@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Editor, { type OnMount } from "@monaco-editor/react";
-import { tierOf, type ServerEvent, type Language, type MatchPlayerView, type MatchStateView, type JudgeResult } from "@arena/shared";
+import { tierOf, type ServerEvent, type Language, type MatchPlayerView, type MatchStateView, type JudgeResult, type MatchActivity } from "@arena/shared";
 import { api, type Problem } from "../api.js";
 import { useAuth } from "../ctx/AuthContext.js";
 import { useWs } from "../hooks/useWs.js";
@@ -128,6 +128,7 @@ export function BattleMatchPage() {
   const runRef = useRef<() => void>(() => {});
   const isMobile = useMediaQuery("(max-width: 820px)");
   const [mobileTab, setMobileTab] = useState<"problem" | "code" | "players">("problem");
+  const [feed, setFeed] = useState<MatchActivity[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -156,6 +157,8 @@ export function BattleMatchPage() {
     run.onEvent(ev);
     if (ev.type === "match_state" && ev.match.id === id) {
       setMatch(ev.match);
+    } else if (ev.type === "match_activity" && ev.matchId === id) {
+      setFeed((f) => [ev.event, ...f].slice(0, 40));
     } else if (ev.type === "verdict" && pendingSubmissions.current.has(ev.submissionId)) {
       pendingSubmissions.current.delete(ev.submissionId);
       setConsole((c) => [...c, { type: "verdict", verdict: ev.result.verdict, result: ev.result }]);
@@ -531,6 +534,25 @@ export function BattleMatchPage() {
               </div>
             );
           })}
+
+          {/* Live submission feed — every player's attempts, verdict only. */}
+          <div style={{ padding: "10px 12px 8px", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line-soft)", fontSize: 10, letterSpacing: "0.1em", color: "var(--txt-3)", fontWeight: 600 }}>
+            LIVE FEED
+          </div>
+          {feed.length === 0 ? (
+            <div style={{ padding: "10px 12px", color: "var(--txt-3)", fontSize: 12 }}>Submissions will show up here as players race.</div>
+          ) : (
+            feed.map((a, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderBottom: "1px solid var(--line-soft)", fontFamily: "var(--mono)", fontSize: 11 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: verdictColor(a.verdict), flexShrink: 0 }} />
+                <span style={{ color: "var(--txt-2)", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {a.isBot ? "🤖 " : ""}{a.handle}
+                </span>
+                <span style={{ color: verdictColor(a.verdict), marginLeft: "auto", whiteSpace: "nowrap" }}>{verdictLabel(a.verdict)}</span>
+                <span style={{ color: "var(--txt-3)", flexShrink: 0 }}>R{a.round + 1}</span>
+              </div>
+            ))
+          )}
         </aside>
       </div>
     </div>

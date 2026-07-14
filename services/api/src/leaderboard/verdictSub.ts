@@ -5,7 +5,7 @@ import { broadcast, sendToUser } from "../ws.js";
 import { prisma } from "../db.js";
 import { recordAccepted, getLeaderboard, isFrozen, ensureFreezeSnapshot } from "./freeze.js";
 import { scoreStanding } from "./scoring.js";
-import { onAccepted as onMatchAccepted } from "../match/engine.js";
+import { onAccepted as onMatchAccepted, recordMatchSubmission } from "../match/engine.js";
 import { recordDailySolve } from "../daily.js";
 import type { JudgeResult, ScoringModel } from "@arena/shared";
 
@@ -70,6 +70,12 @@ export function startVerdictSubscriber(): void {
 
       // A verdict is private to its author — never fan it out to everyone.
       if (submission) sendToUser(submission.userId, { type: "verdict", submissionId, result });
+
+      // The live match feed shows every submission (win or miss) to the whole
+      // lobby — the verdict only, never the code.
+      if (submission?.matchId) {
+        await recordMatchSubmission(submission.matchId, submission.userId, result.verdict);
+      }
 
       if (result.verdict !== "ACCEPTED") return;
 

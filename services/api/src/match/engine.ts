@@ -320,6 +320,27 @@ async function broadcastMatchState(matchId: string): Promise<void> {
   if (state) sendToUsers(state.players.map((p) => p.userId), { type: "match_state", match: state });
 }
 
+/**
+ * Push one line to every player's live match feed: who just submitted and the
+ * verdict. Fires for wins and misses alike (never the code itself), so the
+ * lobby can feel the competition — rivals racing, stumbling, and breaking through.
+ */
+export async function recordMatchSubmission(matchId: string, userId: string, verdict: string): Promise<void> {
+  const match = await prisma.match.findUnique({ where: { id: matchId }, select: { status: true, round: true } });
+  if (!match || match.status !== "ACTIVE") return;
+  const player = await prisma.matchPlayer.findUnique({
+    where: { matchId_userId: { matchId, userId } },
+    include: { user: { select: { handle: true, isBot: true } } },
+  });
+  if (!player) return;
+  const players = await prisma.matchPlayer.findMany({ where: { matchId }, select: { userId: true } });
+  sendToUsers(players.map((p) => p.userId), {
+    type: "match_activity",
+    matchId,
+    event: { handle: player.user.handle, isBot: player.user.isBot, verdict, round: match.round, at: new Date().toISOString() },
+  });
+}
+
 // ── Internal, lock-free transitions (callers must already hold the lock) ────
 
 async function _beginRound(matchId: string, round: number): Promise<void> {
@@ -408,6 +429,7 @@ async function botSubmit(
       judgedAt: new Date(),
     },
   });
+  await recordMatchSubmission(matchId, botId, verdict);
   if (verdict === "ACCEPTED") await onAccepted(matchId);
 }
 
