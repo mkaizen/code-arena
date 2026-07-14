@@ -18,6 +18,7 @@ export async function leaderboardRoutes(app: FastifyInstance) {
   // FR-20: global all-time leaderboard by rating.
   app.get("/leaderboard/global", async () => {
     return prisma.user.findMany({
+      where: { isBot: false },
       orderBy: { rating: "desc" },
       take: 200,
       select: { handle: true, rating: true },

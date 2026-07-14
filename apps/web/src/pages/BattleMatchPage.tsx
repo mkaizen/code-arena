@@ -262,6 +262,11 @@ export function BattleMatchPage() {
         <div style={{ width: 1, height: 24, background: "var(--line)" }} />
         <div style={{ flex: 1, fontFamily: "var(--disp)", fontWeight: 600, fontSize: 14, color: "var(--txt)", display: "flex", alignItems: "center", gap: 12 }}>
           {finished ? "Match Finished" : `Round ${match.round + 1} / ${match.totalRounds}`}
+          {match.practice && (
+            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--v-tle)", border: "1px solid var(--v-tle)", borderRadius: 4, padding: "1px 7px", letterSpacing: "0.04em" }}>
+              PRACTICE
+            </span>
+          )}
           {isDuel && myPlayer && opponent && (
             <span style={{ fontFamily: "var(--mono)", fontSize: 14, color: "var(--txt-2)" }}>
               <span style={{ color: "var(--v-ac)", fontWeight: 700 }}>{myPlayer.roundWins}</span>
@@ -511,7 +516,11 @@ export function BattleMatchPage() {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <Link to={`/u/${encodeURIComponent(p.handle)}`} style={{ fontFamily: "var(--mono)", fontSize: 13, fontWeight: 700, color: tier.color, textDecoration: "none" }}>{p.handle}</Link>
+                  {p.isBot ? (
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 13, fontWeight: 700, color: tier.color }}>🤖 {p.handle}</span>
+                  ) : (
+                    <Link to={`/u/${encodeURIComponent(p.handle)}`} style={{ fontFamily: "var(--mono)", fontSize: 13, fontWeight: 700, color: tier.color, textDecoration: "none" }}>{p.handle}</Link>
+                  )}
                   {isMe && <span style={{ fontSize: 10, color: "var(--txt-3)" }}>(you)</span>}
                   {isDuel && <span style={{ marginLeft: "auto" }}><WinPips wins={p.roundWins} total={match.totalRounds} /></span>}
                 </div>

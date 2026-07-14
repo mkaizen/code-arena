@@ -19,6 +19,7 @@ async function allProblemStats(): Promise<Map<string, { solved: number; acceptan
       COUNT(*) FILTER (WHERE verdict = 'ACCEPTED') AS accepted,
       COUNT(DISTINCT "userId") FILTER (WHERE verdict = 'ACCEPTED') AS solvers
     FROM "Submission"
+    WHERE "userId" NOT IN (SELECT id FROM "User" WHERE "isBot")
     GROUP BY "problemId"`;
   return new Map(rows.map((r) => [r.problemId, toStats(r)]));
 }
@@ -30,7 +31,7 @@ async function oneProblemStats(id: string): Promise<{ solved: number; acceptance
       COUNT(*) FILTER (WHERE verdict = 'ACCEPTED') AS accepted,
       COUNT(DISTINCT "userId") FILTER (WHERE verdict = 'ACCEPTED') AS solvers
     FROM "Submission"
-    WHERE "problemId" = ${id}
+    WHERE "problemId" = ${id} AND "userId" NOT IN (SELECT id FROM "User" WHERE "isBot")
     GROUP BY "problemId"`;
   return toStats(rows[0]);
 }
@@ -79,6 +80,7 @@ export async function problemRoutes(app: FastifyInstance) {
           SELECT DISTINCT ON ("userId") "userId", "timeMs", language
           FROM "Submission"
           WHERE "problemId" = ${problem.id} AND verdict = 'ACCEPTED' AND "timeMs" IS NOT NULL
+            AND "userId" NOT IN (SELECT id FROM "User" WHERE "isBot")
           ORDER BY "userId", "timeMs" ASC
         ) s JOIN "User" u ON u.id = s."userId"
         ORDER BY s."timeMs" ASC
@@ -89,6 +91,7 @@ export async function problemRoutes(app: FastifyInstance) {
           SELECT DISTINCT ON ("userId") "userId", char_length(source) AS chars, language
           FROM "Submission"
           WHERE "problemId" = ${problem.id} AND verdict = 'ACCEPTED'
+            AND "userId" NOT IN (SELECT id FROM "User" WHERE "isBot")
           ORDER BY "userId", char_length(source) ASC
         ) s JOIN "User" u ON u.id = s."userId"
         ORDER BY s.chars ASC

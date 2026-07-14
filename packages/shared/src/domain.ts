@@ -99,6 +99,8 @@ export interface MatchPlayerView {
   userId: string;
   handle: string;
   rating: number;
+  /** A seeded practice bot rather than a real person. */
+  isBot: boolean;
   status: MatchPlayerStatus;
   /** Whether this player has an accepted submission for the current round. */
   solvedCurrentRound: boolean;
@@ -276,4 +278,6 @@ export interface MatchStateView {
   roundEndsAt: string | null;
   problem: MatchProblemView | null;
   players: MatchPlayerView[];
+  /** A practice match against bots — unrated, and no waiting for a lobby. */
+  practice: boolean;
 }

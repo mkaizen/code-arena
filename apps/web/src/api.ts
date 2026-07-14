@@ -243,6 +243,9 @@ export const api = {
   leaveMatchQueue: (): Promise<{ ok: boolean }> =>
     req("/matches/queue", { method: "DELETE" }),
 
+  startPracticeMatch: (mode: MatchMode): Promise<{ matchId: string }> =>
+    req("/matches/practice", { method: "POST", body: JSON.stringify({ mode }) }),
+
   matchQueueStatus: (): Promise<{
     queuedMode: MatchMode | null;
     counts: Record<MatchMode, number>;

@@ -59,6 +59,9 @@ model User {
   passwordHash  String?  // null when OAuth-only (FR-1)
   role          Role     @default(USER)
   rating        Int      @default(1500)
+  // Seeded practice-match opponent (never a real person; excluded from
+  // leaderboards, rating changes, and the forfeit sweep).
+  isBot         Boolean  @default(false)
   defaultLang   String   @default("cpp") // FR-3
   editorPrefs   Json?    // FR-3
   createdAt     DateTime @default(now())
@@ -256,6 +259,8 @@ model Match {
   round            Int         @default(0)
   roundStartedAt   DateTime    @default(now())
   roundDurationSec Int         @default(300)
+  // Practice matches pit one human against seeded bots; they are unrated.
+  practice         Boolean     @default(false)
   createdAt        DateTime    @default(now())
   endedAt          DateTime?
 

@@ -27,6 +27,7 @@ export function BattlePage() {
   const [capacities, setCapacities] = useState<Record<MatchMode, number>>({ ROYALE: 6, DUEL: 2 });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState<MatchMode | "leave" | null>(null);
+  const [practicing, setPracticing] = useState<MatchMode | null>(null);
   const navigated = useRef(false);
 
   useEffect(() => {
@@ -73,6 +74,20 @@ export function BattlePage() {
       setQueuedMode(null);
     } finally {
       setLoading(null);
+    }
+  }
+
+  async function handlePractice(mode: MatchMode) {
+    if (!user) { navigate("/login"); return; }
+    setError("");
+    setPracticing(mode);
+    try {
+      const { matchId } = await api.startPracticeMatch(mode);
+      navigated.current = true;
+      navigate(`/battle/${matchId}`);
+    } catch (e) {
+      setError((e as Error).message);
+      setPracticing(null);
     }
   }
 
@@ -157,6 +172,33 @@ export function BattlePage() {
                 </div>
               );
             })}
+          </div>
+
+          {/* Practice vs bots — no queue, unrated */}
+          <div style={{ marginTop: 16, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "22px 24px", textAlign: "center" }}>
+            <h2 style={{ fontFamily: "var(--disp)", fontSize: 17, fontWeight: 700, color: "var(--txt)", marginBottom: 4 }}>
+              🤖 Practice vs Bots
+            </h2>
+            <p style={{ color: "var(--txt-3)", fontSize: 13, lineHeight: 1.6, marginBottom: 16, maxWidth: 460, marginLeft: "auto", marginRight: "auto" }}>
+              No queue, no waiting, and unrated. Warm up against bots that play like real students — bracketed to your rating, so it feels like a fair lobby.
+            </p>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+              {(["ROYALE", "DUEL"] as MatchMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => handlePractice(mode)}
+                  disabled={practicing !== null}
+                  style={{
+                    background: "transparent", color: "var(--v-tle)", border: "1px solid var(--v-tle)",
+                    fontWeight: 700, fontSize: 13, padding: "9px 18px", borderRadius: 8,
+                    cursor: practicing !== null ? "not-allowed" : "pointer", fontFamily: "var(--disp)",
+                    opacity: practicing !== null && practicing !== mode ? 0.5 : 1,
+                  }}
+                >
+                  {practicing === mode ? "Starting…" : `Practice ${MODE_META[mode].title}`}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </main>
