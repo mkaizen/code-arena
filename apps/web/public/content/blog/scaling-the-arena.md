@@ -1,6 +1,6 @@
 ---
 title: "Building Code Arena: Scaling WebSockets & Docker Sandboxes for a Battle Royale"
-date: "2026-07-14"
+date: "2026-06-09"
 author: "Matthew"
 description: "A deep dive into Code Arena's architecture: decoupling submission spikes with BullMQ, sandboxing untrusted code with Docker and cgroups, streaming verdicts over Redis pub/sub and per-user WebSockets, and orchestrating a real-time coding Battle Royale."
 ---

@@ -1,6 +1,6 @@
 ---
 title: "Polishing Game Feel in a Coding Arena"
-date: "2026-08-21"
+date: "2026-07-11"
 author: "Matthew"
 description: "The small, no-new-logic changes that make a real-time coding match feel good to play: editor keyboard shortcuts (and the stale-closure trap they hide), a verdict flash, an auto-scrolling console, and telling the player why a button is disabled."
 ---

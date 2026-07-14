@@ -1,6 +1,6 @@
 ---
 title: "Measuring a Program's True Peak Memory with cgroups"
-date: "2026-07-24"
+date: "2026-06-16"
 author: "Matthew"
 description: "How to get the exact peak memory a program used — not an estimate — by reading the Linux kernel's own cgroup high-water mark (memory.peak), with fallbacks for cgroup v1, from inside a Docker sandbox."
 ---

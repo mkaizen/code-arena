@@ -1,6 +1,6 @@
 ---
 title: "Sizing a 100-Player Battle Royale: Scale the Judge, Not the Sockets"
-date: "2026-08-18"
+date: "2026-07-08"
 author: "Matthew"
 description: "Scaling a real-time coding Battle Royale from 6 players to 100 isn't a networking problem — it's a judging problem. Working from Code Arena's real sandbox limits (2s, 256MB, one core per container) to judge-seconds per submission, round-1 load, and a concrete server spec."
 ---

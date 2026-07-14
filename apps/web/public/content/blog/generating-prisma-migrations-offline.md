@@ -1,6 +1,6 @@
 ---
 title: "Generating Prisma Migrations Offline, Without a Database"
-date: "2026-07-28"
+date: "2026-06-20"
 author: "Matthew"
 description: "How to generate Prisma migration SQL with no database connection using migrate diff and --from-schema-datamodel — why it beats --from-migrations, and a subtle gotcha that can silently corrupt a migration file and break production."
 ---

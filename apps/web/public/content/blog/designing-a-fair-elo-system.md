@@ -1,6 +1,6 @@
 ---
 title: "Designing a Fair Elo System for Coding Contests"
-date: "2026-07-21"
+date: "2026-06-13"
 author: "Matthew"
 description: "Classic Elo is built for two players. Here's how Code Arena generalizes it to rate N-player coding contests and real-time matches fairly — using expected rank, geometric-mean targeting, damping, and a zero-sum correction."
 ---
