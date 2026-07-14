@@ -9,6 +9,7 @@ import { loadDraft, saveDraft } from "../draft.js";
 import { STARTERS, LANG_LABELS, MONACO_LANG } from "../starters.js";
 import { starterFor } from "../problemStarters.js";
 import { useRun } from "../hooks/useRun.js";
+import { useMediaQuery } from "../hooks/useMediaQuery.js";
 import { RunResults } from "../components/RunResults.js";
 import { sanitizeStatement } from "../sanitize.js";
 
@@ -125,6 +126,8 @@ export function BattleMatchPage() {
   const consoleRef = useRef<HTMLDivElement>(null);
   const submitRef = useRef<() => void>(() => {});
   const runRef = useRef<() => void>(() => {});
+  const isMobile = useMediaQuery("(max-width: 820px)");
+  const [mobileTab, setMobileTab] = useState<"problem" | "code" | "players">("problem");
 
   useEffect(() => {
     if (!id) return;
@@ -249,7 +252,7 @@ export function BattleMatchPage() {
   const opponent = isDuel ? match.players.find((p) => p.userId !== user?.id) ?? null : null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--ink)", overflow: "hidden" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100dvh", background: "var(--ink)", overflow: "hidden" }}>
       {/* Header */}
       <header style={{ height: 52, display: "flex", alignItems: "center", padding: "0 16px", borderBottom: "1px solid var(--line)", background: "var(--panel)", flexShrink: 0, gap: 16 }}>
         <Link to="/battle" style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 15, color: "var(--txt)", textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
@@ -320,12 +323,44 @@ export function BattleMatchPage() {
         </div>
       )}
 
-      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+      {/* Mobile-only tab switcher between the problem, editor and players */}
+      {isMobile && (
+        <div style={{ display: "flex", flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--panel)" }}>
+          {(["problem", "code", "players"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setMobileTab(t)}
+              style={{
+                flex: 1, padding: "10px 0", fontFamily: "var(--disp)", fontWeight: 700, fontSize: 13,
+                background: mobileTab === t ? "var(--panel-2)" : "transparent",
+                color: mobileTab === t ? "var(--txt)" : "var(--txt-3)",
+                border: "none", borderBottom: `2px solid ${mobileTab === t ? "var(--v-ac)" : "transparent"}`,
+                cursor: "pointer",
+              }}
+            >
+              {t === "problem" ? "Problem" : t === "code" ? "Code" : `Players (${match.players.length})`}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div style={{ flex: 1, display: "flex", flexDirection: isMobile ? "column" : "row", minHeight: 0 }}>
         {/* Center: problem + editor */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
+        <div
+          style={{
+            flex: 1, display: isMobile && mobileTab === "players" ? "none" : "flex",
+            flexDirection: "column", minWidth: 0, minHeight: 0,
+          }}
+        >
           {problem ? (
             <>
-              <div style={{ flex: "0 0 38%", overflow: "auto", borderBottom: "1px solid var(--line)", padding: "16px 20px" }}>
+              <div
+                style={{
+                  flex: isMobile ? 1 : "0 0 38%", overflow: "auto", borderBottom: "1px solid var(--line)", padding: "16px 20px",
+                  display: isMobile && mobileTab !== "problem" ? "none" : "block",
+                  minHeight: isMobile ? 0 : undefined,
+                }}
+              >
                 <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
                   <h2 style={{ fontFamily: "var(--disp)", fontSize: 18, fontWeight: 700, color: "var(--txt)" }}>{problem.title}</h2>
                   <span style={{ fontSize: 12, fontWeight: 700, color: diffColor(problem.difficulty) }}>
@@ -352,7 +387,7 @@ export function BattleMatchPage() {
                 )}
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", borderBottom: "1px solid var(--line)", background: "var(--panel)", flexShrink: 0 }}>
+              <div style={{ display: isMobile && mobileTab !== "code" ? "none" : "flex", alignItems: "center", gap: 8, rowGap: 6, flexWrap: "wrap", padding: "6px 12px", borderBottom: "1px solid var(--line)", background: "var(--panel)", flexShrink: 0 }}>
                 <select
                   value={lang}
                   onChange={(e) => setLang(e.target.value as Language)}
@@ -393,6 +428,7 @@ export function BattleMatchPage() {
               <div
                 style={{
                   flex: 1, minHeight: 0, transition: "box-shadow 0.15s ease",
+                  display: isMobile && mobileTab !== "code" ? "none" : "block",
                   boxShadow: flash === "ok" ? "inset 0 0 0 2px var(--v-ac)" : flash === "bad" ? "inset 0 0 0 2px var(--v-wa)" : "none",
                 }}
               >
@@ -406,12 +442,12 @@ export function BattleMatchPage() {
                   options={{
                     fontSize: 13, fontFamily: "'JetBrains Mono', ui-monospace, monospace",
                     minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbersMinChars: 3,
-                    padding: { top: 8, bottom: 8 }, readOnly: !canSubmit,
+                    padding: { top: 8, bottom: 8 }, readOnly: !canSubmit, automaticLayout: true,
                   }}
                 />
               </div>
 
-              <div ref={consoleRef} style={{ height: 130, borderTop: "1px solid var(--line)", background: "var(--panel)", overflow: "auto", padding: "8px 12px", flexShrink: 0 }}>
+              <div ref={consoleRef} style={{ display: isMobile && mobileTab !== "code" ? "none" : "block", height: 130, borderTop: "1px solid var(--line)", background: "var(--panel)", overflow: "auto", padding: "8px 12px", flexShrink: 0 }}>
                 <div style={{ fontSize: 10, letterSpacing: "0.08em", color: "var(--txt-3)", marginBottom: 6, fontWeight: 600 }}>CONSOLE</div>
                 {(run.running || run.result) && (
                   <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid var(--line-soft)" }}>
@@ -448,7 +484,15 @@ export function BattleMatchPage() {
         </div>
 
         {/* Right: players */}
-        <aside style={{ width: 260, flexShrink: 0, borderLeft: "1px solid var(--line)", background: "var(--panel)", display: "flex", flexDirection: "column", overflow: "auto" }}>
+        <aside
+          style={{
+            width: isMobile ? "auto" : 260, flexShrink: 0,
+            flex: isMobile ? 1 : undefined, minHeight: isMobile ? 0 : undefined,
+            borderLeft: isMobile ? "none" : "1px solid var(--line)", background: "var(--panel)",
+            display: isMobile && mobileTab !== "players" ? "none" : "flex",
+            flexDirection: "column", overflow: "auto",
+          }}
+        >
           <div style={{ padding: "10px 12px 8px", borderBottom: "1px solid var(--line-soft)", fontSize: 10, letterSpacing: "0.1em", color: "var(--txt-3)", fontWeight: 600 }}>
             PLAYERS
           </div>
