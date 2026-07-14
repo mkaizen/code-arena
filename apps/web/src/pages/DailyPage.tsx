@@ -174,19 +174,6 @@ export function DailyPage() {
           <div style={{ color: "var(--txt-3)", padding: 16 }}>No problems available yet.</div>
         )}
 
-        {data?.problem && user && (
-          <Link
-            to={`/race/${data.problem.slug}`}
-            style={{
-              display: "inline-block", marginTop: -12, marginBottom: 24,
-              color: "var(--v-tle)", fontFamily: "var(--disp)", fontWeight: 700, fontSize: 13, textDecoration: "none",
-              border: "1px solid var(--v-tle)", borderRadius: 8, padding: "8px 16px",
-            }}
-          >
-            ⚡ Race a ghost on today's problem
-          </Link>
-        )}
-
         {/* Calendar (last 14 days) */}
         {data?.calendar && (
           <div>

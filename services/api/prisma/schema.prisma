@@ -86,7 +86,6 @@ model User {
   matchPlayers    MatchPlayer[]
   matchQueueEntry MatchQueueEntry?
   dailySolves     DailySolve[]
-  ghostRuns       GhostRun[]
 
   @@index([rating])
   @@index([referredById])
@@ -124,7 +123,6 @@ model Problem {
   matchProblems   MatchProblem[]
   submissions     Submission[]
   dailyChallenges DailyChallenge[]
-  ghostRuns       GhostRun[]
   versions        ProblemVersion[]
 }
 
@@ -332,19 +330,3 @@ model DailySolve {
   @@index([userId])
 }
 
-// A recorded solve run for ghost racing: race a replay of someone's past solve.
-// totalMs is the wall-clock start→first-AC time, measured server-side from a
-// Redis race record (see ghost.ts) so it can't be fabricated. events is a small
-// [{offsetMs, verdict}] trail for flavour markers on the race bar.
-model GhostRun {
-  id        String   @id @default(cuid())
-  problem   Problem  @relation(fields: [problemId], references: [id])
-  problemId String
-  user      User     @relation(fields: [userId], references: [id])
-  userId    String
-  totalMs   Int
-  events    Json
-  createdAt DateTime @default(now())
-
-  @@index([problemId, totalMs])
-}

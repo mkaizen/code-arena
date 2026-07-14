@@ -24,7 +24,6 @@ import { MatchReplayPage } from "./pages/MatchReplayPage.js";
 import { BlogPage } from "./pages/BlogPage.js";
 import { BlogPostPage } from "./pages/BlogPostPage.js";
 import { DailyPage } from "./pages/DailyPage.js";
-import { RacePage } from "./pages/RacePage.js";
 import { PageViewTracker } from "./components/PageViewTracker.js";
 import "./styles.css";
 
@@ -40,7 +39,6 @@ export function App() {
           <Route path="/contests" element={<ContestsPage />} />
           <Route path="/contests/:id" element={<ContestPage />} />
           <Route path="/daily" element={<DailyPage />} />
-          <Route path="/race/:slug" element={<RacePage />} />
           <Route path="/problems" element={<ProblemsPage />} />
           <Route path="/problems/:slug" element={<ProblemPage />} />
           <Route path="/profile" element={<ProfilePage />} />
