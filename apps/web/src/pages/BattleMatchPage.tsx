@@ -91,6 +91,41 @@ function RatingDelta({ before, after }: { before: number | null; after: number |
   );
 }
 
+/**
+ * The end-of-match rating reveal: the new rating counts up (or down) from the
+ * old one, with the delta called out. This is the single most important number
+ * of a ranked match, so it gets a real animation instead of tiny grey text.
+ */
+function RatingReveal({ before, after }: { before: number; after: number }) {
+  const [val, setVal] = useState(before);
+  useEffect(() => {
+    if (before === after) { setVal(after); return; }
+    const start = performance.now();
+    const dur = 900;
+    let raf = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic — quick, then settles
+      setVal(Math.round(before + (after - before) * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [before, after]);
+
+  const d = after - before;
+  const color = d > 0 ? "var(--v-ac)" : d < 0 ? "var(--v-wa)" : "var(--txt-2)";
+  return (
+    <span style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}>
+      <span style={{ fontSize: 11, letterSpacing: "0.08em", color: "var(--txt-3)", fontWeight: 600 }}>RATING</span>
+      <span style={{ fontFamily: "var(--mono)", fontSize: 22, fontWeight: 700, color: "var(--txt)" }}>{val}</span>
+      <span style={{ fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, color, animation: "pop 0.3s ease-out" }}>
+        {d > 0 ? "▲" : d < 0 ? "▼" : ""}{d >= 0 ? "+" : ""}{d}
+      </span>
+    </span>
+  );
+}
+
 /** DUEL: round-win pips, one per round (● won, ○ not yet). */
 function WinPips({ wins, total }: { wins: number; total: number }) {
   return (
@@ -136,6 +171,8 @@ export function BattleMatchPage() {
   const [floats, setFloats] = useState<{ id: number; emoji: string; handle: string }[]>([]);
   const floatId = useRef(0);
   const [reactCooldown, setReactCooldown] = useState(false);
+  const [rematchBusy, setRematchBusy] = useState(false);
+  const [rematchError, setRematchError] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -204,6 +241,29 @@ export function BattleMatchPage() {
   function handleRun() {
     if (!problem) return;
     run.start(lang, source, showCustom && customInput.trim() ? customInput : undefined);
+  }
+
+  // "Play Again" closes the loop instead of dead-ending on the result screen.
+  // Practice restarts immediately against fresh bots; a ranked match re-queues
+  // for the same mode — landing you back in the same match if one fills at once,
+  // otherwise in the battle lobby where match_found will pull you in.
+  async function handlePlayAgain() {
+    if (!match || rematchBusy) return;
+    setRematchBusy(true);
+    setRematchError("");
+    try {
+      if (match.practice) {
+        const { matchId } = await api.startPracticeMatch(match.mode);
+        navigate(`/battle/${matchId}`);
+      } else {
+        const res = await api.queueForMatch(match.mode);
+        if (res.matched && res.matchId) navigate(`/battle/${res.matchId}`);
+        else navigate("/battle");
+      }
+    } catch (e) {
+      setRematchError((e as Error).message);
+      setRematchBusy(false);
+    }
   }
 
   // Fire an emote. The server echoes it back over the WS (to everyone, us
@@ -306,22 +366,41 @@ export function BattleMatchPage() {
       </header>
 
       {finished && (
-        <div style={{ padding: "10px 20px", background: "rgba(63,185,80,0.08)", borderBottom: "1px solid rgba(63,185,80,0.2)", color: "var(--v-ac)", fontSize: 13, fontWeight: 600, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 14 }}>
-          <span>
-            {isDuel
-              ? isDraw
-                ? "🤝 The duel ended in a draw."
+        <div style={{ padding: "10px 20px", background: "rgba(63,185,80,0.08)", borderBottom: "1px solid rgba(63,185,80,0.2)", color: "var(--v-ac)", fontSize: 13, fontWeight: 600, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, flexWrap: "wrap" }}>
+            <span>
+              {isDuel
+                ? isDraw
+                  ? "🤝 The duel ended in a draw."
+                  : myPlayer?.placement === 1
+                    ? "🏆 You won the duel!"
+                    : `You lost the duel${opponent ? ` to ${opponent.handle}` : ""}.`
                 : myPlayer?.placement === 1
-                  ? "🏆 You won the duel!"
-                  : `You lost the duel${opponent ? ` to ${opponent.handle}` : ""}.`
-              : myPlayer?.placement === 1
-                ? "🏆 You won the match!"
-                : myPlayer?.placement
-                  ? `Match over — you placed #${myPlayer.placement}`
-                  : "Match over"}
-          </span>
-          {id && (
-            <span style={{ display: "inline-flex", gap: 8 }}>
+                  ? "🏆 You won the match!"
+                  : myPlayer?.placement
+                    ? `Match over — you placed #${myPlayer.placement}`
+                    : "Match over"}
+            </span>
+            {/* The rating swing — only on rated matches (practice is unrated). */}
+            {myPlayer?.ratingBefore != null && myPlayer?.ratingAfter != null && (
+              <RatingReveal before={myPlayer.ratingBefore} after={myPlayer.ratingAfter} />
+            )}
+          </div>
+          <div style={{ display: "inline-flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+            {myPlayer && (
+              <button
+                onClick={handlePlayAgain}
+                disabled={rematchBusy}
+                style={{
+                  fontFamily: "var(--disp)", fontSize: 12, fontWeight: 700, color: "#06210C",
+                  background: "var(--v-ac)", padding: "4px 14px", borderRadius: 6, border: "none",
+                  cursor: rematchBusy ? "not-allowed" : "pointer", opacity: rematchBusy ? 0.7 : 1,
+                }}
+              >
+                {rematchBusy ? "Starting…" : match.practice ? "↻ Play Again" : "↻ New Match"}
+              </button>
+            )}
+            {id && (
               <Link
                 to={`/replay/${id}`}
                 style={{
@@ -331,17 +410,20 @@ export function BattleMatchPage() {
               >
                 Watch Replay
               </Link>
+            )}
+            {id && (
               <Link
                 to={`/share/${id}`}
                 style={{
-                  fontFamily: "var(--disp)", fontSize: 12, fontWeight: 700, color: "#06210C",
-                  background: "var(--v-ac)", padding: "4px 12px", borderRadius: 6, textDecoration: "none",
+                  fontFamily: "var(--disp)", fontSize: 12, fontWeight: 700, color: "var(--txt)",
+                  background: "var(--panel-2)", border: "1px solid var(--line)", padding: "3px 12px", borderRadius: 6, textDecoration: "none",
                 }}
               >
                 Share Result
               </Link>
-            </span>
-          )}
+            )}
+          </div>
+          {rematchError && <span style={{ color: "var(--v-wa)", fontSize: 12, fontWeight: 500 }}>{rematchError}</span>}
         </div>
       )}
       {!finished && eliminated && (
