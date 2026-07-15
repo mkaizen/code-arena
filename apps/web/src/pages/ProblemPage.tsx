@@ -13,6 +13,8 @@ import { starterFor } from "../problemStarters.js";
 import { useRun } from "../hooks/useRun.js";
 import { useMediaQuery } from "../hooks/useMediaQuery.js";
 import { RunResults } from "../components/RunResults.js";
+import { SubmissionResult } from "../components/SubmissionResult.js";
+import type { JudgeResult } from "@arena/shared";
 import { sanitizeStatement } from "../sanitize.js";
 import { useSeo, metaFromHtml } from "../hooks/useSeo.js";
 import type { ServerEvent } from "@arena/shared";
@@ -87,6 +89,7 @@ export function ProblemPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [console_, setConsole] = useState<string>("");
   const [consoleColor, setConsoleColor] = useState("var(--txt-2)");
+  const [result, setResult] = useState<JudgeResult | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [bottomTab, setBottomTab] = useState<"console" | "run">("console");
   const [showCustom, setShowCustom] = useState(false);
@@ -150,17 +153,8 @@ export function ProblemPage() {
     run.onEvent(ev);
     if (ev.type === "verdict" && ev.submissionId === pendingId) {
       setPendingId(null);
-      const color = verdictColor(ev.result.verdict);
-      setConsoleColor(color);
-      let msg = verdictLabel(ev.result.verdict);
-      if (ev.result.maxTimeMs > 0) msg += ` · ${ev.result.maxTimeMs}ms`;
-      if (ev.result.maxMemoryKb > 0) msg += ` · ${(ev.result.maxMemoryKb / 1024).toFixed(1)}MB`;
-      if (ev.result.message) msg += `\n${ev.result.message}`;
-      if (ev.result.compileLog) msg += `\n\n${ev.result.compileLog}`;
-      if (ev.result.runtimeLog) msg += `\n\n${ev.result.runtimeLog}`;
-      if (ev.result.failedStdout) msg += `\n\nYour output on that test:\n${ev.result.failedStdout}`;
-      if (ev.result.failedStderr) msg += `\n\nStderr (debug prints):\n${ev.result.failedStderr}`;
-      setConsole(msg);
+      setConsole("");
+      setResult(ev.result);
       if (problem) {
         setSubmissions((prev) => [
           {
@@ -195,6 +189,7 @@ export function ProblemPage() {
       setSignupNudge("submit");
       return;
     }
+    setResult(null);
     setConsole("Submitting…");
     setConsoleColor("var(--v-judge)");
     try {
@@ -602,9 +597,13 @@ export function ProblemPage() {
               </div>
               <div style={{ flex: 1, overflow: "auto", padding: "8px 12px" }}>
                 {bottomTab === "console" ? (
-                  <pre style={{ fontFamily: "var(--mono)", fontSize: 12, color: consoleColor, margin: 0, whiteSpace: "pre-wrap" }}>
-                    {console_ || "Submit your solution to see results."}
-                  </pre>
+                  result ? (
+                    <SubmissionResult result={result} />
+                  ) : (
+                    <pre style={{ fontFamily: "var(--mono)", fontSize: 12, color: consoleColor, margin: 0, whiteSpace: "pre-wrap" }}>
+                      {console_ || "Submit your solution to see results."}
+                    </pre>
+                  )
                 ) : run.result || run.running ? (
                   <RunResults result={run.result} running={run.running} />
                 ) : (
