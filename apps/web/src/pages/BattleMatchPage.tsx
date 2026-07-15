@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Editor, { type OnMount } from "@monaco-editor/react";
-import { tierOf, MATCH_REACTIONS, type ServerEvent, type Language, type MatchPlayerView, type MatchStateView, type JudgeResult, type MatchActivity } from "@arena/shared";
+import { tierOf, MATCH_REACTIONS, type ServerEvent, type Language, type MatchStateView, type JudgeResult, type MatchActivity } from "@arena/shared";
 import { api, type Problem } from "../api.js";
 import { useAuth } from "../ctx/AuthContext.js";
 import { useWs } from "../hooks/useWs.js";
@@ -13,72 +13,7 @@ import { useMediaQuery } from "../hooks/useMediaQuery.js";
 import { RunResults } from "../components/RunResults.js";
 import { SubmissionResult } from "../components/SubmissionResult.js";
 import { sanitizeStatement } from "../sanitize.js";
-
-function verdictColor(verdict: string): string {
-  if (verdict === "ACCEPTED") return "var(--v-ac)";
-  if (["WRONG_ANSWER", "RUNTIME_ERROR", "MEMORY_LIMIT_EXCEEDED"].includes(verdict)) return "var(--v-wa)";
-  if (verdict === "TIME_LIMIT_EXCEEDED") return "var(--v-tle)";
-  if (verdict === "COMPILATION_ERROR") return "var(--v-ce)";
-  if (["PENDING", "JUDGING"].includes(verdict)) return "var(--v-judge)";
-  return "var(--txt-2)";
-}
-
-function verdictLabel(verdict: string): string {
-  const map: Record<string, string> = {
-    ACCEPTED: "Accepted", WRONG_ANSWER: "Wrong Answer", TIME_LIMIT_EXCEEDED: "Time Limit Exceeded",
-    MEMORY_LIMIT_EXCEEDED: "Memory Limit Exceeded", RUNTIME_ERROR: "Runtime Error",
-    COMPILATION_ERROR: "Compilation Error", INTERNAL_ERROR: "Internal Error",
-    PENDING: "Pending", JUDGING: "Judging…",
-  };
-  return map[verdict] ?? verdict;
-}
-
-function diffColor(d: string): string {
-  if (d === "easy") return "var(--v-ac)";
-  if (d === "med") return "var(--v-tle)";
-  return "var(--v-wa)";
-}
-
-function RoundTimer({ endsAt }: { endsAt: string | null }) {
-  const [remaining, setRemaining] = useState(0);
-  useEffect(() => {
-    if (!endsAt) return;
-    const deadline = new Date(endsAt).getTime();
-    function update() { setRemaining(Math.max(0, deadline - Date.now())); }
-    update();
-    const id = setInterval(update, 1000);
-    return () => clearInterval(id);
-  }, [endsAt]);
-
-  if (!endsAt) return null;
-  const m = Math.floor(remaining / 60000);
-  const s = Math.floor((remaining % 60000) / 1000);
-  const critical = remaining < 30_000;
-  const warn = remaining < 60_000;
-  return (
-    <div
-      style={{
-        fontFamily: "var(--mono)", fontSize: 20, fontWeight: 700,
-        color: critical ? "var(--v-wa)" : warn ? "var(--v-tle)" : "var(--txt)",
-        animation: critical ? "flash 1s step-start infinite" : undefined,
-      }}
-    >
-      {String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
-    </div>
-  );
-}
-
-function playerStatus(p: MatchPlayerView, match: MatchStateView): { label: string; color: string } {
-  const isDraw = match.status === "FINISHED" && match.players.filter((q) => q.placement === 1).length > 1;
-  if (match.status === "FINISHED" && p.placement != null) {
-    if (p.placement === 1 && isDraw) return { label: "🤝 Draw", color: "var(--v-tle)" };
-    return { label: p.placement === 1 ? "🏆 Winner" : `#${p.placement}`, color: p.placement === 1 ? "var(--v-ac)" : "var(--txt-2)" };
-  }
-  if (p.forfeited) return { label: "Forfeited · left", color: "var(--v-wa)" };
-  if (p.status === "ELIMINATED") return { label: `Eliminated · R${(p.eliminatedRound ?? 0) + 1}`, color: "var(--v-wa)" };
-  if (p.solvedCurrentRound) return { label: "Solved ✓", color: "var(--v-ac)" };
-  return { label: "Racing…", color: "var(--txt-3)" };
-}
+import { verdictColor, verdictLabel, diffColor, RoundTimer, playerStatus } from "../matchUi.js";
 
 function RatingDelta({ before, after }: { before: number | null; after: number | null }) {
   if (before == null || after == null) return null;

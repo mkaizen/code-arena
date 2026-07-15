@@ -14,11 +14,12 @@ type WsEnvelope = Parameters<typeof deliverLocal>[0];
  * Fake socket that records what it was sent. `boom` sockets throw on send to
  * prove one dead connection can't take out delivery to the healthy ones.
  */
-function client(userId: string | null, boom = false) {
+function client(userId: string | null, boom = false, spectating?: string[]) {
   const sent: unknown[] = [];
   return {
     userId,
     sent,
+    spectating: spectating ? new Set(spectating) : undefined,
     socket: {
       send: (s: string) => {
         if (boom) throw new Error("dead socket");
@@ -58,6 +59,17 @@ describe("deliverLocal — cross-node fan-out routing", () => {
     expect(u2.sent).toEqual([event]);
     expect(u3.sent).toEqual([]);
     expect(anon.sent).toEqual([]);
+  });
+
+  it("kind: spectators delivers only to sockets watching that match", () => {
+    const watcher = client(null, false, ["m1"]);        // anon spectator of m1
+    const otherWatcher = client("u9", false, ["m2"]);   // watching a different match
+    const player = client("u1");                         // in the match, but not spectating
+    const event: ServerEvent = { type: "match_reaction", matchId: "m1", reaction: { handle: "ada", isBot: false, emoji: "🔥", at: "t" } };
+    deliverLocal({ kind: "spectators", matchId: "m1", event }, [watcher, otherWatcher, player]);
+    expect(watcher.sent).toEqual([event]);
+    expect(otherWatcher.sent).toEqual([]);
+    expect(player.sent).toEqual([]);
   });
 
   it("a throwing (dead) socket does not stop delivery to the rest", () => {

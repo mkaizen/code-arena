@@ -5,12 +5,24 @@ import { getToken } from "../api.js";
 const BASE_WS = (import.meta.env.VITE_API_URL ?? "http://localhost:8080")
   .replace(/^http/, "ws");
 
-export function useWs(onEvent: (e: ServerEvent) => void) {
+/**
+ * Subscribe to the real-time bus. Pass `spectateMatchId` to also follow a live
+ * match you're not playing in — the hook sends a `spectate` control message on
+ * connect (and re-sends it on every reconnect), so a watcher keeps getting the
+ * match's state/feed/reactions even across a dropped socket.
+ */
+export function useWs(
+  onEvent: (e: ServerEvent) => void,
+  opts?: { spectateMatchId?: string },
+) {
   const cbRef = useRef(onEvent);
   cbRef.current = onEvent;
+  const wsRef = useRef<WebSocket | null>(null);
+  // Read at (re)connect time so onopen always subscribes to the latest match.
+  const specRef = useRef<string | undefined>(opts?.spectateMatchId);
+  specRef.current = opts?.spectateMatchId;
 
   useEffect(() => {
-    let ws: WebSocket | null = null;
     let closed = false;
     let retryTimeout: ReturnType<typeof setTimeout> | null = null;
     let delay = 1000;
@@ -22,7 +34,8 @@ export function useWs(onEvent: (e: ServerEvent) => void) {
       // connect time so a reconnect after a refresh uses the current one.
       const token = getToken();
       const url = token ? `${BASE_WS}/ws?token=${encodeURIComponent(token)}` : `${BASE_WS}/ws`;
-      ws = new WebSocket(url);
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
 
       ws.onmessage = (ev) => {
         try {
@@ -43,6 +56,8 @@ export function useWs(onEvent: (e: ServerEvent) => void) {
 
       ws.onopen = () => {
         delay = 1000;
+        // Re-establish any spectator subscription across reconnects.
+        if (specRef.current) ws.send(JSON.stringify({ type: "spectate", matchId: specRef.current }));
       };
     }
 
@@ -51,7 +66,20 @@ export function useWs(onEvent: (e: ServerEvent) => void) {
     return () => {
       closed = true;
       if (retryTimeout) clearTimeout(retryTimeout);
-      ws?.close();
+      wsRef.current?.close();
+      wsRef.current = null;
     };
   }, []);
+
+  // Follow spectator-target changes on an already-open socket (the onopen
+  // handler covers the not-yet-connected case).
+  useEffect(() => {
+    const ws = wsRef.current;
+    const id = opts?.spectateMatchId;
+    if (!ws || ws.readyState !== WebSocket.OPEN || !id) return;
+    ws.send(JSON.stringify({ type: "spectate", matchId: id }));
+    return () => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "unspectate", matchId: id }));
+    };
+  }, [opts?.spectateMatchId]);
 }

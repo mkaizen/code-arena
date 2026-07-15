@@ -24,17 +24,23 @@ export const WS_CHANNEL = "arena:ws";
 interface Client {
   socket: { send: (s: string) => void };
   userId: string | null;
+  /** Match ids this socket is spectating (see `spectate`/`unspectate`). */
+  spectating?: Set<string>;
 }
+
+/** Most matches a single socket may spectate at once — a guard against abuse. */
+const MAX_SPECTATE = 6;
 
 /**
  * A delivery instruction carried over the fan-out bus. `all` goes to every
  * socket (incl. logged-out viewers); `user`/`users` are scoped to the sockets
- * authenticated as those users.
+ * authenticated as those users; `spectators` goes to sockets watching a match.
  */
 export type WsEnvelope =
   | { kind: "all"; event: ServerEvent }
   | { kind: "user"; userId: string; event: ServerEvent }
-  | { kind: "users"; userIds: string[]; event: ServerEvent };
+  | { kind: "users"; userIds: string[]; event: ServerEvent }
+  | { kind: "spectators"; matchId: string; event: ServerEvent };
 
 const clients = new Set<Client>();
 
@@ -45,13 +51,19 @@ const clients = new Set<Client>();
  */
 export function deliverLocal(envelope: WsEnvelope, set: Iterable<Client> = clients): void {
   const payload = JSON.stringify(envelope.event);
-  const targets =
-    envelope.kind === "user" ? new Set([envelope.userId])
-    : envelope.kind === "users" ? new Set(envelope.userIds)
-    : null; // null => broadcast to all
   for (const c of set) {
-    if (targets && (!c.userId || !targets.has(c.userId))) continue;
+    if (!matches(envelope, c)) continue;
     try { c.socket.send(payload); } catch { /* drop dead sockets on next tick */ }
+  }
+}
+
+/** Whether a socket should receive an envelope, by its routing kind. */
+function matches(envelope: WsEnvelope, c: Client): boolean {
+  switch (envelope.kind) {
+    case "all": return true;
+    case "user": return c.userId === envelope.userId;
+    case "users": return c.userId != null && envelope.userIds.includes(c.userId);
+    case "spectators": return c.spectating?.has(envelope.matchId) ?? false;
   }
 }
 
@@ -77,6 +89,11 @@ export function sendToUser(userId: string, event: ServerEvent): void {
 export function sendToUsers(userIds: string[], event: ServerEvent): void {
   if (userIds.length === 0) return;
   publish({ kind: "users", userIds, event });
+}
+
+/** Deliver to every socket currently spectating this match. */
+export function sendToSpectators(matchId: string, event: ServerEvent): void {
+  publish({ kind: "spectators", matchId, event });
 }
 
 /**
@@ -116,8 +133,28 @@ export async function wsRoutes(app: FastifyInstance) {
       }
     }
 
-    const client: Client = { socket, userId };
+    const client: Client = { socket, userId, spectating: new Set() };
     clients.add(client);
+
+    // Inbound control messages. The only one today is spectating: a socket asks
+    // to follow a live match (`{type:"spectate",matchId}`) and starts receiving
+    // that match's state/feed/reactions, or drops it (`unspectate`). Anonymous
+    // sockets can spectate — watching a public match needs no login.
+    socket.on("message", (raw: unknown) => {
+      let msg: { type?: string; matchId?: unknown };
+      try {
+        msg = JSON.parse(String(raw));
+      } catch {
+        return; // ignore malformed frames
+      }
+      if (typeof msg.matchId !== "string") return;
+      if (msg.type === "spectate") {
+        if (client.spectating!.size < MAX_SPECTATE) client.spectating!.add(msg.matchId);
+      } else if (msg.type === "unspectate") {
+        client.spectating!.delete(msg.matchId);
+      }
+    });
+
     socket.on("close", () => clients.delete(client));
   });
 }

@@ -1,4 +1,4 @@
-import type { DailyView, Language, LeaderboardRow, MatchHistoryEntry, MatchMode, MatchRecord, MatchReplay, MatchStateView, PlagiarismProblemReport, ProblemLeaderboard, ProblemVersionDetail, ProblemVersionSummary, PublicProfile, RunResult } from "@arena/shared";
+import type { DailyView, Language, LeaderboardRow, LiveMatchSummary, MatchHistoryEntry, MatchMode, MatchRecord, MatchReplay, MatchStateView, PlagiarismProblemReport, ProblemLeaderboard, ProblemVersionDetail, ProblemVersionSummary, PublicProfile, RunResult } from "@arena/shared";
 
 export interface PlagiarismReport {
   contestId: string;
@@ -256,6 +256,10 @@ export const api = {
   match: (id: string): Promise<MatchStateView> => req(`/matches/${id}`),
 
   publicMatch: (id: string): Promise<MatchStateView> => req(`/matches/${id}/public`),
+
+  // Spectating: the public "Live now" list, and a live match's state snapshot.
+  liveMatches: (): Promise<LiveMatchSummary[]> => req("/matches/live"),
+  watchMatch: (id: string): Promise<MatchStateView> => req(`/matches/${id}/live`),
 
   matchReplay: (id: string): Promise<MatchReplay> => req(`/matches/${id}/replay`),
 

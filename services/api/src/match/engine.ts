@@ -1,12 +1,12 @@
 import { prisma } from "../db.js";
-import { broadcast, sendToUsers } from "../ws.js";
+import { broadcast, sendToUsers, sendToSpectators } from "../ws.js";
 import { recomputeRatings } from "../rating/elo.js";
 import { winsToClinch, placementsByElimination, placementsByScore, humanRatingRanks } from "./rules.js";
 import { pickLadder } from "./ladder.js";
 import { isRecruiter } from "../referrals.js";
 import { botRoundPlan, personaFor, pickOpponents, BOT_ROSTER, botEmail } from "./bots.js";
 import { sanitizeReaction } from "@arena/shared";
-import type { MatchMode, MatchPlayerView, MatchProblemView, MatchStateView, MatchReactionEmoji } from "@arena/shared";
+import type { MatchMode, MatchPlayerView, MatchProblemView, MatchStateView, MatchReactionEmoji, LiveMatchSummary } from "@arena/shared";
 
 /**
  * Per-mode rules. ROYALE: 6 players, ascending ladder, miss a round's timer
@@ -429,6 +429,31 @@ async function earliestSolver(matchId: string, round: number, roundStartedAt: Da
   return first?.userId ?? null;
 }
 
+/**
+ * The public "Live now" list: in-progress ranked matches anyone can spectate.
+ * Practice matches are excluded — they're a solo warm-up against bots, not a
+ * competition worth watching, and it keeps the list to real head-to-heads.
+ */
+export async function getLiveMatches(limit = 20): Promise<LiveMatchSummary[]> {
+  const matches = await prisma.match.findMany({
+    where: { status: "ACTIVE", practice: false },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    include: { players: { include: { user: { select: { handle: true, isBot: true } } } }, _count: { select: { problems: true } } },
+  });
+  return matches.map((m) => {
+    const alive = m.players.filter((p) => p.status === "ALIVE");
+    return {
+      id: m.id,
+      mode: m.mode as MatchMode,
+      round: m.round,
+      totalRounds: m._count.problems,
+      players: alive.map((p) => ({ handle: p.user.handle, isBot: p.user.isBot })),
+      aliveCount: alive.length,
+    };
+  });
+}
+
 export async function getMatchState(matchId: string): Promise<MatchStateView | null> {
   const match = await prisma.match.findUnique({
     where: { id: matchId },
@@ -482,7 +507,10 @@ export async function getMatchState(matchId: string): Promise<MatchStateView | n
 
 async function broadcastMatchState(matchId: string): Promise<void> {
   const state = await getMatchState(matchId);
-  if (state) sendToUsers(state.players.map((p) => p.userId), { type: "match_state", match: state });
+  if (!state) return;
+  const event = { type: "match_state", match: state } as const;
+  sendToUsers(state.players.map((p) => p.userId), event);
+  sendToSpectators(matchId, event); // watchers see the same live state
 }
 
 /**
@@ -499,11 +527,13 @@ export async function recordMatchSubmission(matchId: string, userId: string, ver
   });
   if (!player) return;
   const players = await prisma.matchPlayer.findMany({ where: { matchId }, select: { userId: true } });
-  sendToUsers(players.map((p) => p.userId), {
+  const activity = {
     type: "match_activity",
     matchId,
     event: { handle: player.user.handle, isBot: player.user.isBot, verdict, round: match.round, at: new Date().toISOString() },
-  });
+  } as const;
+  sendToUsers(players.map((p) => p.userId), activity);
+  sendToSpectators(matchId, activity);
 }
 
 // Per-user cooldown on reactions so an emote-spammer can't flood the feed.
@@ -536,11 +566,13 @@ export async function recordMatchReaction(matchId: string, userId: string, emoji
 
   lastReactionAt.set(userId, now);
   const players = await prisma.matchPlayer.findMany({ where: { matchId }, select: { userId: true } });
-  sendToUsers(players.map((p) => p.userId), {
+  const reaction = {
     type: "match_reaction",
     matchId,
     reaction: { handle: player.user.handle, isBot: player.user.isBot, emoji: clean, at: new Date(now).toISOString() },
-  });
+  } as const;
+  sendToUsers(players.map((p) => p.userId), reaction);
+  sendToSpectators(matchId, reaction);
   return true;
 }
 
@@ -549,11 +581,13 @@ async function sendBotReaction(matchId: string, botId: string, handle: string, e
   const match = await prisma.match.findUnique({ where: { id: matchId }, select: { status: true } });
   if (!match || match.status !== "ACTIVE") return;
   const players = await prisma.matchPlayer.findMany({ where: { matchId }, select: { userId: true } });
-  sendToUsers(players.map((p) => p.userId), {
+  const reaction = {
     type: "match_reaction",
     matchId,
     reaction: { handle, isBot: true, emoji, at: new Date().toISOString() },
-  });
+  } as const;
+  sendToUsers(players.map((p) => p.userId), reaction);
+  sendToSpectators(matchId, reaction);
 }
 
 // ── Internal, lock-free transitions (callers must already hold the lock) ────

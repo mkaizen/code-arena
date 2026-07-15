@@ -311,6 +311,18 @@ export interface MatchProblemView {
   ratingValue: number;
 }
 
+/** One in-progress match on the public "Live now" list (spectator discovery). */
+export interface LiveMatchSummary {
+  id: string;
+  mode: MatchMode;
+  round: number;
+  totalRounds: number;
+  /** Handles of the players still alive, for a glanceable "who's playing". */
+  players: { handle: string; isBot: boolean }[];
+  /** How many players remain (ROYALE thins out as it goes). */
+  aliveCount: number;
+}
+
 export interface MatchStateView {
   id: string;
   mode: MatchMode;
