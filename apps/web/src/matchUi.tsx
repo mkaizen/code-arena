@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import type { MatchPlayerView, MatchStateView } from "@arena/shared";
+import type { MatchMode, MatchPlayerView, MatchStateView } from "@arena/shared";
+
+/** The stylised mode name for a match-screen header (Duel/Quad/Battle Royale). */
+export function modeBrand(mode: MatchMode) {
+  if (mode === "DUEL") return <>1v1&nbsp;<span style={{ color: "var(--v-ac)" }}>Duel</span></>;
+  if (mode === "QUADS") return <>Quad&nbsp;<span style={{ color: "var(--v-ac)" }}>Royale</span></>;
+  return <>Battle<span style={{ color: "var(--v-ac)" }}>Royale</span></>;
+}
 
 /**
  * Presentational helpers shared by the live-match screen and the read-only

@@ -9,9 +9,10 @@ import { sanitizeReaction } from "@arena/shared";
 import type { MatchMode, MatchPlayerView, MatchProblemView, MatchStateView, MatchReactionEmoji, LiveMatchSummary } from "@arena/shared";
 
 /**
- * Per-mode rules. ROYALE: 6 players, ascending ladder, miss a round's timer
- * and you're eliminated. DUEL: 1v1 best-of-3 — the first accepted submission
- * takes the round (ending it immediately); most round wins takes the match.
+ * Per-mode rules. ROYALE (6) and QUADS (4) are elimination ladders: miss a
+ * round's timer and you're out, last one standing wins — same engine, different
+ * lobby size. DUEL: 1v1 best-of-3 — the first accepted submission takes the
+ * round (ending it immediately); most round wins takes the match.
  */
 export const MODE_CONFIG: Record<
   MatchMode,
@@ -20,6 +21,7 @@ export const MODE_CONFIG: Record<
   // fillTimeoutSec: how long a partial queue waits for more humans before
   // rating-matched bots backfill the empty seats so a match always starts.
   ROYALE: { capacity: 6, roundDurationSec: 300, rounds: 6, fillTimeoutSec: 45 },
+  QUADS: { capacity: 4, roundDurationSec: 300, rounds: 4, fillTimeoutSec: 35 },
   DUEL: { capacity: 2, roundDurationSec: 600, rounds: 3, fillTimeoutSec: 20 },
 };
 
@@ -320,19 +322,28 @@ export async function queueStatus(userId: string): Promise<{
   capacities: Record<MatchMode, number>;
   fillDeadlines: Record<MatchMode, string | null>;
 }> {
-  const [mine, royale, duel, royaleFill, duelFill] = await Promise.all([
+  const modes = Object.keys(MODE_CONFIG) as MatchMode[];
+  const [mine, perMode] = await Promise.all([
     prisma.matchQueueEntry.findUnique({ where: { userId } }),
-    prisma.matchQueueEntry.count({ where: { mode: "ROYALE" } }),
-    prisma.matchQueueEntry.count({ where: { mode: "DUEL" } }),
-    fillDeadlineFor("ROYALE"),
-    fillDeadlineFor("DUEL"),
+    Promise.all(
+      modes.map(async (mode) => ({
+        mode,
+        count: await prisma.matchQueueEntry.count({ where: { mode } }),
+        fill: await fillDeadlineFor(mode),
+      })),
+    ),
   ]);
-  return {
-    queuedMode: (mine?.mode as MatchMode) ?? null,
-    counts: { ROYALE: royale, DUEL: duel },
-    capacities: { ROYALE: MODE_CONFIG.ROYALE.capacity, DUEL: MODE_CONFIG.DUEL.capacity },
-    fillDeadlines: { ROYALE: royaleFill?.toISOString() ?? null, DUEL: duelFill?.toISOString() ?? null },
-  };
+
+  const counts = {} as Record<MatchMode, number>;
+  const capacities = {} as Record<MatchMode, number>;
+  const fillDeadlines = {} as Record<MatchMode, string | null>;
+  for (const { mode, count, fill } of perMode) {
+    counts[mode] = count;
+    capacities[mode] = MODE_CONFIG[mode].capacity;
+    fillDeadlines[mode] = fill?.toISOString() ?? null;
+  }
+
+  return { queuedMode: (mine?.mode as MatchMode) ?? null, counts, capacities, fillDeadlines };
 }
 
 /**

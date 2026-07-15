@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useSeo } from "../hooks/useSeo.js";
-import { tierOf, type PublicProfile } from "@arena/shared";
+import { tierOf, MODE_LABELS, type PublicProfile } from "@arena/shared";
 import { TopBar } from "../components/TopBar.js";
 import { api } from "../api.js";
 import { useAuth } from "../ctx/AuthContext.js";
@@ -116,7 +116,7 @@ export function UserProfilePage() {
                   const place = m.placement != null ? (m.mode === "DUEL" ? (m.won ? "Win" : "Loss") : `#${m.placement} / ${m.playerCount}`) : "—";
                   return (
                     <Link key={m.matchId} to={`/replay/${m.matchId}`} title="Watch the replay" style={{ display: "grid", gridTemplateColumns: "90px 1fr 90px 70px", gap: 8, padding: "10px 16px", alignItems: "center", borderBottom: i < profile.recentMatches.length - 1 ? "1px solid var(--line-soft)" : "none", fontSize: 13, textDecoration: "none" }}>
-                      <span style={{ fontFamily: "var(--disp)", fontSize: 11, fontWeight: 700, color: m.mode === "DUEL" ? "var(--v-tle)" : "var(--v-ac)" }}>{m.mode === "DUEL" ? "1v1 Duel" : "Royale"}</span>
+                      <span style={{ fontFamily: "var(--disp)", fontSize: 11, fontWeight: 700, color: m.mode === "DUEL" ? "var(--v-tle)" : "var(--v-ac)" }}>{MODE_LABELS[m.mode]}</span>
                       <span style={{ color: m.won ? "var(--v-ac)" : "var(--txt-2)", fontWeight: 600 }}>{m.won ? "🏆 " : ""}{place}</span>
                       <span style={{ fontFamily: "var(--mono)", fontSize: 12, color: delta == null ? "var(--txt-3)" : delta >= 0 ? "var(--v-ac)" : "var(--v-wa)" }}>{delta == null ? "—" : `${delta >= 0 ? "+" : ""}${delta}`}</span>
                       <span style={{ color: "var(--txt-3)", fontSize: 11, textAlign: "right" }}>{m.endedAt ? timeAgo(m.endedAt) : ""}</span>

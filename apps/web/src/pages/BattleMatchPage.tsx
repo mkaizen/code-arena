@@ -13,7 +13,7 @@ import { useMediaQuery } from "../hooks/useMediaQuery.js";
 import { RunResults } from "../components/RunResults.js";
 import { SubmissionResult } from "../components/SubmissionResult.js";
 import { sanitizeStatement } from "../sanitize.js";
-import { verdictColor, verdictLabel, diffColor, RoundTimer, playerStatus } from "../matchUi.js";
+import { verdictColor, verdictLabel, diffColor, RoundTimer, playerStatus, modeBrand } from "../matchUi.js";
 
 function RatingDelta({ before, after }: { before: number | null; after: number | null }) {
   if (before == null || after == null) return null;
@@ -279,7 +279,7 @@ export function BattleMatchPage() {
       <header style={{ height: 52, display: "flex", alignItems: "center", padding: "0 16px", borderBottom: "1px solid var(--line)", background: "var(--panel)", flexShrink: 0, gap: 16 }}>
         <Link to="/battle" style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 15, color: "var(--txt)", textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ color: "var(--txt-3)", fontWeight: 400, fontSize: 13 }}>←</span>
-          {isDuel ? <>1v1&nbsp;<span style={{ color: "var(--v-ac)" }}>Duel</span></> : <>Battle<span style={{ color: "var(--v-ac)" }}>Royale</span></>}
+          {modeBrand(match.mode)}
         </Link>
         <div style={{ width: 1, height: 24, background: "var(--line)" }} />
         <div style={{ flex: 1, fontFamily: "var(--disp)", fontWeight: 600, fontSize: 14, color: "var(--txt)", display: "flex", alignItems: "center", gap: 12 }}>

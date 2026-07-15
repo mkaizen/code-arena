@@ -44,6 +44,7 @@ enum MatchStatus {
 
 enum MatchMode {
   ROYALE // 6-player elimination ladder
+  QUADS  // 4-player elimination ladder
   DUEL   // 1v1, best-of-3 rounds, first AC takes the round
 }
 

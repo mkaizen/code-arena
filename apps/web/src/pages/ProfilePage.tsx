@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, Link } from "react-router-dom";
-import { RECRUITER_THRESHOLD, tierOf, type MatchHistoryEntry, type MatchRecord } from "@arena/shared";
+import { RECRUITER_THRESHOLD, tierOf, MODE_LABELS, type MatchHistoryEntry, type MatchRecord } from "@arena/shared";
 import { TopBar } from "../components/TopBar.js";
 import { api, type Submission } from "../api.js";
 import { useAuth } from "../ctx/AuthContext.js";
@@ -284,7 +284,7 @@ export function ProfilePage() {
                     }}
                   >
                     <span style={{ fontFamily: "var(--disp)", fontSize: 11, fontWeight: 700, color: m.mode === "DUEL" ? "var(--v-tle)" : "var(--v-ac)" }}>
-                      {m.mode === "DUEL" ? "1v1 Duel" : "Royale"}
+                      {MODE_LABELS[m.mode]}
                     </span>
                     <span style={{ color: m.won ? "var(--v-ac)" : "var(--txt-2)", fontWeight: 600 }}>
                       {m.won ? "🏆 " : ""}{place}
