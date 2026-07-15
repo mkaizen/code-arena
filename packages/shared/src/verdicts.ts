@@ -42,6 +42,30 @@ export interface JudgeResult {
   cases: CaseResult[];
 }
 
+/** At-a-glance test progress for a judged submission, for a "passed X / Y" view. */
+export interface VerdictSummary {
+  /** How many hidden tests passed before the verdict was decided. */
+  passed: number;
+  /** Total hidden tests for the problem. */
+  total: number;
+  /** 1-based index of the first failing test, or null (accepted, or nothing ran). */
+  failedCase: number | null;
+}
+
+/**
+ * Derive a "passed X of Y (failed on N)" summary from a judged result. Accepted
+ * means every test passed; a failure means everything before `failedCase`
+ * passed. Compilation errors run nothing, so 0 passed.
+ */
+export function verdictSummary(r: Pick<JudgeResult, "verdict" | "totalCases" | "failedCase" | "cases">): VerdictSummary {
+  const total = r.totalCases ?? r.cases.length;
+  if (r.verdict === Verdict.AC) return { passed: total, total, failedCase: null };
+  if (r.verdict === Verdict.CE || r.verdict === Verdict.IE) return { passed: 0, total, failedCase: null };
+  const failedCase = r.failedCase ?? null;
+  const passed = failedCase != null ? Math.max(0, failedCase - 1) : 0;
+  return { passed, total, failedCase };
+}
+
 /** One case of a Run (test against samples / custom input — never hidden tests). */
 export interface RunCaseResult {
   label: string;

@@ -11,6 +11,7 @@ import { starterFor } from "../problemStarters.js";
 import { useRun } from "../hooks/useRun.js";
 import { useMediaQuery } from "../hooks/useMediaQuery.js";
 import { RunResults } from "../components/RunResults.js";
+import { SubmissionResult } from "../components/SubmissionResult.js";
 import { sanitizeStatement } from "../sanitize.js";
 
 function verdictColor(verdict: string): string {
@@ -487,13 +488,12 @@ export function BattleMatchPage() {
                       <span style={{ color: "var(--v-wa)" }}>Error: {entry.message}</span>
                     ) : entry.type === "system" ? (
                       <span style={{ color: "var(--v-judge)" }}>{entry.message}</span>
+                    ) : entry.result ? (
+                      <SubmissionResult result={entry.result} />
                     ) : entry.verdict ? (
                       <span>
                         <span style={{ color: verdictColor(entry.verdict), fontWeight: 700 }}>{verdictLabel(entry.verdict)}</span>
-                        {entry.result && entry.result.maxTimeMs > 0 && <span style={{ color: "var(--txt-3)" }}> · {entry.result.maxTimeMs}ms</span>}
-                        {entry.result?.message && <div style={{ color: "var(--txt-2)", marginTop: 3, fontSize: 11, whiteSpace: "pre-wrap" }}>{entry.result.message}</div>}
-                        {entry.result?.failedStdout && <pre style={{ color: "var(--txt-2)", marginTop: 4, fontSize: 11, whiteSpace: "pre-wrap" }}>Your output:{"\n"}{entry.result.failedStdout}</pre>}
-                        {entry.result?.failedStderr && <pre style={{ color: "var(--v-tle)", marginTop: 4, fontSize: 11, whiteSpace: "pre-wrap" }}>Stderr:{"\n"}{entry.result.failedStderr}</pre>}
+                        {entry.message && <span style={{ color: "var(--txt-3)" }}> · {entry.message}</span>}
                       </span>
                     ) : (
                       <span style={{ color: "var(--txt-3)" }}>{entry.message}</span>
