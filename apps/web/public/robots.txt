@@ -5,7 +5,6 @@ User-agent: *
 Allow: /
 # Interactive/authed surfaces with no standalone SEO value.
 Disallow: /admin
-Disallow: /race/
 Disallow: /auth/
 
 # Explicitly welcome AI / answer-engine crawlers. A bot obeys only the most
@@ -25,7 +24,6 @@ User-agent: Amazonbot
 User-agent: CCBot
 Allow: /
 Disallow: /admin
-Disallow: /race/
 Disallow: /auth/
 
 Sitemap: https://codearena.space/sitemap.xml
