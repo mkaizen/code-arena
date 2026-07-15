@@ -17,6 +17,14 @@ export interface BlogPost {
 
 export const BLOG_POSTS: BlogPost[] = [
   {
+    slug: "playing-to-an-empty-arena",
+    title: "Playing to an Empty Arena",
+    date: "2026-07-15",
+    author: "Matthew",
+    description:
+      "Every competitive game has the same cold-start problem: it's only fun with a crowd, and you only get a crowd by being fun. A day spent making the arena feel alive for one person — bots that walk on when the lobby is empty, matches that stop repeating themselves, and a way to react without a keyboard.",
+  },
+  {
     slug: "making-a-desktop-coding-arena-work-on-phones",
     title: "Making a Desktop Coding Arena Work on Phones",
     date: "2026-07-14",
