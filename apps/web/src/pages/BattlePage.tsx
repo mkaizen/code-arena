@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { TopBar } from "../components/TopBar.js";
 import { api } from "../api.js";
 import { useAuth } from "../ctx/AuthContext.js";
 import { useWs } from "../hooks/useWs.js";
-import type { MatchMode, ServerEvent } from "@arena/shared";
+import type { LiveMatchSummary, MatchMode, ServerEvent } from "@arena/shared";
 
 const MODE_META: Record<MatchMode, { title: string; tagline: string; blurb: string }> = {
   ROYALE: {
@@ -53,6 +53,7 @@ export function BattlePage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState<MatchMode | "leave" | null>(null);
   const [practicing, setPracticing] = useState<MatchMode | null>(null);
+  const [live, setLive] = useState<LiveMatchSummary[]>([]);
   const navigated = useRef(false);
 
   useEffect(() => {
@@ -61,6 +62,16 @@ export function BattlePage() {
       .then((s) => { setQueuedMode(s.queuedMode); setCounts(s.counts); setCapacities(s.capacities); setFillDeadlines(s.fillDeadlines); })
       .catch(() => {});
   }, [user]);
+
+  // The "Live now" list — polled, since matches start and end without a signal
+  // on this page (it's public, so logged-out visitors can watch too).
+  useEffect(() => {
+    let stopped = false;
+    const load = () => api.liveMatches().then((m) => { if (!stopped) setLive(m); }).catch(() => {});
+    load();
+    const t = setInterval(load, 12_000);
+    return () => { stopped = true; clearInterval(t); };
+  }, []);
 
   useWs((ev: ServerEvent) => {
     if (ev.type === "queue_update") {
@@ -228,6 +239,41 @@ export function BattlePage() {
               ))}
             </div>
           </div>
+
+          {/* Live now — spectate a match already in progress. */}
+          {live.length > 0 && (
+            <div style={{ marginTop: 16, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "18px 20px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--v-wa)", animation: "pulse 1.4s ease-in-out infinite" }} />
+                <h2 style={{ fontFamily: "var(--disp)", fontSize: 15, fontWeight: 700, color: "var(--txt)" }}>Live now</h2>
+                <span style={{ fontSize: 11, color: "var(--txt-3)" }}>· {live.length} match{live.length === 1 ? "" : "es"} in progress</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {live.map((m) => {
+                  const names = m.players.map((p) => (p.isBot ? "🤖 " : "") + p.handle).join(" · ");
+                  return (
+                    <Link
+                      key={m.id}
+                      to={`/watch/${m.id}`}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 8,
+                        background: "var(--panel-2)", border: "1px solid var(--line)", textDecoration: "none",
+                      }}
+                    >
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "var(--v-ac)", fontFamily: "var(--disp)", flexShrink: 0, width: 54 }}>
+                        {m.mode === "DUEL" ? "Duel" : "Royale"}
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--txt-2)", fontFamily: "var(--mono)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {names || "—"}
+                      </span>
+                      <span style={{ fontSize: 11, color: "var(--txt-3)", flexShrink: 0 }}>R{m.round + 1}/{m.totalRounds}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "var(--v-wa)", flexShrink: 0, fontFamily: "var(--disp)" }}>Watch →</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>

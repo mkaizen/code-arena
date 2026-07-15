@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { joinQueue, leaveQueue, queueStatus, getMatchState, recordHeartbeat, recordMatchReaction, startPracticeMatch, MODE_CONFIG } from "../match/engine.js";
+import { joinQueue, leaveQueue, queueStatus, getMatchState, getLiveMatches, recordHeartbeat, recordMatchReaction, startPracticeMatch, MODE_CONFIG } from "../match/engine.js";
 import { getMatchReplay } from "../match/replay.js";
 import { prisma } from "../db.js";
 import type { MatchHistoryEntry, MatchMode } from "@arena/shared";
@@ -111,5 +111,23 @@ export async function matchRoutes(app: FastifyInstance) {
     const replay = await getMatchReplay(id);
     if (!replay) return reply.code(404).send({ error: "not found" });
     return replay;
+  });
+
+  // Public, unauthenticated: the "Live now" list for spectator discovery —
+  // in-progress ranked matches anyone can drop in on.
+  app.get("/matches/live", async () => {
+    return getLiveMatches();
+  });
+
+  // Public, unauthenticated: a live match's state for a spectator. Unlike a
+  // participant's /matches/:id, this only exposes matches that are ACTIVE and
+  // never a single line of anyone's source — just the same rounds, standings,
+  // and problem a spectator watches unfold. Live WebSocket updates come from a
+  // `{type:"spectate"}` subscription on the socket.
+  app.get("/matches/:id/live", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const state = await getMatchState(id);
+    if (!state || state.status !== "ACTIVE") return reply.code(404).send({ error: "not found" });
+    return state;
   });
 }

@@ -34,6 +34,7 @@ const AdminPlagiarismPage = lazyPage(() => import("./pages/AdminPlagiarismPage.j
 const BattlePage = lazyPage(() => import("./pages/BattlePage.js"), "BattlePage");
 const BattleMatchPage = lazyPage(() => import("./pages/BattleMatchPage.js"), "BattleMatchPage");
 const MatchResultPage = lazyPage(() => import("./pages/MatchResultPage.js"), "MatchResultPage");
+const SpectatePage = lazyPage(() => import("./pages/SpectatePage.js"), "SpectatePage");
 const MatchReplayPage = lazyPage(() => import("./pages/MatchReplayPage.js"), "MatchReplayPage");
 const BlogPage = lazyPage(() => import("./pages/BlogPage.js"), "BlogPage");
 const BlogPostPage = lazyPage(() => import("./pages/BlogPostPage.js"), "BlogPostPage");
@@ -65,6 +66,7 @@ export function App() {
             <Route path="/leaderboard" element={<GlobalLBPage />} />
             <Route path="/battle" element={<BattlePage />} />
             <Route path="/battle/:id" element={<BattleMatchPage />} />
+            <Route path="/watch/:id" element={<SpectatePage />} />
             <Route path="/share/:id" element={<MatchResultPage />} />
             <Route path="/replay/:id" element={<MatchReplayPage />} />
             <Route path="/admin" element={<AdminPage />} />
