@@ -4,7 +4,8 @@ import { recomputeRatings } from "../rating/elo.js";
 import { winsToClinch, placementsByElimination, placementsByScore } from "./rules.js";
 import { isRecruiter } from "../referrals.js";
 import { botRoundPlan, personaFor, pickOpponents, BOT_ROSTER, botEmail } from "./bots.js";
-import type { MatchMode, MatchPlayerView, MatchProblemView, MatchStateView } from "@arena/shared";
+import { sanitizeReaction } from "@arena/shared";
+import type { MatchMode, MatchPlayerView, MatchProblemView, MatchStateView, MatchReactionEmoji } from "@arena/shared";
 
 /**
  * Per-mode rules. ROYALE: 6 players, ascending ladder, miss a round's timer
@@ -341,6 +342,56 @@ export async function recordMatchSubmission(matchId: string, userId: string, ver
   });
 }
 
+// Per-user cooldown on reactions so an emote-spammer can't flood the feed.
+// In-memory is fine: reactions are ephemeral, and the worst a lost entry (on a
+// restart or across replicas) does is briefly loosen the throttle for one user.
+const REACTION_COOLDOWN_MS = 700;
+const lastReactionAt = new Map<string, number>();
+
+/**
+ * Fire an emote into every participant's match view. Reactions are pure
+ * presence — never stored, never rated, and only valid while the match is live
+ * and coming from someone actually in it. Returns whether the reaction went out
+ * (false = not a participant, match over, unknown emote, or still on cooldown).
+ */
+export async function recordMatchReaction(matchId: string, userId: string, emoji: unknown): Promise<boolean> {
+  const clean = sanitizeReaction(emoji);
+  if (!clean) return false;
+
+  const now = Date.now();
+  const last = lastReactionAt.get(userId) ?? 0;
+  if (now - last < REACTION_COOLDOWN_MS) return false;
+
+  const match = await prisma.match.findUnique({ where: { id: matchId }, select: { status: true } });
+  if (!match || match.status !== "ACTIVE") return false;
+  const player = await prisma.matchPlayer.findUnique({
+    where: { matchId_userId: { matchId, userId } },
+    include: { user: { select: { handle: true, isBot: true } } },
+  });
+  if (!player) return false;
+
+  lastReactionAt.set(userId, now);
+  const players = await prisma.matchPlayer.findMany({ where: { matchId }, select: { userId: true } });
+  sendToUsers(players.map((p) => p.userId), {
+    type: "match_reaction",
+    matchId,
+    reaction: { handle: player.user.handle, isBot: player.user.isBot, emoji: clean, at: new Date(now).toISOString() },
+  });
+  return true;
+}
+
+/** Fan a reaction out on a bot's behalf, skipping the human-facing cooldown. */
+async function sendBotReaction(matchId: string, botId: string, handle: string, emoji: MatchReactionEmoji): Promise<void> {
+  const match = await prisma.match.findUnique({ where: { id: matchId }, select: { status: true } });
+  if (!match || match.status !== "ACTIVE") return;
+  const players = await prisma.matchPlayer.findMany({ where: { matchId }, select: { userId: true } });
+  sendToUsers(players.map((p) => p.userId), {
+    type: "match_reaction",
+    matchId,
+    reaction: { handle, isBot: true, emoji, at: new Date().toISOString() },
+  });
+}
+
 // ── Internal, lock-free transitions (callers must already hold the lock) ────
 
 async function _beginRound(matchId: string, round: number): Promise<void> {
@@ -390,6 +441,11 @@ async function scheduleBotsForRound(matchId: string, round: number, roundDuratio
     }
     if (plan.solves && plan.solveAtMs != null) {
       arm(plan.solveAtMs, () => botSubmit(matchId, round, bot.user.id, problem.id, "ACCEPTED"));
+      // A little celebration a beat after landing the solve — presence, not spam.
+      arm(plan.solveAtMs + 900, () => sendBotReaction(matchId, bot.user.id, bot.user.handle, "🎉"));
+    } else if (plan.wrongAtMs.length >= 2) {
+      // Been fighting this one for a while and it's not going well — an "oof".
+      arm(plan.wrongAtMs[1] + 400, () => sendBotReaction(matchId, bot.user.id, bot.user.handle, "😅"));
     }
   }
   // Replace (not append) — the previous round's pending timers were cleared on transition.

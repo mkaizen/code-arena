@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Editor, { type OnMount } from "@monaco-editor/react";
-import { tierOf, type ServerEvent, type Language, type MatchPlayerView, type MatchStateView, type JudgeResult, type MatchActivity } from "@arena/shared";
+import { tierOf, MATCH_REACTIONS, type ServerEvent, type Language, type MatchPlayerView, type MatchStateView, type JudgeResult, type MatchActivity } from "@arena/shared";
 import { api, type Problem } from "../api.js";
 import { useAuth } from "../ctx/AuthContext.js";
 import { useWs } from "../hooks/useWs.js";
@@ -91,6 +91,41 @@ function RatingDelta({ before, after }: { before: number | null; after: number |
   );
 }
 
+/**
+ * The end-of-match rating reveal: the new rating counts up (or down) from the
+ * old one, with the delta called out. This is the single most important number
+ * of a ranked match, so it gets a real animation instead of tiny grey text.
+ */
+function RatingReveal({ before, after }: { before: number; after: number }) {
+  const [val, setVal] = useState(before);
+  useEffect(() => {
+    if (before === after) { setVal(after); return; }
+    const start = performance.now();
+    const dur = 900;
+    let raf = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic — quick, then settles
+      setVal(Math.round(before + (after - before) * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [before, after]);
+
+  const d = after - before;
+  const color = d > 0 ? "var(--v-ac)" : d < 0 ? "var(--v-wa)" : "var(--txt-2)";
+  return (
+    <span style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}>
+      <span style={{ fontSize: 11, letterSpacing: "0.08em", color: "var(--txt-3)", fontWeight: 600 }}>RATING</span>
+      <span style={{ fontFamily: "var(--mono)", fontSize: 22, fontWeight: 700, color: "var(--txt)" }}>{val}</span>
+      <span style={{ fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, color, animation: "pop 0.3s ease-out" }}>
+        {d > 0 ? "▲" : d < 0 ? "▼" : ""}{d >= 0 ? "+" : ""}{d}
+      </span>
+    </span>
+  );
+}
+
 /** DUEL: round-win pips, one per round (● won, ○ not yet). */
 function WinPips({ wins, total }: { wins: number; total: number }) {
   return (
@@ -132,6 +167,12 @@ export function BattleMatchPage() {
   const [feed, setFeed] = useState<MatchActivity[]>([]);
   const [showCustom, setShowCustom] = useState(false);
   const [customInput, setCustomInput] = useState("");
+  // Emotes drifting up over the arena — each auto-expires so the list stays short.
+  const [floats, setFloats] = useState<{ id: number; emoji: string; handle: string }[]>([]);
+  const floatId = useRef(0);
+  const [reactCooldown, setReactCooldown] = useState(false);
+  const [rematchBusy, setRematchBusy] = useState(false);
+  const [rematchError, setRematchError] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -162,6 +203,11 @@ export function BattleMatchPage() {
       setMatch(ev.match);
     } else if (ev.type === "match_activity" && ev.matchId === id) {
       setFeed((f) => [ev.event, ...f].slice(0, 40));
+    } else if (ev.type === "match_reaction" && ev.matchId === id) {
+      const fid = ++floatId.current;
+      const { emoji, handle } = ev.reaction;
+      setFloats((f) => [...f, { id: fid, emoji, handle }].slice(-14));
+      setTimeout(() => setFloats((f) => f.filter((x) => x.id !== fid)), 2200);
     } else if (ev.type === "verdict" && pendingSubmissions.current.has(ev.submissionId)) {
       pendingSubmissions.current.delete(ev.submissionId);
       setConsole((c) => [...c, { type: "verdict", verdict: ev.result.verdict, result: ev.result }]);
@@ -195,6 +241,38 @@ export function BattleMatchPage() {
   function handleRun() {
     if (!problem) return;
     run.start(lang, source, showCustom && customInput.trim() ? customInput : undefined);
+  }
+
+  // "Play Again" closes the loop instead of dead-ending on the result screen.
+  // Practice restarts immediately against fresh bots; a ranked match re-queues
+  // for the same mode — landing you back in the same match if one fills at once,
+  // otherwise in the battle lobby where match_found will pull you in.
+  async function handlePlayAgain() {
+    if (!match || rematchBusy) return;
+    setRematchBusy(true);
+    setRematchError("");
+    try {
+      if (match.practice) {
+        const { matchId } = await api.startPracticeMatch(match.mode);
+        navigate(`/battle/${matchId}`);
+      } else {
+        const res = await api.queueForMatch(match.mode);
+        if (res.matched && res.matchId) navigate(`/battle/${res.matchId}`);
+        else navigate("/battle");
+      }
+    } catch (e) {
+      setRematchError((e as Error).message);
+      setRematchBusy(false);
+    }
+  }
+
+  // Fire an emote. The server echoes it back over the WS (to everyone, us
+  // included), so the float is driven there — this just sends and throttles.
+  function handleReact(emoji: string) {
+    if (!id || reactCooldown) return;
+    setReactCooldown(true);
+    setTimeout(() => setReactCooldown(false), 700);
+    api.matchReact(id, emoji).catch(() => {});
   }
 
   const myPlayer = match?.players.find((p) => p.userId === user?.id) ?? null;
@@ -256,6 +334,9 @@ export function BattleMatchPage() {
   const isDuel = match.mode === "DUEL";
   const isDraw = finished && match.players.filter((p) => p.placement === 1).length > 1;
   const opponent = isDuel ? match.players.find((p) => p.userId !== user?.id) ?? null : null;
+  // Anyone still in the match — including eliminated players spectating the
+  // rest of it — can cheer while it's live.
+  const canReact = match.status === "ACTIVE" && !!myPlayer;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100dvh", background: "var(--ink)", overflow: "hidden" }}>
@@ -285,22 +366,41 @@ export function BattleMatchPage() {
       </header>
 
       {finished && (
-        <div style={{ padding: "10px 20px", background: "rgba(63,185,80,0.08)", borderBottom: "1px solid rgba(63,185,80,0.2)", color: "var(--v-ac)", fontSize: 13, fontWeight: 600, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 14 }}>
-          <span>
-            {isDuel
-              ? isDraw
-                ? "🤝 The duel ended in a draw."
+        <div style={{ padding: "10px 20px", background: "rgba(63,185,80,0.08)", borderBottom: "1px solid rgba(63,185,80,0.2)", color: "var(--v-ac)", fontSize: 13, fontWeight: 600, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, flexWrap: "wrap" }}>
+            <span>
+              {isDuel
+                ? isDraw
+                  ? "🤝 The duel ended in a draw."
+                  : myPlayer?.placement === 1
+                    ? "🏆 You won the duel!"
+                    : `You lost the duel${opponent ? ` to ${opponent.handle}` : ""}.`
                 : myPlayer?.placement === 1
-                  ? "🏆 You won the duel!"
-                  : `You lost the duel${opponent ? ` to ${opponent.handle}` : ""}.`
-              : myPlayer?.placement === 1
-                ? "🏆 You won the match!"
-                : myPlayer?.placement
-                  ? `Match over — you placed #${myPlayer.placement}`
-                  : "Match over"}
-          </span>
-          {id && (
-            <span style={{ display: "inline-flex", gap: 8 }}>
+                  ? "🏆 You won the match!"
+                  : myPlayer?.placement
+                    ? `Match over — you placed #${myPlayer.placement}`
+                    : "Match over"}
+            </span>
+            {/* The rating swing — only on rated matches (practice is unrated). */}
+            {myPlayer?.ratingBefore != null && myPlayer?.ratingAfter != null && (
+              <RatingReveal before={myPlayer.ratingBefore} after={myPlayer.ratingAfter} />
+            )}
+          </div>
+          <div style={{ display: "inline-flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+            {myPlayer && (
+              <button
+                onClick={handlePlayAgain}
+                disabled={rematchBusy}
+                style={{
+                  fontFamily: "var(--disp)", fontSize: 12, fontWeight: 700, color: "#06210C",
+                  background: "var(--v-ac)", padding: "4px 14px", borderRadius: 6, border: "none",
+                  cursor: rematchBusy ? "not-allowed" : "pointer", opacity: rematchBusy ? 0.7 : 1,
+                }}
+              >
+                {rematchBusy ? "Starting…" : match.practice ? "↻ Play Again" : "↻ New Match"}
+              </button>
+            )}
+            {id && (
               <Link
                 to={`/replay/${id}`}
                 style={{
@@ -310,17 +410,20 @@ export function BattleMatchPage() {
               >
                 Watch Replay
               </Link>
+            )}
+            {id && (
               <Link
                 to={`/share/${id}`}
                 style={{
-                  fontFamily: "var(--disp)", fontSize: 12, fontWeight: 700, color: "#06210C",
-                  background: "var(--v-ac)", padding: "4px 12px", borderRadius: 6, textDecoration: "none",
+                  fontFamily: "var(--disp)", fontSize: 12, fontWeight: 700, color: "var(--txt)",
+                  background: "var(--panel-2)", border: "1px solid var(--line)", padding: "3px 12px", borderRadius: 6, textDecoration: "none",
                 }}
               >
                 Share Result
               </Link>
-            </span>
-          )}
+            )}
+          </div>
+          {rematchError && <span style={{ color: "var(--v-wa)", fontSize: 12, fontWeight: 500 }}>{rematchError}</span>}
         </div>
       )}
       {!finished && eliminated && (
@@ -519,6 +622,29 @@ export function BattleMatchPage() {
             flexDirection: "column", overflow: "auto",
           }}
         >
+          {canReact && (
+            <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--line-soft)", display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "center" }}>
+              {MATCH_REACTIONS.map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => handleReact(emoji)}
+                  disabled={reactCooldown}
+                  title={`React ${emoji}`}
+                  aria-label={`React ${emoji}`}
+                  style={{
+                    background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 8,
+                    fontSize: 17, lineHeight: 1, padding: "5px 8px", cursor: reactCooldown ? "default" : "pointer",
+                    opacity: reactCooldown ? 0.45 : 1, transition: "opacity 0.15s ease, transform 0.1s ease",
+                  }}
+                  onMouseDown={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(0.88)"; }}
+                  onMouseUp={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; }}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
           <div style={{ padding: "10px 12px 8px", borderBottom: "1px solid var(--line-soft)", fontSize: 10, letterSpacing: "0.1em", color: "var(--txt-3)", fontWeight: 600 }}>
             PLAYERS
           </div>
@@ -572,6 +698,28 @@ export function BattleMatchPage() {
             ))
           )}
         </aside>
+      </div>
+
+      {/* Floating emotes — a fixed layer so they drift over the arena without
+          disturbing layout, and never intercept clicks. */}
+      <div style={{ position: "fixed", right: 24, bottom: 24, width: 180, height: 240, pointerEvents: "none", overflow: "hidden", zIndex: 50 }}>
+        {floats.map((fl) => {
+          const isMine = !!myPlayer && fl.handle === myPlayer.handle;
+          return (
+            <div
+              key={fl.id}
+              style={{
+                position: "absolute", bottom: 0, right: (fl.id % 5) * 30, display: "flex", alignItems: "center", gap: 6,
+                animation: "floatUp 2.2s ease-out forwards", whiteSpace: "nowrap",
+              }}
+            >
+              <span style={{ fontSize: 12, fontFamily: "var(--mono)", fontWeight: 700, color: isMine ? "var(--v-ac)" : "var(--txt-2)", textShadow: "0 1px 3px var(--ink)" }}>
+                {fl.handle}
+              </span>
+              <span style={{ fontSize: 26, lineHeight: 1, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.5))" }}>{fl.emoji}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

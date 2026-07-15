@@ -1,11 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { joinQueue, leaveQueue, queueStatus, getMatchState, recordHeartbeat, startPracticeMatch, MODE_CONFIG } from "../match/engine.js";
+import { joinQueue, leaveQueue, queueStatus, getMatchState, recordHeartbeat, recordMatchReaction, startPracticeMatch, MODE_CONFIG } from "../match/engine.js";
 import { getMatchReplay } from "../match/replay.js";
 import { prisma } from "../db.js";
 import type { MatchHistoryEntry, MatchMode } from "@arena/shared";
 
 const queueBody = z.object({ mode: z.enum(["ROYALE", "DUEL"]).default("ROYALE") });
+const reactBody = z.object({ emoji: z.string() });
 
 export async function matchRoutes(app: FastifyInstance) {
   app.post("/matches/queue", { onRequest: [app.authenticate] }, async (req, reply) => {
@@ -44,6 +45,16 @@ export async function matchRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     await recordHeartbeat(id, req.user.sub);
     return { ok: true };
+  });
+
+  // Fire an emote to everyone in the match. Ephemeral and best-effort: the
+  // engine validates the emoji, participation, live-match state, and per-user
+  // cooldown, and simply reports whether the reaction was delivered.
+  app.post("/matches/:id/react", { onRequest: [app.authenticate] }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { emoji } = reactBody.parse(req.body ?? {});
+    const sent = await recordMatchReaction(id, req.user.sub, emoji);
+    return { sent };
   });
 
   // W/L record + recent finished matches for the profile page.
