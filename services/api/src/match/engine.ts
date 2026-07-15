@@ -2,6 +2,7 @@ import { prisma } from "../db.js";
 import { broadcast, sendToUsers } from "../ws.js";
 import { recomputeRatings } from "../rating/elo.js";
 import { winsToClinch, placementsByElimination, placementsByScore, humanRatingRanks } from "./rules.js";
+import { pickLadder } from "./ladder.js";
 import { isRecruiter } from "../referrals.js";
 import { botRoundPlan, personaFor, pickOpponents, BOT_ROSTER, botEmail } from "./bots.js";
 import { sanitizeReaction } from "@arena/shared";
@@ -73,23 +74,37 @@ function forgetMatchSoon(matchId: string): void {
   }, 60_000).unref?.();
 }
 
-/** Pick the problem ladder for a new match of the given mode. */
-async function pickProblems(mode: MatchMode): Promise<{ id: string }[]> {
+// How many of a player's most recent matches to avoid repeating problems from.
+const RECENT_MATCH_WINDOW = 4;
+
+/** Problems these users saw across their last few matches — avoided when possible. */
+async function recentlySeenProblemIds(userIds: string[]): Promise<Set<string>> {
+  if (userIds.length === 0) return new Set();
+  const recent = await prisma.match.findMany({
+    where: { players: { some: { userId: { in: userIds } } } },
+    orderBy: { createdAt: "desc" },
+    take: RECENT_MATCH_WINDOW,
+    select: { problems: { select: { problemId: true } } },
+  });
+  return new Set(recent.flatMap((m) => m.problems.map((p) => p.problemId)));
+}
+
+/**
+ * Pick the problem ladder for a new match: a randomized, ascending-difficulty
+ * set (see pickLadder) that avoids problems the players have recently seen — so
+ * no two matches feel the same and Royale can't be won by pre-writing the same
+ * six solutions. Falls back to the whole bank if avoiding repeats would leave
+ * too few problems to build a full ladder.
+ */
+async function pickProblems(mode: MatchMode, avoidForUserIds: string[] = []): Promise<{ id: string }[]> {
   const want = MODE_CONFIG[mode].rounds;
-  if (mode === "ROYALE") {
-    // Deterministic ascending ladder of the easiest problems.
-    return prisma.problem.findMany({ orderBy: { ratingValue: "asc" }, take: want, select: { id: true } });
-  }
-  // DUEL: random sample for variety, then ordered easiest → hardest.
   const all = await prisma.problem.findMany({ select: { id: true, ratingValue: true } });
-  for (let i = all.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [all[i], all[j]] = [all[j], all[i]];
-  }
-  return all
-    .slice(0, want)
-    .sort((a, b) => a.ratingValue - b.ratingValue)
-    .map((p) => ({ id: p.id }));
+
+  const seen = await recentlySeenProblemIds(avoidForUserIds);
+  const fresh = all.filter((p) => !seen.has(p.id));
+  const pool = fresh.length > want ? fresh : all;
+
+  return pickLadder(pool, want).map((id) => ({ id }));
 }
 
 /** Thrown (and swallowed) when a queue batch was partly claimed by a concurrent
@@ -110,7 +125,8 @@ async function _claimAndOpenMatch(
   memberIds: string[],
 ): Promise<string | null> {
   const cfg = MODE_CONFIG[mode];
-  const problems = await pickProblems(mode);
+  // Avoid repeating problems the queued humans have recently seen.
+  const problems = await pickProblems(mode, claimIds);
   if (problems.length < 2) throw new Error("not enough problems available to start a match");
   const now = new Date();
   try {
@@ -358,7 +374,7 @@ export async function startPracticeMatch(
   if (allBots.length === 0) throw new Error("no practice bots are available");
   const opponents = pickOpponents(me.rating, allBots, cfg.capacity - 1);
 
-  const problems = await pickProblems(mode);
+  const problems = await pickProblems(mode, [userId]);
   if (problems.length < 2) throw new Error("not enough problems available to start a match");
 
   const now = new Date();
