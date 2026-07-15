@@ -27,7 +27,8 @@ export type ServerEvent =
   | { type: "queue_update"; mode: MatchMode; count: number; capacity: number }
   | { type: "match_found"; matchId: string; playerIds: string[] }
   | { type: "match_state"; match: MatchStateView }
-  | { type: "match_activity"; matchId: string; event: MatchActivity };
+  | { type: "match_activity"; matchId: string; event: MatchActivity }
+  | { type: "match_reaction"; matchId: string; reaction: MatchReaction };
 
 /** One line of the live match feed: who just submitted, and how it went. */
 export interface MatchActivity {
@@ -38,6 +39,35 @@ export interface MatchActivity {
   /** 0-based round the submission was made in. */
   round: number;
   /** ISO timestamp the verdict landed. */
+  at: string;
+}
+
+/**
+ * The emotes players can fire at each other mid-match — the whole social
+ * palette, small on purpose. A reaction is presence, not chat: it says "nice"
+ * or "ouch" without a keyboard leaving the code, and there's no free text to
+ * moderate. The order here is the order they render in the reaction bar.
+ */
+export const MATCH_REACTIONS = ["👍", "🔥", "😮", "😅", "🧠", "🎉"] as const;
+export type MatchReactionEmoji = (typeof MATCH_REACTIONS)[number];
+
+/**
+ * Reject anything that isn't one of the sanctioned emotes. Both the API (before
+ * it fans a reaction out) and the client (before it sends one) go through this,
+ * so an arbitrary string can never ride the reaction channel.
+ */
+export function sanitizeReaction(emoji: unknown): MatchReactionEmoji | null {
+  return typeof emoji === "string" && (MATCH_REACTIONS as readonly string[]).includes(emoji)
+    ? (emoji as MatchReactionEmoji)
+    : null;
+}
+
+/** One emote fired by a player during a live match (ephemeral — never stored). */
+export interface MatchReaction {
+  handle: string;
+  isBot: boolean;
+  emoji: MatchReactionEmoji;
+  /** ISO timestamp the reaction was sent. */
   at: string;
 }
 

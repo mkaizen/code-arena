@@ -261,6 +261,9 @@ export const api = {
   matchHeartbeat: (id: string): Promise<{ ok: boolean }> =>
     req(`/matches/${id}/heartbeat`, { method: "POST", body: "{}" }),
 
+  matchReact: (id: string, emoji: string): Promise<{ sent: boolean }> =>
+    req(`/matches/${id}/react`, { method: "POST", body: JSON.stringify({ emoji }) }),
+
   matchHistory: (): Promise<{ record: MatchRecord; matches: MatchHistoryEntry[] }> =>
     req("/matches/history"),
 
