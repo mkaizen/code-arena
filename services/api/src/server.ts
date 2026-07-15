@@ -18,7 +18,7 @@ import { seoRoutes } from "./routes/seo.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { wsRoutes, startWsBus } from "./ws.js";
 import { startVerdictSubscriber } from "./leaderboard/verdictSub.js";
-import { sweepOverdueMatches, sweepForfeits } from "./match/engine.js";
+import { sweepOverdueMatches, sweepForfeits, sweepStaleQueues } from "./match/engine.js";
 import { sweepContestReminders, sweepStreakNudges } from "./mail/notifications.js";
 
 declare module "fastify" {
@@ -73,6 +73,8 @@ async function main() {
   setInterval(() => {
     sweepOverdueMatches().catch((err) => app.log.error(err, "match sweep failed"));
     sweepForfeits().catch((err) => app.log.error(err, "forfeit sweep failed"));
+    // Restart-safe fallback for the bot-backfill fill timer.
+    sweepStaleQueues().catch((err) => app.log.error(err, "queue backfill sweep failed"));
   }, 15_000);
   // Email sweeps run on a slower cadence — contest reminders and streak nudges
   // are time-of-day driven, not second-sensitive.
