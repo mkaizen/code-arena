@@ -7,7 +7,6 @@ Ways to play:
 - **Contests** — timed rounds with a live, freezable ICPC-style leaderboard.
 - **Battle** — live matchmade matches: **Duel** (1v1, best-of-3) and **Royale** (6-player elimination ladder), with replays and shareable result cards.
 - **Daily** — a featured problem each day with solve streaks and a calendar.
-- **Race** — time-attack against a "ghost": a recorded past run by another user, server-timed so the clock can't be faked.
 - **Practice** — the full problem bank, plus a global all-time leaderboard and an engineering blog.
 
 > Full requirements live in [`docs/Code_Arena_Project_Document.docx`](docs/Code_Arena_Project_Document.docx). An interactive front-end prototype of the contest loop is at [`docs/prototype.html`](docs/prototype.html).
@@ -15,11 +14,11 @@ Ways to play:
 ## Architecture
 
 ```
-apps/web        React + Vite + Monaco editor — contest/battle/daily/race UI, wired to API + WS
+apps/web        React + Vite + Monaco editor — contest/battle/daily UI, wired to API + WS
 services/api     Fastify + Prisma + BullMQ producer + Redis leaderboard + live match engine
                  + email notifications, WS fan-out over a Redis bus
 services/judge   BullMQ worker — Docker sandbox, per-language recipes, S3 test reads
-packages/shared  @arena/shared — verdicts, domain types, match/ghost views, rating-tier colors
+packages/shared  @arena/shared — verdicts, domain types, match & replay views, rating-tier colors
 ```
 
 | Concern | Tech |
@@ -134,8 +133,7 @@ tooling, notifications, and multi-node real-time delivery are in place.
       post-contest finalization
 - [x] Battle — live matchmade Duel (1v1 bo3) and Royale (6-player
       elimination) with replays and shareable result cards
-- [x] Daily challenge with solve streaks, and Race (time-attack vs. a
-      recorded ghost run)
+- [x] Daily challenge with solve streaks and a solve calendar
 - [x] Admin setter UI for the problem bank and contests
 - [x] Seed script — admin user, demo problems, and a live contest
 - [x] Judge→API verdict push via Redis pub/sub (live verdict + leaderboard)

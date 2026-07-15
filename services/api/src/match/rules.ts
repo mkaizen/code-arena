@@ -40,6 +40,27 @@ export function placementsByElimination(
 }
 
 /**
+ * Rating inputs for a match that may include practice bots as seat-fillers
+ * (a ranked queue that timed out and was backfilled). Bots never move on the
+ * ladder and a human should never gain or lose rating to one, so they're
+ * dropped here; the remaining humans are re-ranked contiguously among
+ * themselves (standard competition ranking, ties preserved) so the Elo math
+ * sees a clean human-only field. A single human left over has nobody to be
+ * rated against, so the caller treats fewer than two as unrated.
+ */
+export function humanRatingRanks(
+  players: { userId: string; isBot: boolean; placement: number | null }[],
+): { userId: string; rank: number }[] {
+  const humans = players.filter(
+    (p): p is { userId: string; isBot: boolean; placement: number } => !p.isBot && p.placement != null,
+  );
+  return humans.map((p) => ({
+    userId: p.userId,
+    rank: 1 + humans.filter((q) => q.placement < p.placement).length,
+  }));
+}
+
+/**
  * DUEL final ranking by round wins (most wins first). Equal wins share a rank,
  * so two players on the same score both get placement 1 — a draw.
  */

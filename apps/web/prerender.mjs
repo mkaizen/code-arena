@@ -33,7 +33,7 @@ const diffLabel = (d) => (d === "easy" ? "Easy" : d === "med" ? "Medium" : "Hard
 // One-line pitch reused across the JSON-LD, llms.txt, and page copy.
 const INTRO =
   "Code Arena is a competitive-programming practice platform with real-time judging: " +
-  "1v1 duels, six-player elimination matches, ghost races against past solvers, and a bank " +
+  "1v1 duels, six-player elimination matches, daily challenges, and a bank " +
   "of classic coding-interview problems. Every problem has a statement, worked examples, a " +
   "live judge across six languages, and a solution editorial.";
 

@@ -1,7 +1,7 @@
 import { prisma } from "../db.js";
 import { broadcast, sendToUsers } from "../ws.js";
 import { recomputeRatings } from "../rating/elo.js";
-import { winsToClinch, placementsByElimination, placementsByScore } from "./rules.js";
+import { winsToClinch, placementsByElimination, placementsByScore, humanRatingRanks } from "./rules.js";
 import { isRecruiter } from "../referrals.js";
 import { botRoundPlan, personaFor, pickOpponents, BOT_ROSTER, botEmail } from "./bots.js";
 import { sanitizeReaction } from "@arena/shared";
@@ -12,9 +12,14 @@ import type { MatchMode, MatchPlayerView, MatchProblemView, MatchStateView, Matc
  * and you're eliminated. DUEL: 1v1 best-of-3 — the first accepted submission
  * takes the round (ending it immediately); most round wins takes the match.
  */
-export const MODE_CONFIG: Record<MatchMode, { capacity: number; roundDurationSec: number; rounds: number }> = {
-  ROYALE: { capacity: 6, roundDurationSec: 300, rounds: 6 },
-  DUEL: { capacity: 2, roundDurationSec: 600, rounds: 3 },
+export const MODE_CONFIG: Record<
+  MatchMode,
+  { capacity: number; roundDurationSec: number; rounds: number; fillTimeoutSec: number }
+> = {
+  // fillTimeoutSec: how long a partial queue waits for more humans before
+  // rating-matched bots backfill the empty seats so a match always starts.
+  ROYALE: { capacity: 6, roundDurationSec: 300, rounds: 6, fillTimeoutSec: 45 },
+  DUEL: { capacity: 2, roundDurationSec: 600, rounds: 3, fillTimeoutSec: 20 },
 };
 
 // A player with no heartbeat for this long is treated as having abandoned the
@@ -31,6 +36,11 @@ const locks = new Map<string, Promise<unknown>>();
 // they're tracked per match so a round change or finish can cancel the ones
 // that haven't fired yet (a bot must never "solve" a round that already moved on).
 const botTimers = new Map<string, ReturnType<typeof setTimeout>[]>();
+// Per-mode "fill" timer: once a queue is partially full, this fires at the
+// oldest waiter's deadline and backfills the empty seats with bots so a match
+// always starts. A DB-backed sweep (sweepStaleQueues) is the restart-safe
+// fallback if the process dies with a timer pending.
+const queueFillTimers = new Map<MatchMode, ReturnType<typeof setTimeout>>();
 
 function clearBotTimers(matchId: string): void {
   for (const t of botTimers.get(matchId) ?? []) clearTimeout(t);
@@ -82,9 +92,146 @@ async function pickProblems(mode: MatchMode): Promise<{ id: string }[]> {
     .map((p) => ({ id: p.id }));
 }
 
+/** Thrown (and swallowed) when a queue batch was partly claimed by a concurrent
+ *  join/backfill, so the transaction rolls back instead of double-booking. */
+class QueueClaimLost extends Error {}
+
+/**
+ * Atomically claim `claimIds` out of the queue and open a match with
+ * `memberIds` (claimed humans, plus any backfill bots). The claim only
+ * succeeds if every id was still queued — otherwise it rolls back and returns
+ * null, leaving the survivors in the queue for the next attempt. This is what
+ * keeps a fill timer firing at the same instant as a queue-filling join from
+ * seating the same player in two matches.
+ */
+async function _claimAndOpenMatch(
+  mode: MatchMode,
+  claimIds: string[],
+  memberIds: string[],
+): Promise<string | null> {
+  const cfg = MODE_CONFIG[mode];
+  const problems = await pickProblems(mode);
+  if (problems.length < 2) throw new Error("not enough problems available to start a match");
+  const now = new Date();
+  try {
+    const match = await prisma.$transaction(async (tx) => {
+      const del = await tx.matchQueueEntry.deleteMany({ where: { userId: { in: claimIds } } });
+      if (del.count < claimIds.length) throw new QueueClaimLost();
+      return tx.match.create({
+        data: {
+          mode,
+          roundDurationSec: cfg.roundDurationSec,
+          // Seed lastSeenAt so players get a full grace window to open the page
+          // before the forfeit sweep can consider them absent.
+          players: { create: memberIds.map((id) => ({ userId: id, lastSeenAt: now })) },
+          problems: { create: problems.map((p, i) => ({ problemId: p.id, round: i })) },
+        },
+      });
+    });
+    return match.id;
+  } catch (err) {
+    if (err instanceof QueueClaimLost) return null;
+    throw err;
+  }
+}
+
+/** When bots will backfill this mode's queue (oldest waiter + timeout), or null if empty. */
+async function fillDeadlineFor(mode: MatchMode): Promise<Date | null> {
+  const oldest = await prisma.matchQueueEntry.findFirst({ where: { mode }, orderBy: [{ queuedAt: "asc" }] });
+  if (!oldest) return null;
+  return new Date(oldest.queuedAt.getTime() + MODE_CONFIG[mode].fillTimeoutSec * 1000);
+}
+
 async function broadcastQueueCount(mode: MatchMode): Promise<void> {
   const count = await prisma.matchQueueEntry.count({ where: { mode } });
-  broadcast({ type: "queue_update", mode, count, capacity: MODE_CONFIG[mode].capacity });
+  const deadline = await fillDeadlineFor(mode);
+  broadcast({ type: "queue_update", mode, count, capacity: MODE_CONFIG[mode].capacity, fillDeadline: deadline?.toISOString() ?? null });
+}
+
+function clearQueueFillTimer(mode: MatchMode): void {
+  const t = queueFillTimers.get(mode);
+  if (t) {
+    clearTimeout(t);
+    queueFillTimers.delete(mode);
+  }
+}
+
+/**
+ * (Re)arm the per-mode fill timer to fire at the current oldest waiter's
+ * deadline. Idempotent — safe to call after any queue mutation; it re-anchors
+ * to whoever is now oldest and clears itself when the queue drains.
+ */
+async function reconcileQueueFill(mode: MatchMode): Promise<void> {
+  clearQueueFillTimer(mode);
+  const deadline = await fillDeadlineFor(mode);
+  if (!deadline) return;
+  const delay = Math.max(0, deadline.getTime() - Date.now());
+  const t = setTimeout(() => {
+    runBackfill(mode).catch((err) => console.error("queue backfill error", err));
+  }, delay);
+  t.unref?.();
+  queueFillTimers.set(mode, t);
+}
+
+/** Serialize backfills per mode so a timer and the sweep can't double-start. */
+async function runBackfill(mode: MatchMode): Promise<void> {
+  await withLock("queue:" + mode, () => _startBackfill(mode));
+}
+
+/**
+ * Start a match for whoever's waiting, filling the empty seats with
+ * rating-matched bots. Runs when a partial queue times out — so a player never
+ * waits forever for a lobby that will never fill. Human placements are rated
+ * among themselves at the end (bots are excluded), and a lone human plays an
+ * effectively unrated match rather than being sat against a wall of bots.
+ */
+async function _startBackfill(mode: MatchMode): Promise<void> {
+  clearQueueFillTimer(mode);
+  const cfg = MODE_CONFIG[mode];
+  const waiting = await prisma.matchQueueEntry.findMany({
+    where: { mode },
+    orderBy: [{ priority: "desc" }, { queuedAt: "asc" }],
+  });
+  if (waiting.length === 0) return;
+
+  const humanIds = waiting.slice(0, cfg.capacity).map((c) => c.userId);
+
+  const need = cfg.capacity - humanIds.length;
+  let botIds: string[] = [];
+  if (need > 0) {
+    await ensureBotsProvisioned();
+    const humans = await prisma.user.findMany({ where: { id: { in: humanIds } }, select: { rating: true } });
+    const avg = Math.round(humans.reduce((s, h) => s + h.rating, 0) / Math.max(1, humans.length));
+    const allBots = await prisma.user.findMany({ where: { isBot: true }, select: { id: true, rating: true } });
+    botIds = pickOpponents(avg, allBots, need).map((b) => b.id);
+  }
+
+  const matchId = await _claimAndOpenMatch(mode, humanIds, [...humanIds, ...botIds]);
+  if (!matchId) {
+    // Someone left the queue or a join grabbed the batch first — try again for
+    // whoever remains.
+    await reconcileQueueFill(mode);
+    return;
+  }
+
+  sendToUsers(humanIds, { type: "match_found", matchId, playerIds: humanIds });
+  await broadcastQueueCount(mode);
+  await reconcileQueueFill(mode); // re-arm for any waiters beyond this match's capacity
+  await withLock(matchId, () => _beginRound(matchId, 0));
+}
+
+/**
+ * Restart-safe fallback: if a fill timer was lost (process restart), start the
+ * backfill for any queue whose oldest waiter is past the deadline. The small
+ * grace keeps the precise in-memory timer as the normal path.
+ */
+export async function sweepStaleQueues(): Promise<void> {
+  for (const mode of Object.keys(MODE_CONFIG) as MatchMode[]) {
+    const oldest = await prisma.matchQueueEntry.findFirst({ where: { mode }, orderBy: [{ queuedAt: "asc" }] });
+    if (!oldest) continue;
+    const overdueBy = Date.now() - oldest.queuedAt.getTime() - MODE_CONFIG[mode].fillTimeoutSec * 1000;
+    if (overdueBy >= 5000) await runBackfill(mode);
+  }
 }
 
 export async function joinQueue(
@@ -116,58 +263,59 @@ export async function joinQueue(
     orderBy: [{ priority: "desc" }, { queuedAt: "asc" }],
   });
   if (waiting.length < cfg.capacity) {
-    broadcast({ type: "queue_update", mode, count: waiting.length, capacity: cfg.capacity });
+    // Not full yet — arm (or re-anchor) the bot-backfill timer so this doesn't
+    // wait forever, and broadcast the count plus when the fill will fire.
+    await reconcileQueueFill(mode);
+    await broadcastQueueCount(mode);
     return { matched: false, count: waiting.length, capacity: cfg.capacity };
   }
 
   const chosenIds = waiting.slice(0, cfg.capacity).map((c) => c.userId);
-  const problems = await pickProblems(mode);
-  if (problems.length < 2) {
-    // Not enough problems seeded to run a real match — leave the queue as-is.
-    throw new Error("not enough problems available to start a match");
+  const matchId = await _claimAndOpenMatch(mode, chosenIds, chosenIds);
+  if (!matchId) {
+    // Lost the race for part of this batch — stay queued and let the next
+    // join, the fill timer, or the sweep form the match.
+    await reconcileQueueFill(mode);
+    await broadcastQueueCount(mode);
+    const count = await prisma.matchQueueEntry.count({ where: { mode } });
+    return { matched: false, count, capacity: cfg.capacity };
   }
 
-  const match = await prisma.$transaction(async (tx) => {
-    await tx.matchQueueEntry.deleteMany({ where: { userId: { in: chosenIds } } });
-    return tx.match.create({
-      data: {
-        mode,
-        roundDurationSec: cfg.roundDurationSec,
-        // Seed lastSeenAt so players get a full grace window to open the page
-        // before the forfeit sweep can consider them absent.
-        players: { create: chosenIds.map((id) => ({ userId: id, lastSeenAt: new Date() })) },
-        problems: { create: problems.map((p, i) => ({ problemId: p.id, round: i })) },
-      },
-    });
-  });
-
-  sendToUsers(chosenIds, { type: "match_found", matchId: match.id, playerIds: chosenIds });
+  sendToUsers(chosenIds, { type: "match_found", matchId, playerIds: chosenIds });
   await broadcastQueueCount(mode);
+  await reconcileQueueFill(mode); // re-anchor (or clear) the fill timer for anyone still waiting
 
-  await withLock(match.id, () => _beginRound(match.id, 0));
-  return { matched: true, matchId: match.id };
+  await withLock(matchId, () => _beginRound(matchId, 0));
+  return { matched: true, matchId };
 }
 
 export async function leaveQueue(userId: string): Promise<void> {
   const entry = await prisma.matchQueueEntry.findUnique({ where: { userId } });
   await prisma.matchQueueEntry.deleteMany({ where: { userId } });
-  if (entry) await broadcastQueueCount(entry.mode as MatchMode);
+  if (entry) {
+    await broadcastQueueCount(entry.mode as MatchMode);
+    await reconcileQueueFill(entry.mode as MatchMode); // re-anchor to the new oldest, or clear if empty
+  }
 }
 
 export async function queueStatus(userId: string): Promise<{
   queuedMode: MatchMode | null;
   counts: Record<MatchMode, number>;
   capacities: Record<MatchMode, number>;
+  fillDeadlines: Record<MatchMode, string | null>;
 }> {
-  const [mine, royale, duel] = await Promise.all([
+  const [mine, royale, duel, royaleFill, duelFill] = await Promise.all([
     prisma.matchQueueEntry.findUnique({ where: { userId } }),
     prisma.matchQueueEntry.count({ where: { mode: "ROYALE" } }),
     prisma.matchQueueEntry.count({ where: { mode: "DUEL" } }),
+    fillDeadlineFor("ROYALE"),
+    fillDeadlineFor("DUEL"),
   ]);
   return {
     queuedMode: (mine?.mode as MatchMode) ?? null,
     counts: { ROYALE: royale, DUEL: duel },
     capacities: { ROYALE: MODE_CONFIG.ROYALE.capacity, DUEL: MODE_CONFIG.DUEL.capacity },
+    fillDeadlines: { ROYALE: royaleFill?.toISOString() ?? null, DUEL: duelFill?.toISOString() ?? null },
   };
 }
 
@@ -407,7 +555,9 @@ async function _beginRound(matchId: string, round: number): Promise<void> {
   timer.unref?.();
   timers.set(matchId, timer);
 
-  if (match.practice) await scheduleBotsForRound(matchId, round, match.roundDurationSec);
+  // Drive any bots in the match — practice matches, or a ranked queue that was
+  // backfilled with bots. No-ops cheaply when the match is all humans.
+  await scheduleBotsForRound(matchId, round, match.roundDurationSec);
 }
 
 /**
@@ -499,12 +649,15 @@ async function _applyMatchRatings(matchId: string): Promise<void> {
   if (match?.practice) return; // practice matches are unrated — nobody's ladder moves
   const players = await prisma.matchPlayer.findMany({
     where: { matchId },
-    include: { user: { select: { rating: true } } },
+    include: { user: { select: { rating: true, isBot: true } } },
   });
-  const participants = players
-    .filter((p) => p.placement != null)
-    .map((p) => ({ userId: p.userId, rating: p.user.rating, rank: p.placement! }));
-  if (participants.length < 2) return;
+  // Bots (present only when a ranked queue was backfilled) are excluded and the
+  // humans are re-ranked among themselves — you can't win or lose rating to a
+  // seat-filler, and a lone human is left unrated.
+  const ratingById = new Map(players.map((p) => [p.userId, p.user.rating]));
+  const ranks = humanRatingRanks(players.map((p) => ({ userId: p.userId, isBot: p.user.isBot, placement: p.placement })));
+  if (ranks.length < 2) return;
+  const participants = ranks.map((r) => ({ userId: r.userId, rating: ratingById.get(r.userId)!, rank: r.rank }));
 
   const deltas = recomputeRatings(participants);
   await prisma.$transaction([

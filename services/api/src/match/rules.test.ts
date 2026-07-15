@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { winsToClinch, placementsByElimination, placementsByScore } from "./rules.js";
+import { winsToClinch, placementsByElimination, placementsByScore, humanRatingRanks } from "./rules.js";
 
 describe("winsToClinch", () => {
   it("is a majority of the rounds", () => {
@@ -60,5 +60,65 @@ describe("placementsByScore", () => {
       { userId: "b", roundWins: 1 },
     ]);
     expect(p).toEqual({ a: 1, b: 1 });
+  });
+});
+
+describe("humanRatingRanks", () => {
+  it("is unchanged for an all-human field", () => {
+    const ranks = humanRatingRanks([
+      { userId: "a", isBot: false, placement: 1 },
+      { userId: "b", isBot: false, placement: 2 },
+      { userId: "c", isBot: false, placement: 3 },
+    ]);
+    expect(ranks).toEqual([
+      { userId: "a", rank: 1 },
+      { userId: "b", rank: 2 },
+      { userId: "c", rank: 3 },
+    ]);
+  });
+
+  it("drops bots and re-ranks the humans contiguously", () => {
+    // A backfilled royale: human placed 1st and 4th, bots took 2nd/3rd/5th/6th.
+    const ranks = humanRatingRanks([
+      { userId: "h1", isBot: false, placement: 1 },
+      { userId: "bot1", isBot: true, placement: 2 },
+      { userId: "bot2", isBot: true, placement: 3 },
+      { userId: "h2", isBot: false, placement: 4 },
+      { userId: "bot3", isBot: true, placement: 5 },
+    ]);
+    expect(ranks).toEqual([
+      { userId: "h1", rank: 1 },
+      { userId: "h2", rank: 2 },
+    ]);
+  });
+
+  it("preserves ties among humans (competition ranking)", () => {
+    const ranks = humanRatingRanks([
+      { userId: "h1", isBot: false, placement: 1 },
+      { userId: "h2", isBot: false, placement: 1 },
+      { userId: "bot", isBot: true, placement: 3 },
+      { userId: "h3", isBot: false, placement: 4 },
+    ]);
+    expect(ranks).toEqual([
+      { userId: "h1", rank: 1 },
+      { userId: "h2", rank: 1 },
+      { userId: "h3", rank: 3 },
+    ]);
+  });
+
+  it("returns a lone human (caller leaves them unrated)", () => {
+    const ranks = humanRatingRanks([
+      { userId: "solo", isBot: false, placement: 1 },
+      { userId: "bot1", isBot: true, placement: 2 },
+    ]);
+    expect(ranks).toEqual([{ userId: "solo", rank: 1 }]);
+  });
+
+  it("ignores players with no placement", () => {
+    const ranks = humanRatingRanks([
+      { userId: "a", isBot: false, placement: 1 },
+      { userId: "b", isBot: false, placement: null },
+    ]);
+    expect(ranks).toEqual([{ userId: "a", rank: 1 }]);
   });
 });

@@ -19,12 +19,37 @@ const MODE_META: Record<MatchMode, { title: string; tagline: string; blurb: stri
   },
 };
 
+/**
+ * While a queue is partially full, bots backfill the empty seats at a deadline
+ * so a match always starts. This ticks that down so the wait reads as
+ * intentional ("a match is coming") rather than broken ("nobody's here").
+ */
+function FillCountdown({ deadline }: { deadline: string | null }) {
+  const [remaining, setRemaining] = useState(0);
+  useEffect(() => {
+    if (!deadline) { setRemaining(0); return; }
+    const end = new Date(deadline).getTime();
+    const update = () => setRemaining(Math.max(0, end - Date.now()));
+    update();
+    const t = setInterval(update, 500);
+    return () => clearInterval(t);
+  }, [deadline]);
+  if (!deadline) return null;
+  const s = Math.ceil(remaining / 1000);
+  return (
+    <div style={{ color: "var(--v-tle)", fontSize: 11, marginBottom: 14, letterSpacing: "0.02em" }}>
+      {s > 0 ? `🤖 Bots fill the empty seats in ${s}s` : "Starting…"}
+    </div>
+  );
+}
+
 export function BattlePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [queuedMode, setQueuedMode] = useState<MatchMode | null>(null);
   const [counts, setCounts] = useState<Record<MatchMode, number>>({ ROYALE: 0, DUEL: 0 });
   const [capacities, setCapacities] = useState<Record<MatchMode, number>>({ ROYALE: 6, DUEL: 2 });
+  const [fillDeadlines, setFillDeadlines] = useState<Record<MatchMode, string | null>>({ ROYALE: null, DUEL: null });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState<MatchMode | "leave" | null>(null);
   const [practicing, setPracticing] = useState<MatchMode | null>(null);
@@ -33,7 +58,7 @@ export function BattlePage() {
   useEffect(() => {
     if (!user) return;
     api.matchQueueStatus()
-      .then((s) => { setQueuedMode(s.queuedMode); setCounts(s.counts); setCapacities(s.capacities); })
+      .then((s) => { setQueuedMode(s.queuedMode); setCounts(s.counts); setCapacities(s.capacities); setFillDeadlines(s.fillDeadlines); })
       .catch(() => {});
   }, [user]);
 
@@ -41,6 +66,7 @@ export function BattlePage() {
     if (ev.type === "queue_update") {
       setCounts((c) => ({ ...c, [ev.mode]: ev.count }));
       setCapacities((c) => ({ ...c, [ev.mode]: ev.capacity }));
+      setFillDeadlines((d) => ({ ...d, [ev.mode]: ev.fillDeadline ?? null }));
     } else if (ev.type === "match_found" && user && ev.playerIds.includes(user.id) && !navigated.current) {
       navigated.current = true;
       navigate(`/battle/${ev.matchId}`);
@@ -140,9 +166,11 @@ export function BattlePage() {
                   <div style={{ fontFamily: "var(--mono)", fontSize: 32, fontWeight: 700, color: "var(--v-ac)", marginBottom: 2 }}>
                     {counts[mode]}/{capacities[mode]}
                   </div>
-                  <div style={{ color: "var(--txt-3)", fontSize: 11, marginBottom: 18, letterSpacing: "0.05em" }}>
+                  <div style={{ color: "var(--txt-3)", fontSize: 11, marginBottom: isQueuedHere ? 6 : 18, letterSpacing: "0.05em" }}>
                     {isQueuedHere ? "WAITING FOR PLAYERS…" : "PLAYERS IN QUEUE"}
                   </div>
+
+                  {isQueuedHere && <FillCountdown deadline={fillDeadlines[mode]} />}
 
                   {isQueuedHere ? (
                     <button

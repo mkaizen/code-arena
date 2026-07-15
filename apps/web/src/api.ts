@@ -250,6 +250,7 @@ export const api = {
     queuedMode: MatchMode | null;
     counts: Record<MatchMode, number>;
     capacities: Record<MatchMode, number>;
+    fillDeadlines: Record<MatchMode, string | null>;
   }> => req("/matches/queue/status"),
 
   match: (id: string): Promise<MatchStateView> => req(`/matches/${id}`),

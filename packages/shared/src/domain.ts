@@ -24,7 +24,7 @@ export type ServerEvent =
   | { type: "run_result"; runId: string; result: import("./verdicts.js").RunResult }
   | { type: "leaderboard"; contestId: string; frozen: boolean; rows: LeaderboardRow[] }
   | { type: "contest"; contestId: string; state: "upcoming" | "live" | "ended" }
-  | { type: "queue_update"; mode: MatchMode; count: number; capacity: number }
+  | { type: "queue_update"; mode: MatchMode; count: number; capacity: number; fillDeadline?: string | null }
   | { type: "match_found"; matchId: string; playerIds: string[] }
   | { type: "match_state"; match: MatchStateView }
   | { type: "match_activity"; matchId: string; event: MatchActivity }
