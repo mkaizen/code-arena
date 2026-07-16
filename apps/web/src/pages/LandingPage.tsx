@@ -21,13 +21,14 @@ function TermCase({ delay, statusDelay, n, ms }: { delay: number; statusDelay: n
   );
 }
 
-const cases = [
+const cases: { tag: string; title: string; body: string; span?: boolean }[] = [
   { tag: "CASE 01 · CONTESTS", title: "ICPC-style live contests", body: "Timed rounds, a real freeze window before the end, and a scoreboard that updates the second a verdict lands." },
   { tag: "CASE 02 · DUEL", title: "1v1 duel, best of 3", body: "Ten minutes on the clock. First accepted solution takes the round — not the neatest code, the fastest correct one." },
   { tag: "CASE 03 · ROYALE", title: "Six-player elimination", body: "An ascending difficulty ladder. Miss the timer on a round and you're out — last coder standing wins the lobby." },
   { tag: "CASE 04 · RATING", title: "One Elo, every mode", body: "Contests and matches feed the same rating. Forfeits are detected and settled — nobody stalls a duel by walking away." },
   { tag: "CASE 05 · DEBUGGING", title: "Run before you submit", body: "Test against the sample cases with your own stdin, see your actual stdout and stderr — before it counts against you." },
   { tag: "CASE 06 · BANK", title: "67 problems and counting", body: "From FizzBuzz to 0/1 Knapsack — curated difficulty, not a random dump." },
+  { tag: "CASE 07 · NEW · QUADS", title: "Quad Royale — four-player elimination", body: "The Royale ladder, four across: quicker to fill, quicker to finish. Miss a round's timer and you're out — last one standing takes it. Rated, or warm up against bots, or just watch one live.", span: true },
 ];
 
 const chips: { label: string; diff: "easy" | "med" | "hard" }[] = [
@@ -101,8 +102,8 @@ export function LandingPage() {
             </h1>
             <p style={{ fontSize: 16, color: "var(--txt-2)", maxWidth: "44ch", marginBottom: 28, lineHeight: 1.7 }}>
               Code Arena is a judge that doesn't wait for a submission window to close.
-              Race a stranger head-to-head, survive a six-player elimination ladder,
-              or grind the bank solo — every accepted solution moves your rating.
+              Race a stranger head-to-head, outlast a four- or six-player elimination
+              ladder, or grind the bank solo — every accepted solution moves your rating.
             </p>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               <Link to="/problems/two-sum" style={btnPrimary}>Solve one now — no signup →</Link>
@@ -156,13 +157,13 @@ export function LandingPage() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, background: "var(--line)", border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
             {cases.map((c) => (
-              <div key={c.tag} style={{ background: "var(--panel)", padding: "24px 22px" }}>
+              <div key={c.tag} style={{ background: "var(--panel)", padding: "24px 22px", gridColumn: c.span ? "1 / -1" : undefined }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", color: "var(--txt-3)", marginBottom: 10 }}>
                   <span>{c.tag}</span>
                   <span style={{ color: "var(--v-ac)", fontWeight: 700 }}>PASS</span>
                 </div>
                 <h3 style={{ fontFamily: "var(--disp)", fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{c.title}</h3>
-                <p style={{ color: "var(--txt-2)", fontSize: 13.5, lineHeight: 1.6, margin: 0 }}>{c.body}</p>
+                <p style={{ color: "var(--txt-2)", fontSize: 13.5, lineHeight: 1.6, margin: 0, maxWidth: c.span ? "70ch" : undefined }}>{c.body}</p>
               </div>
             ))}
           </div>

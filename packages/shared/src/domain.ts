@@ -131,11 +131,19 @@ export interface LeaderboardRow {
 }
 
 /**
- * Real-time matches. ROYALE: 6 players race an ascending-difficulty ladder,
- * miss a round's timer and you're eliminated. DUEL: 1v1 best-of-3 — first
- * accepted submission takes the round, most round wins takes the match.
+ * Real-time matches. ROYALE (6) and QUADS (4) are elimination ladders — race an
+ * ascending-difficulty ladder, miss a round's timer and you're eliminated, last
+ * one standing wins. DUEL: 1v1 best-of-3 — first accepted submission takes the
+ * round, most round wins takes the match.
  */
-export type MatchMode = "ROYALE" | "DUEL";
+export type MatchMode = "ROYALE" | "QUADS" | "DUEL";
+
+/** Human-readable mode names for UI. */
+export const MODE_LABELS: Record<MatchMode, string> = {
+  ROYALE: "Battle Royale",
+  QUADS: "Quad Royale",
+  DUEL: "1v1 Duel",
+};
 export type MatchPlayerStatus = "ALIVE" | "ELIMINATED";
 
 export interface MatchPlayerView {

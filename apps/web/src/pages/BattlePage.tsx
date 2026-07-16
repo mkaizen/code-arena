@@ -12,6 +12,11 @@ const MODE_META: Record<MatchMode, { title: string; tagline: string; blurb: stri
     tagline: "6 players · elimination ladder · 5 min per round",
     blurb: "One ascending-difficulty problem ladder. Miss the timer on a round and you're eliminated — last one standing wins.",
   },
+  QUADS: {
+    title: "Quad Royale",
+    tagline: "4 players · elimination ladder · 5 min per round",
+    blurb: "The same elimination ladder, four across. Miss the timer on a round and you're out — last one standing takes it. Quicker to fill, quicker to finish.",
+  },
   DUEL: {
     title: "1v1 Duel",
     tagline: "2 players · best of 3 · 10 min per problem",
@@ -47,9 +52,9 @@ export function BattlePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [queuedMode, setQueuedMode] = useState<MatchMode | null>(null);
-  const [counts, setCounts] = useState<Record<MatchMode, number>>({ ROYALE: 0, DUEL: 0 });
-  const [capacities, setCapacities] = useState<Record<MatchMode, number>>({ ROYALE: 6, DUEL: 2 });
-  const [fillDeadlines, setFillDeadlines] = useState<Record<MatchMode, string | null>>({ ROYALE: null, DUEL: null });
+  const [counts, setCounts] = useState<Record<MatchMode, number>>({ ROYALE: 0, QUADS: 0, DUEL: 0 });
+  const [capacities, setCapacities] = useState<Record<MatchMode, number>>({ ROYALE: 6, QUADS: 4, DUEL: 2 });
+  const [fillDeadlines, setFillDeadlines] = useState<Record<MatchMode, string | null>>({ ROYALE: null, QUADS: null, DUEL: null });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState<MatchMode | "leave" | null>(null);
   const [practicing, setPracticing] = useState<MatchMode | null>(null);
@@ -147,7 +152,7 @@ export function BattlePage() {
           )}
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
-            {(["ROYALE", "DUEL"] as MatchMode[]).map((mode) => {
+            {(["ROYALE", "QUADS", "DUEL"] as MatchMode[]).map((mode) => {
               const meta = MODE_META[mode];
               const isQueuedHere = queuedMode === mode;
               const busy = loading === mode || loading === "leave";
@@ -222,7 +227,7 @@ export function BattlePage() {
               No queue, no waiting, and unrated. Warm up against bots that play like real students — bracketed to your rating, so it feels like a fair lobby.
             </p>
             <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-              {(["ROYALE", "DUEL"] as MatchMode[]).map((mode) => (
+              {(["ROYALE", "QUADS", "DUEL"] as MatchMode[]).map((mode) => (
                 <button
                   key={mode}
                   onClick={() => handlePractice(mode)}
@@ -261,7 +266,7 @@ export function BattlePage() {
                       }}
                     >
                       <span style={{ fontSize: 11, fontWeight: 700, color: "var(--v-ac)", fontFamily: "var(--disp)", flexShrink: 0, width: 54 }}>
-                        {m.mode === "DUEL" ? "Duel" : "Royale"}
+                        {m.mode === "DUEL" ? "Duel" : m.mode === "QUADS" ? "Quads" : "Royale"}
                       </span>
                       <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--txt-2)", fontFamily: "var(--mono)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {names || "—"}

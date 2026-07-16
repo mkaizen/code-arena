@@ -5,7 +5,7 @@ import { getMatchReplay } from "../match/replay.js";
 import { prisma } from "../db.js";
 import type { MatchHistoryEntry, MatchMode } from "@arena/shared";
 
-const queueBody = z.object({ mode: z.enum(["ROYALE", "DUEL"]).default("ROYALE") });
+const queueBody = z.object({ mode: z.enum(["ROYALE", "QUADS", "DUEL"]).default("ROYALE") });
 const reactBody = z.object({ emoji: z.string() });
 
 export async function matchRoutes(app: FastifyInstance) {

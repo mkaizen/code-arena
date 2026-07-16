@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import type { MatchReplay, ReplayRound } from "@arena/shared";
-import { tierOf } from "@arena/shared";
+import { tierOf, MODE_LABELS } from "@arena/shared";
 import { TopBar } from "../components/TopBar.js";
 import { api } from "../api.js";
 import { useAuth } from "../ctx/AuthContext.js";
@@ -118,7 +118,7 @@ export function MatchReplayPage() {
         {/* Header */}
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
           <h1 style={{ fontFamily: "var(--disp)", fontSize: 24, fontWeight: 700, color: "var(--txt)", margin: 0 }}>
-            {isDuel ? "1v1 Duel" : "Battle Royale"} <span style={{ color: "var(--txt-3)", fontWeight: 500, fontSize: 16 }}>· Game Review</span>
+            {MODE_LABELS[replay.mode]} <span style={{ color: "var(--txt-3)", fontWeight: 500, fontSize: 16 }}>· Game Review</span>
           </h1>
           <div style={{ display: "flex", gap: 8 }}>
             <Link to={`/share/${replay.id}`} style={{ fontFamily: "var(--disp)", fontSize: 12, fontWeight: 700, color: "#06210C", background: "var(--v-ac)", padding: "6px 12px", borderRadius: 6, textDecoration: "none" }}>

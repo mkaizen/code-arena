@@ -5,7 +5,7 @@ import { api, type Problem } from "../api.js";
 import { useWs } from "../hooks/useWs.js";
 import { useMediaQuery } from "../hooks/useMediaQuery.js";
 import { sanitizeStatement } from "../sanitize.js";
-import { verdictColor, verdictLabel, diffColor, RoundTimer, playerStatus } from "../matchUi.js";
+import { verdictColor, verdictLabel, diffColor, RoundTimer, playerStatus, modeBrand } from "../matchUi.js";
 
 /**
  * Read-only spectator view of a live match. Same rounds, standings, feed, and
@@ -75,7 +75,7 @@ export function SpectatePage() {
       <header style={{ height: 52, display: "flex", alignItems: "center", padding: "0 16px", borderBottom: "1px solid var(--line)", background: "var(--panel)", flexShrink: 0, gap: 16 }}>
         <Link to="/battle" style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 15, color: "var(--txt)", textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ color: "var(--txt-3)", fontWeight: 400, fontSize: 13 }}>←</span>
-          {isDuel ? <>1v1&nbsp;<span style={{ color: "var(--v-ac)" }}>Duel</span></> : <>Battle<span style={{ color: "var(--v-ac)" }}>Royale</span></>}
+          {modeBrand(match.mode)}
         </Link>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, color: "var(--v-wa)", border: "1px solid var(--v-wa)", borderRadius: 4, padding: "1px 7px", letterSpacing: "0.04em" }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--v-wa)", animation: finished ? undefined : "pulse 1.4s ease-in-out infinite" }} />

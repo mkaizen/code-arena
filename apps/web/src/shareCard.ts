@@ -1,4 +1,4 @@
-import type { MatchStateView } from "@arena/shared";
+import { MODE_LABELS, type MatchStateView } from "@arena/shared";
 
 const COLORS = {
   ink: "#0E1116",
@@ -28,7 +28,6 @@ export function renderShareCard(match: MatchStateView, viewerUserId: string | un
   ctx.lineWidth = 1;
   ctx.strokeRect(40, 40, W - 80, H - 80);
 
-  const isDuel = match.mode === "DUEL";
   const me = match.players.find((p) => p.userId === viewerUserId) ?? match.players[0];
   const isDraw = match.players.filter((p) => p.placement === 1).length > 1;
   const won = me?.placement === 1 && !isDraw;
@@ -43,7 +42,7 @@ export function renderShareCard(match: MatchStateView, viewerUserId: string | un
 
   ctx.font = "600 20px 'Space Grotesk', sans-serif";
   ctx.fillStyle = COLORS.txt2;
-  ctx.fillText(isDuel ? "1v1 Duel" : "Battle Royale", 64, 130);
+  ctx.fillText(MODE_LABELS[match.mode], 64, 130);
 
   // Result headline
   ctx.textAlign = "center";
