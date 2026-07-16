@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { joinQueue, leaveQueue, queueStatus, getMatchState, getLiveMatches, recordHeartbeat, recordMatchReaction, startPracticeMatch, MODE_CONFIG } from "../match/engine.js";
+import { joinQueue, leaveQueue, queueStatus, getMatchState, getLiveMatches, recordHeartbeat, recordMatchReaction, offerRematch, declineRematch, startPracticeMatch, MODE_CONFIG } from "../match/engine.js";
 import { getMatchReplay } from "../match/replay.js";
 import { prisma } from "../db.js";
 import type { MatchHistoryEntry, MatchMode } from "@arena/shared";
@@ -55,6 +55,19 @@ export async function matchRoutes(app: FastifyInstance) {
     const { emoji } = reactBody.parse(req.body ?? {});
     const sent = await recordMatchReaction(id, req.user.sub, emoji);
     return { sent };
+  });
+
+  // Offer/accept a rematch of a finished duel — starts a new match with the
+  // same two players once both opt in.
+  app.post("/matches/:id/rematch", { onRequest: [app.authenticate] }, async (req) => {
+    const { id } = req.params as { id: string };
+    return offerRematch(id, req.user.sub);
+  });
+
+  app.post("/matches/:id/rematch/decline", { onRequest: [app.authenticate] }, async (req) => {
+    const { id } = req.params as { id: string };
+    await declineRematch(id, req.user.sub);
+    return { ok: true };
   });
 
   // W/L record + recent finished matches for the profile page.

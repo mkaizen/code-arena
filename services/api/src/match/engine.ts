@@ -408,6 +408,94 @@ export async function startPracticeMatch(
   return { matchId: match.id };
 }
 
+/** Push the current rematch-offer state to both players of a finished duel. */
+function broadcastRematch(matchId: string, participantIds: string[], offeredBy: string[], declined: boolean): void {
+  sendToUsers(participantIds, { type: "rematch", matchId, offeredBy, declined });
+}
+
+/**
+ * Offer — or accept — a rematch of a finished duel. Once both human players
+ * have opted in, a fresh match with the exact same two players opens right
+ * away. Scoped to DUELs between two humans: the "I'll get you this time"
+ * rivalry loop, not a lobby-wide reset. Returns the new match id to the caller
+ * once it starts, or `{ waiting: true }` while the opponent hasn't accepted.
+ */
+export async function offerRematch(matchId: string, userId: string): Promise<{ matchId?: string; waiting: boolean }> {
+  return withLock("rematch:" + matchId, async () => {
+    const match = await prisma.match.findUnique({
+      where: { id: matchId },
+      include: { players: { include: { user: { select: { isBot: true } } } } },
+    });
+    if (!match || match.status !== "FINISHED" || match.mode !== "DUEL") return { waiting: false };
+    const humanIds = match.players.filter((p) => !p.user.isBot).map((p) => p.userId);
+    if (humanIds.length !== 2 || !humanIds.includes(userId)) return { waiting: false };
+
+    await prisma.matchPlayer.update({
+      where: { matchId_userId: { matchId, userId } },
+      data: { wantsRematch: true },
+    });
+
+    const fresh = await prisma.matchPlayer.findMany({
+      where: { matchId, userId: { in: humanIds } },
+      select: { userId: true, wantsRematch: true },
+    });
+    const wanters = fresh.filter((p) => p.wantsRematch).map((p) => p.userId);
+    if (wanters.length < humanIds.length) {
+      broadcastRematch(matchId, humanIds, wanters, false);
+      return { waiting: true };
+    }
+
+    // Both in — but neither can already be mid-match (e.g. someone hit Play
+    // Again first). If so, hold: the offer stands, nothing double-books.
+    const busy = await prisma.matchPlayer.findFirst({
+      where: { userId: { in: humanIds }, match: { status: "ACTIVE" } },
+      select: { matchId: true },
+    });
+    if (busy) return { waiting: true };
+
+    // Claim the rematch atomically so two near-simultaneous accepts (possibly
+    // on different nodes) can't open two matches — only the clear that flips
+    // the flags proceeds.
+    const cleared = await prisma.matchPlayer.updateMany({
+      where: { matchId, wantsRematch: true },
+      data: { wantsRematch: false },
+    });
+    if (cleared.count === 0) return { waiting: true };
+
+    const problems = await pickProblems("DUEL", humanIds);
+    if (problems.length < 2) throw new Error("not enough problems available to start a match");
+    const now = new Date();
+    const next = await prisma.match.create({
+      data: {
+        mode: "DUEL",
+        practice: match.practice,
+        roundDurationSec: MODE_CONFIG.DUEL.roundDurationSec,
+        players: { create: humanIds.map((id) => ({ userId: id, lastSeenAt: now })) },
+        problems: { create: problems.map((p, i) => ({ problemId: p.id, round: i })) },
+      },
+    });
+
+    sendToUsers(humanIds, { type: "match_found", matchId: next.id, playerIds: humanIds });
+    await withLock(next.id, () => _beginRound(next.id, 0));
+    return { matchId: next.id, waiting: false };
+  });
+}
+
+/** Withdraw/decline a rematch: clears both players' intent and tells them. */
+export async function declineRematch(matchId: string, userId: string): Promise<void> {
+  await withLock("rematch:" + matchId, async () => {
+    const match = await prisma.match.findUnique({
+      where: { id: matchId },
+      include: { players: { include: { user: { select: { isBot: true } } } } },
+    });
+    if (!match || match.mode !== "DUEL") return;
+    const humanIds = match.players.filter((p) => !p.user.isBot).map((p) => p.userId);
+    if (!humanIds.includes(userId)) return;
+    await prisma.matchPlayer.updateMany({ where: { matchId }, data: { wantsRematch: false } });
+    broadcastRematch(matchId, humanIds, [], true);
+  });
+}
+
 async function loadProblemForRound(matchId: string, round: number): Promise<MatchProblemView | null> {
   const mp = await prisma.matchProblem.findUnique({
     where: { matchId_round: { matchId, round } },

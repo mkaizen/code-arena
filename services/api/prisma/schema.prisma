@@ -298,6 +298,10 @@ model MatchPlayer {
   // Rating snapshot applied when the match finishes (matches are rated).
   ratingBefore    Int?
   ratingAfter     Int?
+  // DUEL rematch: set when this player has offered/accepted a rematch of the
+  // finished match. When both humans have, a fresh match with the same two
+  // players is opened. Cleared on start or decline.
+  wantsRematch    Boolean           @default(false)
 
   @@id([matchId, userId])
 }
