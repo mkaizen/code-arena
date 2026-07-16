@@ -269,6 +269,11 @@ export const api = {
   matchReact: (id: string, emoji: string): Promise<{ sent: boolean }> =>
     req(`/matches/${id}/react`, { method: "POST", body: JSON.stringify({ emoji }) }),
 
+  offerRematch: (id: string): Promise<{ matchId?: string; waiting: boolean }> =>
+    req(`/matches/${id}/rematch`, { method: "POST", body: "{}" }),
+  declineRematch: (id: string): Promise<{ ok: boolean }> =>
+    req(`/matches/${id}/rematch/decline`, { method: "POST", body: "{}" }),
+
   matchHistory: (): Promise<{ record: MatchRecord; matches: MatchHistoryEntry[] }> =>
     req("/matches/history"),
 

@@ -28,7 +28,8 @@ export type ServerEvent =
   | { type: "match_found"; matchId: string; playerIds: string[] }
   | { type: "match_state"; match: MatchStateView }
   | { type: "match_activity"; matchId: string; event: MatchActivity }
-  | { type: "match_reaction"; matchId: string; reaction: MatchReaction };
+  | { type: "match_reaction"; matchId: string; reaction: MatchReaction }
+  | { type: "rematch"; matchId: string; offeredBy: string[]; declined: boolean };
 
 /** One line of the live match feed: who just submitted, and how it went. */
 export interface MatchActivity {

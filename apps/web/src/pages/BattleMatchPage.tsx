@@ -106,11 +106,20 @@ export function BattleMatchPage() {
   const [floats, setFloats] = useState<{ id: number; emoji: string; handle: string }[]>([]);
   const floatId = useRef(0);
   const [reactCooldown, setReactCooldown] = useState(false);
-  const [rematchBusy, setRematchBusy] = useState(false);
-  const [rematchError, setRematchError] = useState("");
+  const [playAgainBusy, setPlayAgainBusy] = useState(false);
+  const [playAgainError, setPlayAgainError] = useState("");
+  // Rematch (same-opponent, duels only): which players have offered so far.
+  const [rematchOfferedBy, setRematchOfferedBy] = useState<string[]>([]);
+  const [rematchDeclined, setRematchDeclined] = useState(false);
+  const rematchNav = useRef(false);
 
   useEffect(() => {
     if (!id) return;
+    // Reset per-match rematch state — navigating into a rematch keeps this
+    // component mounted, only the :id changes.
+    rematchNav.current = false;
+    setRematchOfferedBy([]);
+    setRematchDeclined(false);
     api.match(id).then(setMatch).catch((e: Error) => setLoadError(e.message));
   }, [id]);
 
@@ -143,6 +152,13 @@ export function BattleMatchPage() {
       const { emoji, handle } = ev.reaction;
       setFloats((f) => [...f, { id: fid, emoji, handle }].slice(-14));
       setTimeout(() => setFloats((f) => f.filter((x) => x.id !== fid)), 2200);
+    } else if (ev.type === "rematch" && ev.matchId === id) {
+      setRematchOfferedBy(ev.offeredBy);
+      setRematchDeclined(ev.declined);
+    } else if (ev.type === "match_found" && ev.matchId !== id && user && ev.playerIds.includes(user.id) && !rematchNav.current) {
+      // The rematch we agreed to has started — jump into it.
+      rematchNav.current = true;
+      navigate(`/battle/${ev.matchId}`);
     } else if (ev.type === "verdict" && pendingSubmissions.current.has(ev.submissionId)) {
       pendingSubmissions.current.delete(ev.submissionId);
       setConsole((c) => [...c, { type: "verdict", verdict: ev.result.verdict, result: ev.result }]);
@@ -150,7 +166,7 @@ export function BattleMatchPage() {
       if (flashTimer.current) clearTimeout(flashTimer.current);
       flashTimer.current = setTimeout(() => setFlash(null), 1100);
     }
-  }, [id, run.onEvent]);
+  }, [id, run.onEvent, user, navigate]);
   useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current); }, []);
 
   useWs(handleWsEvent);
@@ -183,9 +199,9 @@ export function BattleMatchPage() {
   // for the same mode — landing you back in the same match if one fills at once,
   // otherwise in the battle lobby where match_found will pull you in.
   async function handlePlayAgain() {
-    if (!match || rematchBusy) return;
-    setRematchBusy(true);
-    setRematchError("");
+    if (!match || playAgainBusy) return;
+    setPlayAgainBusy(true);
+    setPlayAgainError("");
     try {
       if (match.practice) {
         const { matchId } = await api.startPracticeMatch(match.mode);
@@ -196,9 +212,25 @@ export function BattleMatchPage() {
         else navigate("/battle");
       }
     } catch (e) {
-      setRematchError((e as Error).message);
-      setRematchBusy(false);
+      setPlayAgainError((e as Error).message);
+      setPlayAgainBusy(false);
     }
+  }
+
+  // Offer/accept a rematch of a finished duel. Optimistically show ourselves as
+  // having offered; the server's `rematch` echo (and `match_found` once both
+  // agree) drives the rest.
+  function handleRematch() {
+    if (!id || !user) return;
+    setRematchDeclined(false);
+    setRematchOfferedBy((o) => (o.includes(user.id) ? o : [...o, user.id]));
+    api.offerRematch(id).catch(() => {});
+  }
+
+  function handleDeclineRematch() {
+    if (!id) return;
+    setRematchOfferedBy([]);
+    api.declineRematch(id).catch(() => {});
   }
 
   // Fire an emote. The server echoes it back over the WS (to everyone, us
@@ -273,6 +305,13 @@ export function BattleMatchPage() {
   // rest of it — can cheer while it's live.
   const canReact = match.status === "ACTIVE" && !!myPlayer;
 
+  // Rematch is the two-human duel rivalry loop. The opponent here must be a real
+  // player (a bot duel just offers Play Again).
+  const rematchEligible = finished && isDuel && !!myPlayer && !myPlayer.isBot
+    && match.players.filter((p) => !p.isBot).length === 2;
+  const iOfferedRematch = !!user && rematchOfferedBy.includes(user.id);
+  const oppOfferedRematch = !!opponent && rematchOfferedBy.includes(opponent.userId);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100dvh", background: "var(--ink)", overflow: "hidden" }}>
       {/* Header */}
@@ -321,18 +360,62 @@ export function BattleMatchPage() {
               <RatingReveal before={myPlayer.ratingBefore} after={myPlayer.ratingAfter} />
             )}
           </div>
+
+          {/* Rematch — same two players, the "I'll get you this time" loop. */}
+          {rematchEligible && opponent && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+              {oppOfferedRematch && !iOfferedRematch ? (
+                <>
+                  <span style={{ color: "var(--v-tle)" }}>🔥 {opponent.handle} wants a rematch!</span>
+                  <button
+                    onClick={handleRematch}
+                    style={{ fontFamily: "var(--disp)", fontSize: 12, fontWeight: 700, color: "#06210C", background: "var(--v-ac)", padding: "4px 14px", borderRadius: 6, border: "none", cursor: "pointer" }}
+                  >
+                    Accept rematch
+                  </button>
+                  <button
+                    onClick={handleDeclineRematch}
+                    style={{ fontFamily: "var(--disp)", fontSize: 12, fontWeight: 700, color: "var(--txt-2)", background: "transparent", padding: "3px 12px", borderRadius: 6, border: "1px solid var(--line)", cursor: "pointer" }}
+                  >
+                    Decline
+                  </button>
+                </>
+              ) : iOfferedRematch ? (
+                <>
+                  <span style={{ color: "var(--txt-2)" }}>Waiting for {opponent.handle} to accept…</span>
+                  <button
+                    onClick={handleDeclineRematch}
+                    style={{ fontFamily: "var(--disp)", fontSize: 12, fontWeight: 700, color: "var(--txt-2)", background: "transparent", padding: "3px 12px", borderRadius: 6, border: "1px solid var(--line)", cursor: "pointer" }}
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={handleRematch}
+                    style={{ fontFamily: "var(--disp)", fontSize: 12, fontWeight: 700, color: "#06210C", background: "var(--v-ac)", padding: "4px 14px", borderRadius: 6, border: "none", cursor: "pointer" }}
+                  >
+                    ↻ Rematch {opponent.handle}
+                  </button>
+                  {rematchDeclined && <span style={{ color: "var(--txt-3)", fontSize: 12 }}>Rematch declined.</span>}
+                </>
+              )}
+            </div>
+          )}
+
           <div style={{ display: "inline-flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
             {myPlayer && (
               <button
                 onClick={handlePlayAgain}
-                disabled={rematchBusy}
+                disabled={playAgainBusy}
                 style={{
                   fontFamily: "var(--disp)", fontSize: 12, fontWeight: 700, color: "#06210C",
                   background: "var(--v-ac)", padding: "4px 14px", borderRadius: 6, border: "none",
-                  cursor: rematchBusy ? "not-allowed" : "pointer", opacity: rematchBusy ? 0.7 : 1,
+                  cursor: playAgainBusy ? "not-allowed" : "pointer", opacity: playAgainBusy ? 0.7 : 1,
                 }}
               >
-                {rematchBusy ? "Starting…" : match.practice ? "↻ Play Again" : "↻ New Match"}
+                {playAgainBusy ? "Starting…" : match.practice ? "↻ Play Again" : "↻ New Match"}
               </button>
             )}
             {id && (
@@ -358,7 +441,7 @@ export function BattleMatchPage() {
               </Link>
             )}
           </div>
-          {rematchError && <span style={{ color: "var(--v-wa)", fontSize: 12, fontWeight: 500 }}>{rematchError}</span>}
+          {playAgainError && <span style={{ color: "var(--v-wa)", fontSize: 12, fontWeight: 500 }}>{playAgainError}</span>}
         </div>
       )}
       {!finished && eliminated && (
