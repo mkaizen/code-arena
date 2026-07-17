@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import Editor, { type OnMount } from "@monaco-editor/react";
-import { type Language } from "@arena/shared";
+import { tagLabel, type Language } from "@arena/shared";
 import { TopBar } from "../components/TopBar.js";
 import { api, type Problem, type Submission } from "../api.js";
 import type { ProblemLeaderboard } from "@arena/shared";
@@ -290,6 +290,24 @@ export function ProblemPage() {
                 Solved by {problem.solved}{problem.acceptance != null ? ` · ${problem.acceptance}% AC` : ""}
               </span>
             </div>
+
+            {/* Topic tags — link to the topic hubs (internal linking + SEO). */}
+            {problem.tags.length > 0 && (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+                {problem.tags.map((tag) => (
+                  <Link
+                    key={tag}
+                    to={`/problems/tag/${encodeURIComponent(tag)}`}
+                    style={{
+                      fontSize: 11, padding: "2px 9px", borderRadius: 100, textDecoration: "none",
+                      background: "var(--panel-2)", color: "var(--txt-3)", border: "1px solid var(--line)",
+                    }}
+                  >
+                    {tagLabel(tag)}
+                  </Link>
+                ))}
+              </div>
+            )}
 
             <div
               dangerouslySetInnerHTML={{ __html: sanitizeStatement(problem.statement) }}

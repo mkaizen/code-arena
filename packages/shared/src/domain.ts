@@ -145,6 +145,21 @@ export const MODE_LABELS: Record<MatchMode, string> = {
   QUADS: "Quad Royale",
   DUEL: "1v1 Duel",
 };
+
+/**
+ * Display name for a problem tag. Tags are stored as URL-safe slugs
+ * (e.g. "two-pointers"); most read fine title-cased, a few need a hand.
+ * (Mirrored in apps/web/prerender.mjs for the static topic-hub pages.)
+ */
+const TAG_LABEL_OVERRIDES: Record<string, string> = {
+  dp: "Dynamic Programming",
+};
+export function tagLabel(tag: string): string {
+  return (
+    TAG_LABEL_OVERRIDES[tag] ??
+    tag.split("-").map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(" ")
+  );
+}
 export type MatchPlayerStatus = "ALIVE" | "ELIMINATED";
 
 export interface MatchPlayerView {
