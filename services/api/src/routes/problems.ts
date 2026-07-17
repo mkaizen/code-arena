@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { Language, SpeedRow, BrevityRow } from "@arena/shared";
+import { relatedProblems } from "@arena/shared";
 import { prisma } from "../db.js";
 
 interface StatRow { problemId: string; total: bigint; accepted: bigint; solvers: bigint }
@@ -63,6 +64,18 @@ export async function problemRoutes(app: FastifyInstance) {
     if (!p) return reply.code(404).send({ error: "not found" });
     const stats = await oneProblemStats(p.id);
     return { ...p, ...stats }; // hidden tests are never serialized to clients (FR-4)
+  });
+
+  // Problems that share tags with this one — powers the "Related problems"
+  // section (internal linking + keeping solvers in the bank).
+  app.get("/problems/:slug/related", async (req, reply) => {
+    const { slug } = req.params as { slug: string };
+    const all = await prisma.problem.findMany({
+      select: { slug: true, title: true, difficulty: true, ratingValue: true, tags: true },
+    });
+    const target = all.find((p) => p.slug === slug);
+    if (!target) return reply.code(404).send({ error: "not found" });
+    return relatedProblems(target, all, 6);
   });
 
   // Per-problem speed (fastest runtime) & brevity (shortest source) boards.
