@@ -27,7 +27,7 @@ const cases: { tag: string; title: string; body: string; span?: boolean }[] = [
   { tag: "CASE 03 · ROYALE", title: "Six-player elimination", body: "An ascending difficulty ladder. Miss the timer on a round and you're out — last coder standing wins the lobby." },
   { tag: "CASE 04 · RATING", title: "One Elo, every mode", body: "Contests and matches feed the same rating. Forfeits are detected and settled — nobody stalls a duel by walking away." },
   { tag: "CASE 05 · DEBUGGING", title: "Run before you submit", body: "Test against the sample cases with your own stdin, see your actual stdout and stderr — before it counts against you." },
-  { tag: "CASE 06 · BANK", title: "67 problems and counting", body: "From FizzBuzz to 0/1 Knapsack — curated difficulty, not a random dump." },
+  { tag: "CASE 06 · BANK", title: "150+ problems and counting", body: "From FizzBuzz to largest-rectangle-in-histogram — curated difficulty, not a random dump." },
   { tag: "CASE 07 · NEW · QUADS", title: "Quad Royale — four-player elimination", body: "The Royale ladder, four across: quicker to fill, quicker to finish. Miss a round's timer and you're out — last one standing takes it. Rated, or warm up against bots, or just watch one live.", span: true },
 ];
 
