@@ -160,6 +160,47 @@ export function tagLabel(tag: string): string {
     tag.split("-").map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(" ")
   );
 }
+
+/** Minimal problem shape needed to rank relatedness. */
+export interface RelatedProblemInput {
+  slug: string;
+  title: string;
+  ratingValue: number;
+  tags: string[];
+}
+
+/**
+ * Rank the problems most related to `target` by shared-tag overlap (more shared
+ * tags = more related), breaking ties by closeness in rating and then title for
+ * determinism. Only problems that share at least one tag are returned, and the
+ * target itself is excluded. Generic so callers keep their own richer row type.
+ */
+export function relatedProblems<T extends RelatedProblemInput>(target: RelatedProblemInput, all: T[], limit = 6): T[] {
+  const tags = new Set(target.tags);
+  return all
+    .filter((p) => p.slug !== target.slug)
+    .map((p) => ({ p, shared: p.tags.reduce((n, t) => n + (tags.has(t) ? 1 : 0), 0) }))
+    .filter((x) => x.shared > 0)
+    .sort((a, b) =>
+      b.shared - a.shared ||
+      Math.abs(a.p.ratingValue - target.ratingValue) - Math.abs(b.p.ratingValue - target.ratingValue) ||
+      a.p.title.localeCompare(b.p.title),
+    )
+    .slice(0, limit)
+    .map((x) => x.p);
+}
+
+/**
+ * Pull a "Time … / Space …" complexity line out of an editorial (HTML or plain
+ * text), if present — the kind of glanceable fact worth surfacing on the page.
+ */
+export function extractComplexity(editorial: string): { time: string | null; space: string | null } | null {
+  const text = editorial.replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/gi, " ").replace(/\s+/g, " ");
+  const time = text.match(/Time:\s*(O\([^)]*\)[^.<]*)/i);
+  const space = text.match(/Space:\s*(O\([^)]*\)[^.<]*)/i);
+  if (!time && !space) return null;
+  return { time: time ? time[1].trim() : null, space: space ? space[1].trim() : null };
+}
 export type MatchPlayerStatus = "ALIVE" | "ELIMINATED";
 
 export interface MatchPlayerView {

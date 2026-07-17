@@ -13,6 +13,8 @@ import { fileURLToPath } from "node:url";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ReactMarkdown from "react-markdown";
+// Shared, single-sourced content logic (built before this script runs).
+import { tagLabel, relatedProblems } from "@arena/shared";
 
 const WEB_DIR = fileURLToPath(new URL(".", import.meta.url));
 const DIST = join(WEB_DIR, "dist");
@@ -29,9 +31,6 @@ const EDITORIALS = eval("(" + seed.match(/const EDITORIALS: Record<string, strin
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const stripHtml = (h) => h.replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/gi, " ").replace(/\s+/g, " ").trim();
 const diffLabel = (d) => (d === "easy" ? "Easy" : d === "med" ? "Medium" : "Hard");
-// Display name for a tag slug. Mirrors tagLabel() in @arena/shared/domain.ts.
-const TAG_LABEL_OVERRIDES = { dp: "Dynamic Programming" };
-const tagLabel = (t) => TAG_LABEL_OVERRIDES[t] ?? t.split("-").map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(" ");
 const tagLink = (t) => `<a href="/problems/tag/${esc(t)}">${esc(tagLabel(t))}</a>`;
 
 // One-line pitch reused across the JSON-LD, llms.txt, and page copy.
@@ -131,12 +130,18 @@ for (const p of PROBLEMS) {
   const title = `${p.title} — Code Arena`;
   const description = `Solve ${p.title} (${diffLabel(p.difficulty)}) on Code Arena — statement, examples, a live judge, and a solution editorial. ${stripHtml(p.statement).slice(0, 90)}`;
   const editorial = EDITORIALS[p.slug] || "";
+  const related = relatedProblems(p, PROBLEMS, 6);
   const snapshot =
     `<main style="max-width:760px;margin:0 auto;padding:24px">` +
     `<h1>${esc(p.title)}</h1>` +
     `<p>${diffLabel(p.difficulty)} · rating ${p.ratingValue}${p.tags?.length ? " · " + p.tags.map(tagLink).join(", ") : ""}</p>` +
     p.statement +
     (editorial ? `<section><h2>Editorial</h2>${editorial}</section>` : "") +
+    (related.length
+      ? `<section><h2>Related problems</h2><ul>` +
+        related.map((r) => `<li><a href="/problems/${esc(r.slug)}">${esc(r.title)}</a> — ${diffLabel(r.difficulty)}</li>`).join("") +
+        `</ul></section>`
+      : "") +
     `<p><a href="/problems/${esc(p.slug)}">Open ${esc(p.title)} in Code Arena →</a></p>` +
     `</main>`;
 

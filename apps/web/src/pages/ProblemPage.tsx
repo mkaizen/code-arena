@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import Editor, { type OnMount } from "@monaco-editor/react";
-import { tagLabel, type Language } from "@arena/shared";
+import { tagLabel, extractComplexity, type Language } from "@arena/shared";
 import { TopBar } from "../components/TopBar.js";
-import { api, type Problem, type Submission } from "../api.js";
+import { api, type Problem, type RelatedProblem, type Submission } from "../api.js";
 import type { ProblemLeaderboard } from "@arena/shared";
 import { useAuth } from "../ctx/AuthContext.js";
 import { useWs } from "../hooks/useWs.js";
@@ -98,6 +98,7 @@ export function ProblemPage() {
   // they try to submit, "solved" the moment their run passes every sample.
   const [signupNudge, setSignupNudge] = useState<null | "submit" | "solved">(null);
   const [board, setBoard] = useState<ProblemLeaderboard | null>(null);
+  const [related, setRelated] = useState<RelatedProblem[]>([]);
   const run = useRun(problem?.id, { poll: !user });
   const submitRef = useRef<() => void>(() => {});
   const runRef = useRef<() => void>(() => {});
@@ -119,6 +120,8 @@ export function ProblemPage() {
       .then((p) => { setProblem(p); setLoading(false); })
       .catch((e: Error) => { setError(e.message); setLoading(false); });
     api.problemLeaderboard(slug).then(setBoard).catch(() => {});
+    setRelated([]);
+    api.problemRelated(slug).then(setRelated).catch(() => {});
   }, [slug]);
 
   useEffect(() => {
@@ -375,12 +378,51 @@ export function ProblemPage() {
                 <summary style={{ cursor: "pointer", padding: "12px 0", fontFamily: "var(--disp)", fontSize: 14, fontWeight: 600, color: "var(--v-tle)", listStyle: "none" }}>
                   📖 Editorial — solution walkthrough (spoiler)
                 </summary>
+                {(() => {
+                  // Surface the target complexity at the top of the revealed
+                  // editorial — glanceable, and gated with the rest of the solution.
+                  const cx = extractComplexity(problem.editorial);
+                  return cx ? (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "4px 0 8px" }}>
+                      {cx.time && <span style={{ fontSize: 11, fontFamily: "var(--mono)", color: "var(--txt-2)", background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 6, padding: "3px 9px" }}>⏱ Time {cx.time}</span>}
+                      {cx.space && <span style={{ fontSize: 11, fontFamily: "var(--mono)", color: "var(--txt-2)", background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 6, padding: "3px 9px" }}>💾 Space {cx.space}</span>}
+                    </div>
+                  ) : null;
+                })()}
                 <div
                   className="editorial"
                   dangerouslySetInnerHTML={{ __html: sanitizeStatement(problem.editorial) }}
                   style={{ color: "var(--txt-2)", fontSize: 13, lineHeight: 1.8, padding: "4px 0 16px" }}
                 />
               </details>
+            )}
+
+            {/* Related problems — internal linking + keeps solvers in the bank. */}
+            {related.length > 0 && (
+              <div style={{ marginTop: 28 }}>
+                <h2 style={{ fontFamily: "var(--disp)", fontSize: 14, fontWeight: 700, color: "var(--txt-2)", marginBottom: 10 }}>
+                  Related problems
+                </h2>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {related.map((r) => (
+                    <Link
+                      key={r.slug}
+                      to={`/problems/${r.slug}`}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 8,
+                        background: "var(--panel)", border: "1px solid var(--line)", textDecoration: "none",
+                      }}
+                    >
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--txt)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {r.title}
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 600, flexShrink: 0, color: r.difficulty === "easy" ? "var(--v-ac)" : r.difficulty === "med" ? "var(--v-tle)" : "var(--v-wa)" }}>
+                        {r.difficulty === "easy" ? "Easy" : r.difficulty === "med" ? "Medium" : "Hard"}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
             )}
 
             {/* Submission history */}

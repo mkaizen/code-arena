@@ -81,6 +81,14 @@ export interface Problem extends ProblemSummary {
   samples: Sample[];
 }
 
+export interface RelatedProblem {
+  slug: string;
+  title: string;
+  difficulty: "easy" | "med" | "hard";
+  ratingValue: number;
+  tags: string[];
+}
+
 export interface AdminProblemRow {
   id: string;
   slug: string;
@@ -163,6 +171,8 @@ export const api = {
   },
 
   problem: (slug: string): Promise<Problem> => req(`/problems/${slug}`),
+
+  problemRelated: (slug: string): Promise<RelatedProblem[]> => req(`/problems/${slug}/related`),
 
   problemLeaderboard: (slug: string): Promise<ProblemLeaderboard> => req(`/problems/${slug}/leaderboard`),
 
