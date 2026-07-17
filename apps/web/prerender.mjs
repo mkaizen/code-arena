@@ -29,6 +29,10 @@ const EDITORIALS = eval("(" + seed.match(/const EDITORIALS: Record<string, strin
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const stripHtml = (h) => h.replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/gi, " ").replace(/\s+/g, " ").trim();
 const diffLabel = (d) => (d === "easy" ? "Easy" : d === "med" ? "Medium" : "Hard");
+// Display name for a tag slug. Mirrors tagLabel() in @arena/shared/domain.ts.
+const TAG_LABEL_OVERRIDES = { dp: "Dynamic Programming" };
+const tagLabel = (t) => TAG_LABEL_OVERRIDES[t] ?? t.split("-").map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(" ");
+const tagLink = (t) => `<a href="/problems/tag/${esc(t)}">${esc(tagLabel(t))}</a>`;
 
 // One-line pitch reused across the JSON-LD, llms.txt, and page copy.
 const INTRO =
@@ -130,7 +134,7 @@ for (const p of PROBLEMS) {
   const snapshot =
     `<main style="max-width:760px;margin:0 auto;padding:24px">` +
     `<h1>${esc(p.title)}</h1>` +
-    `<p>${diffLabel(p.difficulty)} · rating ${p.ratingValue}${p.tags?.length ? " · " + p.tags.map(esc).join(", ") : ""}</p>` +
+    `<p>${diffLabel(p.difficulty)} · rating ${p.ratingValue}${p.tags?.length ? " · " + p.tags.map(tagLink).join(", ") : ""}</p>` +
     p.statement +
     (editorial ? `<section><h2>Editorial</h2>${editorial}</section>` : "") +
     `<p><a href="/problems/${esc(p.slug)}">Open ${esc(p.title)} in Code Arena →</a></p>` +
@@ -180,11 +184,34 @@ for (const p of PROBLEMS) {
   write(`problems/${p.slug}`, render({ title, description, path: `/problems/${p.slug}`, snapshot, jsonLd }));
 }
 
+// ── Topic & difficulty groupings (hub pages + internal linking) ────────────
+const DIFFS = ["easy", "med", "hard"];
+const byTag = new Map(); // tag slug -> problems[]
+for (const p of PROBLEMS) for (const t of p.tags || []) {
+  if (!byTag.has(t)) byTag.set(t, []);
+  byTag.get(t).push(p);
+}
+// Most-populated first, then alphabetical — the order they appear in nav.
+const tagsSorted = [...byTag.keys()].sort((a, b) => byTag.get(b).length - byTag.get(a).length || a.localeCompare(b));
+const byDiff = new Map(DIFFS.map((d) => [d, PROBLEMS.filter((p) => p.difficulty === d)]));
+
+// A crawlable "browse by topic / difficulty" nav, linking every hub. Reused on
+// the problem index and each hub page so the whole set is one click apart.
+const browseNav =
+  `<nav aria-label="Browse problems">` +
+  `<h2>Problems by difficulty</h2><p>` +
+  DIFFS.filter((d) => byDiff.get(d).length).map((d) => `<a href="/problems/difficulty/${d}">${diffLabel(d)} (${byDiff.get(d).length})</a>`).join(" · ") +
+  `</p><h2>Problems by topic</h2><p>` +
+  tagsSorted.map((t) => `<a href="/problems/tag/${esc(t)}">${esc(tagLabel(t))} (${byTag.get(t).length})</a>`).join(" · ") +
+  `</p></nav>`;
+
 // ── Problem index (internal linking + crawl discovery) ─────────────────────
 const listSnapshot =
   `<main style="max-width:760px;margin:0 auto;padding:24px">` +
   `<h1>Practice Problems</h1>` +
-  `<p>Browse Code Arena's problem bank of classic interview questions and algorithm challenges.</p><ul>` +
+  `<p>Browse Code Arena's problem bank of classic interview questions and algorithm challenges.</p>` +
+  browseNav +
+  `<ul>` +
   PROBLEMS.map((p) => `<li><a href="/problems/${esc(p.slug)}">${esc(p.title)}</a> — ${diffLabel(p.difficulty)}</li>`).join("") +
   `</ul></main>`;
 write("problems", render({
@@ -217,6 +244,73 @@ write("problems", render({
     ]),
   ],
 }));
+
+// ── Topic & difficulty hub pages (programmatic SEO landing pages) ───────────
+// One crawlable page per tag and per difficulty, each listing its problems with
+// ItemList JSON-LD — capturing category queries ("dynamic programming practice
+// problems") the flat problem list never could.
+function hubPage({ slug, heading, title, description, list, crumbName }) {
+  const snapshot =
+    `<main style="max-width:760px;margin:0 auto;padding:24px">` +
+    `<h1>${esc(heading)}</h1>` +
+    `<p>${esc(description)}</p><ul>` +
+    list.map((p) => `<li><a href="/problems/${esc(p.slug)}">${esc(p.title)}</a> — ${diffLabel(p.difficulty)}${p.tags?.length ? " · " + p.tags.map(tagLink).join(", ") : ""}</li>`).join("") +
+    `</ul><p><a href="/problems">← All problems</a></p>` +
+    browseNav +
+    `</main>`;
+  write(slug, render({
+    title, description, path: `/${slug}`, snapshot,
+    jsonLd: [
+      {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        name: heading,
+        url: `${SITE}/${slug}`,
+        description,
+        isPartOf: { "@type": "WebSite", name: "Code Arena", url: SITE },
+        mainEntity: {
+          "@type": "ItemList",
+          numberOfItems: list.length,
+          itemListElement: list.map((p, i) => ({ "@type": "ListItem", position: i + 1, name: p.title, url: `${SITE}/problems/${p.slug}` })),
+        },
+      },
+      crumbs([
+        { name: "Home", url: `${SITE}/` },
+        { name: "Problems", url: `${SITE}/problems` },
+        { name: crumbName, url: `${SITE}/${slug}` },
+      ]),
+    ],
+  }));
+}
+
+let hubCount = 0;
+for (const d of DIFFS) {
+  const list = byDiff.get(d);
+  if (!list.length) continue;
+  const label = diffLabel(d);
+  hubPage({
+    slug: `problems/difficulty/${d}`,
+    heading: `${label} Coding Problems`,
+    title: `${label} Coding Problems — Code Arena`,
+    description: `Practice ${list.length} ${label.toLowerCase()} coding problems on Code Arena — each with a live judge, worked examples, and a solution editorial.`,
+    list,
+    crumbName: label,
+  });
+  hubCount++;
+}
+for (const t of tagsSorted) {
+  const list = byTag.get(t);
+  const label = tagLabel(t);
+  hubPage({
+    slug: `problems/tag/${t}`,
+    heading: `${label} Problems`,
+    title: `${label} Problems — Code Arena`,
+    description: `Practice ${list.length} ${label} coding problem${list.length === 1 ? "" : "s"} on Code Arena — from easy to hard, each with a live judge and a solution editorial.`,
+    list,
+    crumbName: label,
+  });
+  hubCount++;
+}
 
 // ── Blog: render each markdown post's body to HTML (identical to the client's
 //    react-markdown output) and bake it into the initial HTML for SEO. ────────
@@ -338,4 +432,4 @@ if (posts.length) {
 }
 writeFileSync(join(DIST, "llms-full.txt"), full);
 
-console.log(`prerendered ${PROBLEMS.length} problem pages + problem index + ${posts.length} blog post(s) + blog index; wrote llms.txt (${(llms.length / 1024).toFixed(1)}kb) + llms-full.txt (${(full.length / 1024).toFixed(1)}kb)`);
+console.log(`prerendered ${PROBLEMS.length} problem pages + problem index + ${hubCount} topic/difficulty hubs + ${posts.length} blog post(s) + blog index; wrote llms.txt (${(llms.length / 1024).toFixed(1)}kb) + llms-full.txt (${(full.length / 1024).toFixed(1)}kb)`);

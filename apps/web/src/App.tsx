@@ -60,6 +60,8 @@ export function App() {
             <Route path="/contests/:id" element={<ContestPage />} />
             <Route path="/daily" element={<DailyPage />} />
             <Route path="/problems" element={<ProblemsPage />} />
+            <Route path="/problems/tag/:tag" element={<ProblemsPage />} />
+            <Route path="/problems/difficulty/:level" element={<ProblemsPage />} />
             <Route path="/problems/:slug" element={<ProblemPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/u/:handle" element={<UserProfilePage />} />

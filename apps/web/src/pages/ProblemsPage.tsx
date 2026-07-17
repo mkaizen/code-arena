@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { tierOf } from "@arena/shared";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { tierOf, tagLabel } from "@arena/shared";
 import { TopBar } from "../components/TopBar.js";
 import { api, type ProblemSummary } from "../api.js";
 import { useAuth } from "../ctx/AuthContext.js";
@@ -15,6 +15,8 @@ const DIFF_LABELS: Record<Difficulty, string> = {
   hard: "Hard",
 };
 
+const DIFF_FULL: Record<"easy" | "med" | "hard", string> = { easy: "Easy", med: "Medium", hard: "Hard" };
+
 function diffColor(d: string): string {
   if (d === "easy") return "var(--v-ac)";
   if (d === "med") return "var(--v-tle)";
@@ -24,19 +26,32 @@ function diffColor(d: string): string {
 
 export function ProblemsPage() {
   const { user } = useAuth();
+  // These pages double as topic/difficulty hubs (/problems/tag/:tag,
+  // /problems/difficulty/:level) — indexable landing pages that preset the filter.
+  const { tag: tagParam, level: levelParam } = useParams<{ tag?: string; level?: string }>();
+  const hubLevel = levelParam === "easy" || levelParam === "med" || levelParam === "hard" ? levelParam : null;
   const [problems, setProblems] = useState<ProblemSummary[]>([]);
   const [solvedIds, setSolvedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [diff, setDiff] = useState<Difficulty>("all");
-  const [activeTag, setActiveTag] = useState<string>("");
+  const [diff, setDiff] = useState<Difficulty>(hubLevel ?? "all");
+  const [activeTag, setActiveTag] = useState<string>(tagParam ?? "");
   const navigate = useNavigate();
 
-  useSeo({
-    title: "Practice Problems",
-    description: "Browse Code Arena's problem bank — classic interview questions and algorithm challenges across easy, medium, and hard, each with a live judge and speed leaderboards.",
-    path: "/problems",
-  });
+  // Sync the filter to the URL when navigating between hubs (the component
+  // stays mounted, only the route params change).
+  useEffect(() => {
+    setActiveTag(tagParam ?? "");
+    setDiff(hubLevel ?? "all");
+  }, [tagParam, hubLevel]);
+
+  useSeo(
+    tagParam
+      ? { title: `${tagLabel(tagParam)} Problems`, description: `Practice ${tagLabel(tagParam)} coding problems on Code Arena — from easy to hard, each with a live judge, worked examples, and a solution editorial.`, path: `/problems/tag/${tagParam}` }
+      : hubLevel
+        ? { title: `${DIFF_FULL[hubLevel]} Coding Problems`, description: `Practice ${DIFF_FULL[hubLevel].toLowerCase()} coding problems on Code Arena — each with a live judge, worked examples, and a solution editorial.`, path: `/problems/difficulty/${hubLevel}` }
+        : { title: "Practice Problems", description: "Browse Code Arena's problem bank — classic interview questions and algorithm challenges across easy, medium, and hard, each with a live judge and speed leaderboards.", path: "/problems" },
+  );
 
   useEffect(() => {
     setLoading(true);
@@ -65,16 +80,22 @@ export function ProblemsPage() {
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "var(--ink)" }}>
       <TopBar />
       <main style={{ flex: 1, maxWidth: 900, width: "100%", margin: "0 auto", padding: "32px 20px" }}>
+        {(tagParam || hubLevel) && (
+          <Link to="/problems" style={{ fontSize: 12, color: "var(--txt-3)", textDecoration: "none", fontFamily: "var(--disp)", fontWeight: 600 }}>
+            ← All problems
+          </Link>
+        )}
         <h1
           style={{
             fontFamily: "var(--disp)",
             fontSize: 24,
             fontWeight: 700,
             color: "var(--txt)",
+            marginTop: tagParam || hubLevel ? 6 : 0,
             marginBottom: 20,
           }}
         >
-          Problems
+          {tagParam ? `${tagLabel(tagParam)} Problems` : hubLevel ? `${DIFF_FULL[hubLevel]} Coding Problems` : "Problems"}
         </h1>
 
         {/* Filter bar */}

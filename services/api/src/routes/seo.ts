@@ -16,13 +16,20 @@ export async function seoRoutes(app: FastifyInstance) {
   app.get("/sitemap.xml", async (_req, reply) => {
     const base = env.WEB_BASE_URL.replace(/\/$/, "");
     const problems = await prisma.problem.findMany({
-      select: { slug: true, createdAt: true },
+      select: { slug: true, createdAt: true, difficulty: true, tags: true },
       orderBy: { ratingValue: "asc" },
     });
+
+    // Topic & difficulty hub pages — one indexable landing page per tag and
+    // difficulty in the bank (kept in lockstep with the prerendered hubs).
+    const difficulties = [...new Set(problems.map((p) => p.difficulty))];
+    const tags = [...new Set(problems.flatMap((p) => p.tags))].sort();
 
     const staticUrls = [
       { loc: `${base}/`, priority: "1.0", changefreq: "daily" },
       { loc: `${base}/problems`, priority: "0.9", changefreq: "daily" },
+      ...difficulties.map((d) => ({ loc: `${base}/problems/difficulty/${d}`, priority: "0.7", changefreq: "weekly" })),
+      ...tags.map((t) => ({ loc: `${base}/problems/tag/${encodeURIComponent(t)}`, priority: "0.7", changefreq: "weekly" })),
       { loc: `${base}/daily`, priority: "0.8", changefreq: "daily" },
       { loc: `${base}/leaderboard`, priority: "0.6", changefreq: "daily" },
       { loc: `${base}/blog`, priority: "0.6", changefreq: "weekly" },
