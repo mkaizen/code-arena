@@ -88,6 +88,24 @@ export function MatchResultPage() {
               Watch the full replay →
             </Link>
           )}
+
+          {/* Guests played with a throwaway account — convert them before the
+              session evaporates. Tailored line for the AI-duel demo path. */}
+          {user?.guest && (
+            <div style={{ marginTop: 28, maxWidth: 480, textAlign: "center", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "20px 22px" }}>
+              <div style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 15, color: "var(--txt)", marginBottom: 6 }}>
+                {match.aiDuel ? "Want a rematch — and a rating?" : "Keep your progress"}
+              </div>
+              <p style={{ color: "var(--txt-3)", fontSize: 13, lineHeight: 1.6, marginBottom: 14 }}>
+                {match.aiDuel
+                  ? "You just played as a guest. Create a free account to save your record against the AI, climb the ladder, and duel real players."
+                  : "You're playing as a guest. Create a free account to save your rating and match history."}
+              </p>
+              <Link to="/login" style={{ display: "inline-block", background: "var(--v-ac)", color: "#06210C", fontWeight: 700, fontSize: 14, padding: "10px 22px", borderRadius: 8, textDecoration: "none", fontFamily: "var(--disp)" }}>
+                Create a free account →
+              </Link>
+            </div>
+          )}
         </>
       )}
     </div>

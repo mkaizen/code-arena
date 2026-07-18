@@ -400,4 +400,6 @@ export interface MatchStateView {
   players: MatchPlayerView[];
   /** A practice match against bots — unrated, and no waiting for a lobby. */
   practice: boolean;
+  /** A "Challenge the AI" duel: the opponent is an LLM writing real, judged code. */
+  aiDuel: boolean;
 }

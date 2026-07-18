@@ -22,6 +22,8 @@ export interface StoredUser {
   handle: string;
   rating: number;
   role?: "USER" | "SETTER" | "ADMIN";
+  /** True for a throwaway no-signup session (see api.guestSession). */
+  guest?: boolean;
 }
 
 export function storeUser(u: StoredUser) {
@@ -162,6 +164,10 @@ export const api = {
   refresh: (): Promise<StoredUser> =>
     req("/auth/refresh", { method: "POST", body: "{}" }),
 
+  // Throwaway session for a logged-out visitor to play a no-signup AI duel.
+  guestSession: (): Promise<StoredUser> =>
+    req("/auth/guest", { method: "POST", body: "{}" }),
+
   problems: (params?: { difficulty?: string; tag?: string }): Promise<ProblemSummary[]> => {
     const qs = new URLSearchParams();
     if (params?.difficulty) qs.set("difficulty", params.difficulty);
@@ -255,6 +261,13 @@ export const api = {
 
   startPracticeMatch: (mode: MatchMode): Promise<{ matchId: string }> =>
     req("/matches/practice", { method: "POST", body: JSON.stringify({ mode }) }),
+
+  // "Challenge the AI": is it configured, and start a duel against the LLM.
+  aiConfig: (): Promise<{ enabled: boolean; opponent: string | null }> =>
+    req("/matches/ai/config"),
+
+  startAiDuel: (difficulty: "easy" | "med" | "hard"): Promise<{ matchId: string }> =>
+    req("/matches/ai", { method: "POST", body: JSON.stringify({ difficulty }) }),
 
   matchQueueStatus: (): Promise<{
     queuedMode: MatchMode | null;

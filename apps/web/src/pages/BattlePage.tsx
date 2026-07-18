@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { TopBar } from "../components/TopBar.js";
+import { ChallengeAi } from "../components/ChallengeAi.js";
 import { api } from "../api.js";
 import { useAuth } from "../ctx/AuthContext.js";
 import { useWs } from "../hooks/useWs.js";
@@ -216,6 +217,11 @@ export function BattlePage() {
                 </div>
               );
             })}
+          </div>
+
+          {/* Challenge the AI — no queue, no signup, unrated */}
+          <div style={{ marginTop: 16 }}>
+            <ChallengeAi />
           </div>
 
           {/* Practice vs bots — no queue, unrated */}

@@ -84,12 +84,34 @@ export async function authRoutes(app: FastifyInstance) {
     return reply.send({ id: user.id, token: app.jwt.sign({ sub: user.id }), handle: user.handle, rating: user.rating, role: user.role });
   });
 
+  // Mint a throwaway guest account so a logged-out visitor can play a
+  // "Challenge the AI" duel with no signup. Capped per IP so it can't be used
+  // to mass-create accounts. Guests are unrated and excluded from leaderboards.
+  app.post("/auth/guest", { config: { rateLimit: { max: 20, timeWindow: "1 hour" } } }, async (_req, reply) => {
+    // Retry on the vanishingly rare handle/email collision.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const suffix = Math.random().toString(36).slice(2, 8);
+      try {
+        const user = await prisma.user.create({
+          data: { handle: `guest-${suffix}`, email: `guest+${suffix}@codearena.local`, guest: true },
+        });
+        return reply.send({
+          id: user.id, token: app.jwt.sign({ sub: user.id }),
+          handle: user.handle, rating: user.rating, role: user.role, guest: true,
+        });
+      } catch {
+        // handle/email uniqueness clash — try a fresh suffix.
+      }
+    }
+    return reply.code(503).send({ error: "could not create a guest session, please retry" });
+  });
+
   // Exchange a valid (unexpired) token for a fresh one. The web app calls
   // this on boot, so sessions slide forward while stale tokens age out.
   app.post("/auth/refresh", { onRequest: [app.authenticate] }, async (req, reply) => {
     const user = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!user) return reply.code(401).send({ error: "unauthorized" });
-    return reply.send({ id: user.id, token: app.jwt.sign({ sub: user.id }), handle: user.handle, rating: user.rating, role: user.role });
+    return reply.send({ id: user.id, token: app.jwt.sign({ sub: user.id }), handle: user.handle, rating: user.rating, role: user.role, guest: user.guest });
   });
 }
 

@@ -604,6 +604,7 @@ export async function getMatchState(matchId: string): Promise<MatchStateView | n
     problem,
     players,
     practice: match.practice,
+    aiDuel: match.aiDuel,
   };
 }
 

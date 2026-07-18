@@ -68,6 +68,10 @@ model User {
   // for every human. Distinguishes an LLM opponent that writes real, judged code
   // from a statistical practice bot.
   botModel      String?
+  // Throwaway account minted for a logged-out visitor so they can play a
+  // "Challenge the AI" duel with no signup. Excluded from leaderboards; can be
+  // upgraded to a real account later, or reaped.
+  guest         Boolean  @default(false)
   defaultLang   String   @default("cpp") // FR-3
   editorPrefs   Json?    // FR-3
   createdAt     DateTime @default(now())
