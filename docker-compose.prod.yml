@@ -106,6 +106,18 @@ services:
       # not sent. Set it (+ a verified EMAIL_FROM) to turn on notifications.
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-Code Arena <onboarding@resend.dev>}
+      # AI opponent ("Challenge the AI") is optional: leave AI_API_KEY and
+      # AI_OPPONENT_MODEL unset and the feature is disabled (its endpoints 404).
+      # Set both to turn it on. See .env.prod.example for the full list.
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_OPPONENT_MODEL: ${AI_OPPONENT_MODEL:-}
+      AI_OPPONENT_NAME: ${AI_OPPONENT_NAME:-Arena AI}
+      AI_API_URL: ${AI_API_URL:-https://api.anthropic.com/v1/messages}
+      AI_API_VERSION: ${AI_API_VERSION:-2023-06-01}
+      # Optional extra models (JSON array) + model-vs-model exhibition matches.
+      AI_MODELS: ${AI_MODELS:-}
+      AI_VS_AI_ENABLED: ${AI_VS_AI_ENABLED:-false}
+      AI_VS_AI_INTERVAL_SEC: ${AI_VS_AI_INTERVAL_SEC:-900}
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
