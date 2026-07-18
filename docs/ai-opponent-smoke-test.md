@@ -35,7 +35,7 @@ deploying with the feature configured. ~5 minutes.
 
 2. **Start a duel.** As a logged-in user, `POST /matches/ai { "difficulty": "med" }`
    → `{ matchId }`. Open the match; you should see one opponent whose handle is the
-   configured name, and a normal DUEL (best-of-3) board.
+   configured name, and a single-problem duel board (first to solve it wins).
 
 3. **Watch the AI actually play.** After the think-time pause (medium ≈ 20s), the
    opponent's submission appears in the live feed with a real verdict. Confirm in
