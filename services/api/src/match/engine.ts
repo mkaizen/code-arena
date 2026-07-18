@@ -607,6 +607,7 @@ export async function getMatchState(matchId: string): Promise<MatchStateView | n
     players,
     practice: match.practice,
     aiDuel: match.aiDuel,
+    aiDifficulty: match.aiDifficulty,
   };
 }
 

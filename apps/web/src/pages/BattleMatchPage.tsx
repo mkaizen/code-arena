@@ -217,6 +217,22 @@ export function BattleMatchPage() {
     }
   }
 
+  // Start a fresh AI duel at the same difficulty. (Plain "Play Again" would send
+  // an AI-duel player into a practice-vs-bots match, since AI duels are practice.)
+  async function handleChallengeAgain() {
+    if (!match || playAgainBusy) return;
+    setPlayAgainBusy(true);
+    setPlayAgainError("");
+    try {
+      const diff = match.aiDifficulty === "easy" || match.aiDifficulty === "hard" ? match.aiDifficulty : "med";
+      const { matchId } = await api.startAiDuel(diff);
+      navigate(`/battle/${matchId}`);
+    } catch (e) {
+      setPlayAgainError((e as Error).message);
+      setPlayAgainBusy(false);
+    }
+  }
+
   // Offer/accept a rematch of a finished duel. Optimistically show ourselves as
   // having offered; the server's `rematch` echo (and `match_found` once both
   // agree) drives the rest.
@@ -336,10 +352,24 @@ export function BattleMatchPage() {
             </span>
           )}
         </div>
-        {!finished && <RoundTimer endsAt={match.roundEndsAt} />}
+        {/* AI duels have no visible clock — it's a straight race, and the AI
+            usually solves fast, so a countdown just adds noise. (The backend
+            keeps a generous deadline as a safety net.) */}
+        {!finished && !match.aiDuel && <RoundTimer endsAt={match.roundEndsAt} />}
       </header>
 
-      {finished && (
+      {finished && match.aiDuel && (
+        <AiDuelResult
+          won={myPlayer?.placement === 1 && !isDraw}
+          draw={isDraw}
+          opponentName={opponent?.handle ?? "the AI"}
+          matchId={id}
+          onChallengeAgain={handleChallengeAgain}
+          busy={playAgainBusy}
+          error={playAgainError}
+        />
+      )}
+      {finished && !match.aiDuel && (
         <div style={{ padding: "10px 20px", background: "rgba(63,185,80,0.08)", borderBottom: "1px solid rgba(63,185,80,0.2)", color: "var(--v-ac)", fontSize: 13, fontWeight: 600, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, flexWrap: "wrap" }}>
             <span>
@@ -739,6 +769,52 @@ export function BattleMatchPage() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// The end-of-duel panel for a "Challenge the AI" match — violet-themed, with a
+// same-difficulty rematch, the replay (which reveals the AI's actual code), and
+// a share link.
+function AiDuelResult({ won, draw, opponentName, matchId, onChallengeAgain, busy, error }: {
+  won: boolean;
+  draw: boolean;
+  opponentName: string;
+  matchId?: string;
+  onChallengeAgain: () => void;
+  busy: boolean;
+  error: string;
+}) {
+  const AI = "#a371f7";
+  const headline = draw ? "🤝 Draw against the AI" : won ? "🏆 You beat the AI!" : "🤖 The AI won this one";
+  const headColor = draw ? "var(--txt)" : won ? "var(--v-ac)" : "var(--v-wa)";
+  const tint = draw ? "rgba(163,113,247,0.10)" : won ? "rgba(63,185,80,0.12)" : "rgba(255,92,92,0.10)";
+  const border = draw ? "rgba(163,113,247,0.35)" : won ? "rgba(63,185,80,0.3)" : "rgba(255,92,92,0.3)";
+  const linkBase = { fontFamily: "var(--disp)", fontSize: 13, fontWeight: 700, padding: "6px 16px", borderRadius: 8, textDecoration: "none" } as const;
+  return (
+    <div style={{ padding: "16px 20px", background: `radial-gradient(140% 220% at 0% 0%, rgba(163,113,247,0.16), transparent 60%), ${tint}`, borderBottom: `1px solid ${border}`, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+      <div style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 22, color: headColor }}>{headline}</div>
+      <div style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--txt-3)" }}>vs 🤖 {opponentName}</div>
+      <div style={{ display: "inline-flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 6 }}>
+        <button
+          onClick={onChallengeAgain}
+          disabled={busy}
+          style={{ fontFamily: "var(--disp)", fontSize: 13, fontWeight: 700, color: "#fff", background: AI, padding: "7px 18px", borderRadius: 8, border: "none", cursor: busy ? "not-allowed" : "pointer", opacity: busy ? 0.7 : 1 }}
+        >
+          {busy ? "Starting…" : "⚔ Challenge again"}
+        </button>
+        {matchId && (
+          <Link to={`/replay/${matchId}`} style={{ ...linkBase, color: AI, background: "transparent", border: `1px solid ${AI}` }}>
+            Watch replay →
+          </Link>
+        )}
+        {matchId && (
+          <Link to={`/share/${matchId}`} style={{ ...linkBase, color: "var(--txt-2)", background: "var(--panel-2)", border: "1px solid var(--line)" }}>
+            Share
+          </Link>
+        )}
+      </div>
+      {error && <span style={{ color: "var(--v-wa)", fontSize: 12 }}>{error}</span>}
     </div>
   );
 }
