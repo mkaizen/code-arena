@@ -250,6 +250,38 @@ write("problems", render({
   ],
 }));
 
+// ── Humans vs AI landing page (crawlable shell; live data hydrates client-side) ─
+const vsAiSnapshot =
+  `<main style="max-width:760px;margin:0 auto;padding:24px">` +
+  `<h1>Humans vs AI — Can You Out-Code the AI?</h1>` +
+  `<p>Code Arena lets you play a live 1v1 coding duel against an AI opponent. The AI reads the ` +
+  `same problem you do, writes real code, and it's judged on the same hidden tests on the same ` +
+  `clock — nothing is scripted. This page tracks the AI's win rate against human players and the ` +
+  `roster of people who have beaten it.</p>` +
+  `<p><a href="/battle">Challenge the AI</a> — no signup required.</p>` +
+  `</main>`;
+write("vs-ai", render({
+  title: "Humans vs AI — Can You Out-Code the AI? — Code Arena",
+  description:
+    "A live 1v1 coding leaderboard: humans vs an AI that writes real code judged on the same hidden tests. See the AI's win rate against human players and who's beaten it.",
+  path: "/vs-ai",
+  snapshot: vsAiSnapshot,
+  jsonLd: [
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      name: "Humans vs AI",
+      url: `${SITE}/vs-ai`,
+      description: "Live humans-vs-AI coding duel leaderboard on Code Arena.",
+      isPartOf: { "@type": "WebSite", name: "Code Arena", url: SITE },
+    },
+    crumbs([
+      { name: "Home", url: `${SITE}/` },
+      { name: "Humans vs AI", url: `${SITE}/vs-ai` },
+    ]),
+  ],
+}));
+
 // ── Topic & difficulty hub pages (programmatic SEO landing pages) ───────────
 // One crawlable page per tag and per difficulty, each listing its problems with
 // ItemList JSON-LD — capturing category queries ("dynamic programming practice

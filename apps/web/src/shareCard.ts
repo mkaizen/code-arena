@@ -31,6 +31,9 @@ export function renderShareCard(match: MatchStateView, viewerUserId: string | un
   const me = match.players.find((p) => p.userId === viewerUserId) ?? match.players[0];
   const isDraw = match.players.filter((p) => p.placement === 1).length > 1;
   const won = me?.placement === 1 && !isDraw;
+  // In a "Challenge the AI" duel the opponent is the bot player — frame the
+  // headline around the matchup so a shared card reads "I beat the AI".
+  const aiOpponent = match.aiDuel ? match.players.find((p) => p.isBot) : undefined;
 
   // Wordmark
   ctx.font = "700 32px 'Space Grotesk', sans-serif";
@@ -52,16 +55,20 @@ export function renderShareCard(match: MatchStateView, viewerUserId: string | un
     ctx.fillText("🤝 DRAW", W / 2, 300);
   } else if (won) {
     ctx.fillStyle = COLORS.ac;
-    ctx.fillText("🏆 VICTORY", W / 2, 300);
+    ctx.fillText(aiOpponent ? "🏆 I BEAT THE AI" : "🏆 VICTORY", W / 2, 300);
   } else {
     ctx.fillStyle = COLORS.wa;
-    ctx.fillText(me?.placement ? `#${me.placement} PLACE` : "DEFEAT", W / 2, 300);
+    ctx.fillText(aiOpponent ? "🤖 THE AI WON" : me?.placement ? `#${me.placement} PLACE` : "DEFEAT", W / 2, 300);
   }
 
-  // Handle + rating delta
+  // Handle (or the AI matchup) + rating delta
   ctx.font = "700 40px 'JetBrains Mono', monospace";
   ctx.fillStyle = COLORS.txt;
-  ctx.fillText(me?.handle ?? "", W / 2, 380);
+  ctx.fillText(
+    aiOpponent ? `${me?.handle ?? "you"} vs ${aiOpponent.handle}` : me?.handle ?? "",
+    W / 2,
+    380,
+  );
 
   if (me?.ratingBefore != null && me?.ratingAfter != null) {
     const delta = me.ratingAfter - me.ratingBefore;

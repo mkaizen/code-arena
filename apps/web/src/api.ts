@@ -22,6 +22,8 @@ export interface StoredUser {
   handle: string;
   rating: number;
   role?: "USER" | "SETTER" | "ADMIN";
+  /** True for a throwaway no-signup session (see api.guestSession). */
+  guest?: boolean;
 }
 
 export function storeUser(u: StoredUser) {
@@ -144,6 +146,31 @@ export interface GlobalLBRow {
   rating: number;
 }
 
+export interface AiModelRecord {
+  name: string;
+  played: number;
+  aiWins: number;
+  humanWins: number;
+  draws: number;
+}
+export interface AiChampion {
+  handle: string;
+  wins: number;
+  games: number;
+}
+export interface AiVsAiStanding {
+  name: string;
+  played: number;
+  wins: number;
+  losses: number;
+  draws: number;
+}
+export interface AiLeaderboard {
+  models: AiModelRecord[];
+  champions: AiChampion[];
+  aiVsAi: AiVsAiStanding[];
+}
+
 export interface LeaderboardData {
   frozen: boolean;
   rows: LeaderboardRow[];
@@ -161,6 +188,10 @@ export const api = {
 
   refresh: (): Promise<StoredUser> =>
     req("/auth/refresh", { method: "POST", body: "{}" }),
+
+  // Throwaway session for a logged-out visitor to play a no-signup AI duel.
+  guestSession: (): Promise<StoredUser> =>
+    req("/auth/guest", { method: "POST", body: "{}" }),
 
   problems: (params?: { difficulty?: string; tag?: string }): Promise<ProblemSummary[]> => {
     const qs = new URLSearchParams();
@@ -198,6 +229,8 @@ export const api = {
     req(`/contests/${contestId}/leaderboard`),
 
   globalLeaderboard: (): Promise<GlobalLBRow[]> => req("/leaderboard/global"),
+
+  aiLeaderboard: (): Promise<AiLeaderboard> => req("/leaderboard/ai"),
 
   // Admin routes
   adminCreateProblem: (body: {
@@ -255,6 +288,13 @@ export const api = {
 
   startPracticeMatch: (mode: MatchMode): Promise<{ matchId: string }> =>
     req("/matches/practice", { method: "POST", body: JSON.stringify({ mode }) }),
+
+  // "Challenge the AI": is it configured, and start a duel against the LLM.
+  aiConfig: (): Promise<{ enabled: boolean; opponent: string | null }> =>
+    req("/matches/ai/config"),
+
+  startAiDuel: (difficulty: "easy" | "med" | "hard"): Promise<{ matchId: string }> =>
+    req("/matches/ai", { method: "POST", body: JSON.stringify({ difficulty }) }),
 
   matchQueueStatus: (): Promise<{
     queuedMode: MatchMode | null;

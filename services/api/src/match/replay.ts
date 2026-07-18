@@ -3,6 +3,7 @@ import type {
   Difficulty,
   MatchMode,
   MatchReplay,
+  ReplayAiSolution,
   ReplayEvent,
   ReplayPlayer,
   ReplayRound,
@@ -34,6 +35,14 @@ export async function getMatchReplay(matchId: string): Promise<MatchReplay | nul
       select: { userId: true, problemId: true, verdict: true, createdAt: true },
     }),
   ]);
+
+  // AI opponents' actual code, so a replay can show how the AI solved each round.
+  // Restricted to bot players with a model — human source is never exposed here.
+  const aiSubs = await prisma.submission.findMany({
+    where: { matchId, user: { botModel: { not: null } } },
+    orderBy: { createdAt: "asc" },
+    select: { userId: true, problemId: true, language: true, source: true, verdict: true },
+  });
 
   const startMs = match.createdAt.getTime();
   const handleOf = new Map(match.players.map((p) => [p.userId, p.user.handle]));
@@ -96,6 +105,20 @@ export async function getMatchReplay(matchId: string): Promise<MatchReplay | nul
     };
   });
 
+  // One solution per (AI player, round): the accepted program if there was one,
+  // otherwise the AI's latest attempt that round.
+  const aiByKey = new Map<string, { userId: string; round: number; language: string; source: string; accepted: boolean }>();
+  for (const s of aiSubs) {
+    const key = `${s.userId}:${s.problemId}`;
+    const accepted = s.verdict === "ACCEPTED";
+    const cur = aiByKey.get(key);
+    if (cur?.accepted) continue; // already captured the accepted solution
+    aiByKey.set(key, { userId: s.userId, round: roundOfProblem.get(s.problemId) ?? 0, language: s.language, source: s.source, accepted });
+  }
+  const aiSolutions: ReplayAiSolution[] = [...aiByKey.values()]
+    .map((v) => ({ round: v.round, handle: handleOf.get(v.userId) ?? "AI", language: v.language, source: v.source, accepted: v.accepted }))
+    .sort((a, b) => a.round - b.round || a.handle.localeCompare(b.handle));
+
   const players: ReplayPlayer[] = match.players
     .map((p) => ({
       userId: p.userId,
@@ -125,5 +148,6 @@ export async function getMatchReplay(matchId: string): Promise<MatchReplay | nul
     players,
     rounds,
     timeline,
+    aiSolutions,
   };
 }

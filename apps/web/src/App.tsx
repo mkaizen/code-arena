@@ -23,6 +23,7 @@ const ProblemPage = lazyPage(() => import("./pages/ProblemPage.js"), "ProblemPag
 const ProfilePage = lazyPage(() => import("./pages/ProfilePage.js"), "ProfilePage");
 const UserProfilePage = lazyPage(() => import("./pages/UserProfilePage.js"), "UserProfilePage");
 const GlobalLBPage = lazyPage(() => import("./pages/GlobalLBPage.js"), "GlobalLBPage");
+const VsAiPage = lazyPage(() => import("./pages/VsAiPage.js"), "VsAiPage");
 const OAuthCallbackPage = lazyPage(() => import("./pages/OAuthCallbackPage.js"), "OAuthCallbackPage");
 const AdminPage = lazyPage(() => import("./pages/AdminPage.js"), "AdminPage");
 const AdminProblemNewPage = lazyPage(() => import("./pages/AdminProblemNewPage.js"), "AdminProblemNewPage");
@@ -66,6 +67,7 @@ export function App() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/u/:handle" element={<UserProfilePage />} />
             <Route path="/leaderboard" element={<GlobalLBPage />} />
+            <Route path="/vs-ai" element={<VsAiPage />} />
             <Route path="/battle" element={<BattlePage />} />
             <Route path="/battle/:id" element={<BattleMatchPage />} />
             <Route path="/watch/:id" element={<SpectatePage />} />

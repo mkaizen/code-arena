@@ -6,6 +6,8 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   register: (handle: string, email: string, password: string, ref?: string) => Promise<void>;
   loginWithOAuth: (provider: "github" | "google", code: string) => Promise<void>;
+  /** Mint (once) a throwaway guest session so a logged-out visitor can play. */
+  ensureGuest: () => Promise<StoredUser>;
   logout: () => void;
 }
 
@@ -41,13 +43,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(u);
   }, []);
 
+  const ensureGuest = useCallback(async (): Promise<StoredUser> => {
+    const existing = getMe();
+    if (existing) return existing;
+    const u = await api.guestSession();
+    storeUser(u);
+    setUser(u);
+    return u;
+  }, []);
+
   const logout = useCallback(() => {
     clearUser();
     setUser(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, register, loginWithOAuth, logout }}>
+    <AuthContext.Provider value={{ user, login, register, loginWithOAuth, ensureGuest, logout }}>
       {children}
     </AuthContext.Provider>
   );

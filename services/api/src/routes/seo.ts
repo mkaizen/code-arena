@@ -32,6 +32,7 @@ export async function seoRoutes(app: FastifyInstance) {
       ...tags.map((t) => ({ loc: `${base}/problems/tag/${encodeURIComponent(t)}`, priority: "0.7", changefreq: "weekly" })),
       { loc: `${base}/daily`, priority: "0.8", changefreq: "daily" },
       { loc: `${base}/leaderboard`, priority: "0.6", changefreq: "daily" },
+      { loc: `${base}/vs-ai`, priority: "0.7", changefreq: "daily" },
       { loc: `${base}/blog`, priority: "0.6", changefreq: "weekly" },
     ];
 

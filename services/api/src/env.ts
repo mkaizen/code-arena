@@ -26,6 +26,23 @@ const schema = z.object({
   // rather than sent, so the app runs fine with no provider configured.
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default("Code Arena <onboarding@resend.dev>"),
+  // AI opponent ("Challenge the AI") is opt-in the same way: without an API key
+  // the feature is disabled and its endpoints 404, so the app runs anywhere.
+  // The wire model id and display name are supplied at deploy — never hardcoded —
+  // so the same code can front any provider/model.
+  AI_API_KEY: z.string().optional(),
+  AI_API_URL: z.string().default("https://api.anthropic.com/v1/messages"),
+  AI_API_VERSION: z.string().default("2023-06-01"),
+  AI_OPPONENT_MODEL: z.string().optional(),
+  AI_OPPONENT_NAME: z.string().default("Arena AI"),
+  // Extra opponents for a multi-model roster and AI-vs-AI matches. JSON array of
+  // { name, model, apiKey, apiUrl?, apiVersion? }. The single AI_* vars above are
+  // always the first ("house") model; these are appended.
+  AI_MODELS: z.string().optional(),
+  // AI-vs-AI auto-matches that populate the model-vs-model board. Off by default
+  // (they spend real model budget); needs >=2 configured models to do anything.
+  AI_VS_AI_ENABLED: z.coerce.boolean().default(false),
+  AI_VS_AI_INTERVAL_SEC: z.coerce.number().default(900),
 });
 
 export const env = schema.parse(process.env);

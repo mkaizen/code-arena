@@ -1,6 +1,7 @@
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../ctx/AuthContext.js";
 import { useSeo } from "../hooks/useSeo.js";
+import { ChallengeAi } from "../components/ChallengeAi.js";
 
 function TermLine({ delay, dim, children }: { delay: number; dim?: boolean; children: React.ReactNode }) {
   return (
@@ -72,7 +73,9 @@ export function LandingPage() {
 
   useSeo({ path: "/" }); // default homepage title/description
 
-  if (user) return <Navigate to="/contests" replace />;
+  // A real account goes straight to the app; a throwaway guest stays here so the
+  // "Challenge the AI" flow can navigate it into its duel without being bounced.
+  if (user && !user.guest) return <Navigate to="/contests" replace />;
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--ink)", color: "var(--txt)" }}>
@@ -134,6 +137,12 @@ export function LandingPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Challenge the AI — the one-click, no-signup demo. Renders nothing
+            unless the opponent is configured on the server. */}
+        <div style={{ padding: "8px 0 40px" }}>
+          <ChallengeAi />
         </div>
 
         {/* Scoreboard */}

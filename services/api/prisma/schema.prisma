@@ -63,6 +63,15 @@ model User {
   // Seeded practice-match opponent (never a real person; excluded from
   // leaderboards, rating changes, and the forfeit sweep).
   isBot         Boolean  @default(false)
+  // For AI-opponent bots only: the wire model id this bot plays as (e.g. the
+  // configured AI_OPPONENT_MODEL). null for the 16 simulated practice bots and
+  // for every human. Distinguishes an LLM opponent that writes real, judged code
+  // from a statistical practice bot.
+  botModel      String?
+  // Throwaway account minted for a logged-out visitor so they can play a
+  // "Challenge the AI" duel with no signup. Excluded from leaderboards; can be
+  // upgraded to a real account later, or reaped.
+  guest         Boolean  @default(false)
   defaultLang   String   @default("cpp") // FR-3
   editorPrefs   Json?    // FR-3
   createdAt     DateTime @default(now())
@@ -262,6 +271,14 @@ model Match {
   roundDurationSec Int         @default(300)
   // Practice matches pit one human against seeded bots; they are unrated.
   practice         Boolean     @default(false)
+  // "Challenge the AI" duels: one human vs one LLM opponent. Unrated for the
+  // human ladder; tracked separately on the AI leaderboard. aiDifficulty is the
+  // opponent's effort setting (easy/med/hard) for the whole match.
+  aiDuel           Boolean     @default(false)
+  aiDifficulty     String?
+  // Model-vs-model exhibition: two LLM opponents, no human. Feeds the AI-vs-AI
+  // board, kept separate from the human-vs-AI record.
+  aiVsAi           Boolean     @default(false)
   createdAt        DateTime    @default(now())
   endedAt          DateTime?
 

@@ -18,7 +18,7 @@ import { seoRoutes } from "./routes/seo.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { wsRoutes, startWsBus } from "./ws.js";
 import { startVerdictSubscriber } from "./leaderboard/verdictSub.js";
-import { sweepOverdueMatches, sweepForfeits, sweepStaleQueues } from "./match/engine.js";
+import { sweepOverdueMatches, sweepForfeits, sweepStaleQueues, sweepAiVsAi } from "./match/engine.js";
 import { sweepContestReminders, sweepStreakNudges } from "./mail/notifications.js";
 
 declare module "fastify" {
@@ -82,6 +82,11 @@ async function main() {
     sweepContestReminders().catch((err) => app.log.error(err, "contest reminder sweep failed"));
     sweepStreakNudges().catch((err) => app.log.error(err, "streak nudge sweep failed"));
   }, 5 * 60_000);
+  // Model-vs-model exhibition matches, off unless AI_VS_AI_ENABLED. The sweep
+  // self-throttles to one live exhibition, so the fixed cadence just paces it.
+  setInterval(() => {
+    sweepAiVsAi().catch((err) => app.log.error(err, "ai-vs-ai sweep failed"));
+  }, Math.max(60, env.AI_VS_AI_INTERVAL_SEC) * 1000);
   await app.listen({ port: env.API_PORT, host: "0.0.0.0" });
 }
 

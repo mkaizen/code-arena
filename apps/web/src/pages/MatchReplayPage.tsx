@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import type { MatchReplay, ReplayRound } from "@arena/shared";
+import type { MatchReplay, ReplayAiSolution, ReplayRound } from "@arena/shared";
 import { tierOf, MODE_LABELS } from "@arena/shared";
 import { TopBar } from "../components/TopBar.js";
 import { api } from "../api.js";
@@ -34,7 +34,26 @@ function shortVerdict(v: string): string {
   return m[v] ?? v;
 }
 
-function RoundCard({ round, isDuel }: { round: ReplayRound; isDuel: boolean }) {
+function AiCode({ sol }: { sol: ReplayAiSolution }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        style={{ background: "transparent", border: "none", color: "#a78bfa", fontFamily: "var(--disp)", fontWeight: 700, fontSize: 12, cursor: "pointer", padding: 0 }}
+      >
+        {open ? "▾" : "▸"} How 🤖 {sol.handle} solved it ({sol.language}{sol.accepted ? "" : " · last attempt"})
+      </button>
+      {open && (
+        <pre style={{ marginTop: 8, background: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "12px 14px", overflowX: "auto", fontFamily: "var(--mono)", fontSize: 12, lineHeight: 1.55, color: "var(--txt-2)" }}>
+          <code>{sol.source}</code>
+        </pre>
+      )}
+    </div>
+  );
+}
+
+function RoundCard({ round, isDuel, aiSolutions }: { round: ReplayRound; isDuel: boolean; aiSolutions: ReplayAiSolution[] }) {
   return (
     <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "18px 20px", marginBottom: 14 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
@@ -73,6 +92,12 @@ function RoundCard({ round, isDuel }: { round: ReplayRound; isDuel: boolean }) {
               </span>
             </div>
           ))}
+        </div>
+      )}
+
+      {aiSolutions.length > 0 && (
+        <div style={{ marginTop: 12, borderTop: "1px solid var(--line-soft)", paddingTop: 10 }}>
+          {aiSolutions.map((sol, i) => <AiCode key={i} sol={sol} />)}
         </div>
       )}
     </div>
@@ -168,7 +193,9 @@ export function MatchReplayPage() {
 
         {/* Round-by-round */}
         <h2 style={{ fontFamily: "var(--disp)", fontSize: 16, fontWeight: 600, color: "var(--txt)", marginBottom: 12 }}>Round by round</h2>
-        {replay.rounds.map((r) => <RoundCard key={r.round} round={r} isDuel={isDuel} />)}
+        {replay.rounds.map((r) => (
+          <RoundCard key={r.round} round={r} isDuel={isDuel} aiSolutions={replay.aiSolutions.filter((s) => s.round === r.round)} />
+        ))}
 
         {/* Chronological feed */}
         {replay.timeline.length > 0 && (
