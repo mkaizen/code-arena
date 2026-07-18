@@ -158,9 +158,17 @@ export interface AiChampion {
   wins: number;
   games: number;
 }
+export interface AiVsAiStanding {
+  name: string;
+  played: number;
+  wins: number;
+  losses: number;
+  draws: number;
+}
 export interface AiLeaderboard {
   models: AiModelRecord[];
   champions: AiChampion[];
+  aiVsAi: AiVsAiStanding[];
 }
 
 export interface LeaderboardData {

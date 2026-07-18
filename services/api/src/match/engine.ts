@@ -6,7 +6,9 @@ import { pickLadder } from "./ladder.js";
 import { isRecruiter } from "../referrals.js";
 import { botRoundPlan, personaFor, pickOpponents, BOT_ROSTER, botEmail } from "./bots.js";
 import { EFFORT, isAiDifficulty, type AiDifficulty, type AiFeedback, type AiProblem } from "../ai/opponent.js";
-import { generateSolution, aiConfigured, aiOpponentName, aiOpponentModel } from "../ai/provider.js";
+import { generateSolution, houseModel, modelByKey, aiModels } from "../ai/provider.js";
+import type { AiModel } from "../ai/models.js";
+import { env } from "../env.js";
 import { judgeQueue } from "../queue.js";
 import { sanitizeReaction } from "@arena/shared";
 import type { MatchMode, MatchPlayerView, MatchProblemView, MatchStateView, MatchReactionEmoji, LiveMatchSummary } from "@arena/shared";
@@ -808,22 +810,22 @@ async function aiDifficultyFor(matchId: string): Promise<AiDifficulty> {
   return isAiDifficulty(m?.aiDifficulty) ? m!.aiDifficulty as AiDifficulty : "med";
 }
 
-/** Provision (once) the AI-opponent bot user for the configured model. */
-async function ensureAiOpponent(): Promise<string> {
-  const model = aiOpponentModel(); // guarded by aiConfigured() upstream
-  const existing = await prisma.user.findFirst({ where: { isBot: true, botModel: model }, select: { id: true } });
+/** Provision (once) the AI-opponent bot user for a given model. */
+async function ensureAiOpponent(model: AiModel): Promise<string> {
+  const existing = await prisma.user.findFirst({ where: { isBot: true, botModel: model.key }, select: { id: true } });
   if (existing) return existing.id;
-  const created = await prisma.user.create({
-    data: {
-      handle: aiOpponentName(),
-      email: `bot+ai+${model}@codearena.local`,
-      isBot: true,
-      botModel: model,
-      rating: 1600,
-    },
-    select: { id: true },
-  });
-  return created.id;
+  const base = { email: `bot+ai+${model.key}@codearena.local`, isBot: true, botModel: model.key, rating: 1600 };
+  try {
+    const created = await prisma.user.create({ data: { handle: model.name, ...base }, select: { id: true } });
+    return created.id;
+  } catch {
+    // Handle collision (two models sharing a display name) — disambiguate.
+    const created = await prisma.user.create({
+      data: { handle: `${model.name} ·${model.key.slice(-4)}`, ...base },
+      select: { id: true },
+    });
+    return created.id;
+  }
 }
 
 /** Load the full problem view (statement + samples) the model needs to solve. */
@@ -865,10 +867,13 @@ async function kickAiOpponent(
   feedback?: AiFeedback,
 ): Promise<void> {
   if (!(await stillAiTurn(matchId, round, botId))) return;
+  const bot = await prisma.user.findUnique({ where: { id: botId }, select: { botModel: true } });
+  const model = bot?.botModel ? modelByKey(bot.botModel) : undefined;
+  if (!model) return; // this opponent's model is no longer configured
   const problem = await loadAiProblem(matchId, round);
   if (!problem) return;
 
-  const solution = await generateSolution(problem, difficulty, feedback);
+  const solution = await generateSolution(model, problem, difficulty, feedback);
   if (!solution) return; // couldn't get a runnable answer this attempt — sit the turn out
   if (!(await stillAiTurn(matchId, round, botId))) return; // round moved on while thinking
 
@@ -933,7 +938,8 @@ export async function startAiMatch(
   userId: string,
   difficulty: AiDifficulty,
 ): Promise<{ matchId: string }> {
-  if (!aiConfigured()) throw new Error("AI opponent is not configured");
+  const model = houseModel();
+  if (!model) throw new Error("AI opponent is not configured");
 
   const live = await prisma.matchPlayer.findFirst({
     where: { userId, match: { status: "ACTIVE" } },
@@ -942,7 +948,7 @@ export async function startAiMatch(
   if (live) return { matchId: live.matchId };
 
   const cfg = MODE_CONFIG.DUEL;
-  const opponentId = await ensureAiOpponent();
+  const opponentId = await ensureAiOpponent(model);
   const problems = await pickProblems("DUEL", [userId]);
   if (problems.length < 2) throw new Error("not enough problems available to start a match");
 
@@ -966,6 +972,75 @@ export async function startAiMatch(
 
   await withLock(match.id, () => _beginRound(match.id, 0));
   return { matchId: match.id };
+}
+
+/**
+ * Start a model-vs-model exhibition duel: two AI opponents, no human, both at
+ * full effort. Feeds the AI-vs-AI board. Reuses the same engine as any duel —
+ * each bot writes real code that the judge grades, first accepted takes the round.
+ */
+export async function startAiVsAiMatch(a: AiModel, b: AiModel): Promise<{ matchId: string }> {
+  const [idA, idB] = await Promise.all([ensureAiOpponent(a), ensureAiOpponent(b)]);
+  const cfg = MODE_CONFIG.DUEL;
+  const problems = await pickProblems("DUEL");
+  if (problems.length < 2) throw new Error("not enough problems available to start a match");
+
+  const now = new Date();
+  const match = await prisma.match.create({
+    data: {
+      mode: "DUEL",
+      practice: true,
+      aiVsAi: true,
+      aiDifficulty: "hard", // both models at full effort — a fair comparison
+      roundDurationSec: cfg.roundDurationSec,
+      players: {
+        create: [
+          { userId: idA, lastSeenAt: now },
+          { userId: idB, lastSeenAt: now },
+        ],
+      },
+      problems: { create: problems.map((p, i) => ({ problemId: p.id, round: i })) },
+    },
+  });
+
+  await withLock(match.id, () => _beginRound(match.id, 0));
+  return { matchId: match.id };
+}
+
+/**
+ * Periodic driver for AI-vs-AI exhibition matches. Env-gated (off by default,
+ * since it spends model budget) and needs at least two configured models. Runs
+ * at most one exhibition at a time so cost stays bounded: it no-ops while one is
+ * still live, and otherwise pairs the two least-recently-played models.
+ */
+export async function sweepAiVsAi(): Promise<void> {
+  if (!env.AI_VS_AI_ENABLED) return;
+  const models = houseModel() ? aiModels() : [];
+  if (models.length < 2) return;
+
+  // At most one exhibition in flight.
+  const live = await prisma.match.count({ where: { aiVsAi: true, status: "ACTIVE" } });
+  if (live > 0) return;
+
+  // Pair the two models whose opponent bots have gone longest without a match
+  // (fresh models, never provisioned, sort first), for even coverage.
+  const bots = await prisma.user.findMany({
+    where: { isBot: true, botModel: { in: models.map((m) => m.key) } },
+    select: { id: true, botModel: true },
+  });
+  const lastPlayedByKey = new Map<string, number>();
+  for (const bot of bots) {
+    const last = await prisma.matchPlayer.findFirst({
+      where: { userId: bot.id, match: { aiVsAi: true } },
+      orderBy: { match: { createdAt: "desc" } },
+      select: { match: { select: { createdAt: true } } },
+    });
+    if (bot.botModel) lastPlayedByKey.set(bot.botModel, last?.match.createdAt.getTime() ?? 0);
+  }
+  const ranked = [...models].sort(
+    (m1, m2) => (lastPlayedByKey.get(m1.key) ?? 0) - (lastPlayedByKey.get(m2.key) ?? 0),
+  );
+  await startAiVsAiMatch(ranked[0], ranked[1]).catch((err) => console.error("ai-vs-ai start failed", err));
 }
 
 /**

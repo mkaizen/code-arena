@@ -4,11 +4,12 @@
  * touches the network.
  *
  * The default request shape is the Anthropic Messages API; any
- * Anthropic-compatible endpoint works by overriding AI_API_URL. The wire model
- * id is always supplied via config, never hardcoded.
+ * Anthropic-compatible endpoint works per-model via its `apiUrl`. Which model a
+ * call uses is passed in (see `models.ts`), never hardcoded.
  */
 
 import { env } from "../env.js";
+import { parseAiModels, type AiModel } from "./models.js";
 import {
   EFFORT,
   buildMessages,
@@ -19,45 +20,55 @@ import {
   type AiSolution,
 } from "./opponent.js";
 
-/** Whether the AI opponent is configured — the whole feature is gated on this. */
+/** The configured model roster (house model first). */
+export function aiModels(): AiModel[] {
+  return parseAiModels(env);
+}
+
+/** Whether any AI opponent is configured — the whole feature is gated on this. */
 export function aiConfigured(): boolean {
-  return Boolean(env.AI_API_KEY && env.AI_OPPONENT_MODEL);
+  return aiModels().length > 0;
 }
 
-/** The configured opponent's display name, shown in the match UI. */
+/** The default ("house") opponent used for human-vs-AI duels, or null. */
+export function houseModel(): AiModel | null {
+  return aiModels()[0] ?? null;
+}
+
+/** Look up a configured model by its key (wire model id / User.botModel). */
+export function modelByKey(key: string): AiModel | undefined {
+  return aiModels().find((m) => m.key === key);
+}
+
+/** The house opponent's display name, shown in the match UI. */
 export function aiOpponentName(): string {
-  return env.AI_OPPONENT_NAME;
-}
-
-/** The configured wire model id the opponent plays as. */
-export function aiOpponentModel(): string {
-  return env.AI_OPPONENT_MODEL as string;
+  return houseModel()?.name ?? "the AI";
 }
 
 /**
- * Ask the configured model for a solution. Returns null on any failure or
+ * Ask a specific model for a solution. Returns null on any failure or
  * unparseable response — the caller treats that as "the opponent didn't get an
  * answer out this attempt", never a crash.
  */
 export async function generateSolution(
+  model: AiModel,
   problem: AiProblem,
   difficulty: AiDifficulty,
   feedback?: AiFeedback,
 ): Promise<AiSolution | null> {
-  if (!aiConfigured()) return null;
   const effort = EFFORT[difficulty];
   const { system, user } = buildMessages(problem, feedback);
 
   try {
-    const res = await fetch(env.AI_API_URL, {
+    const res = await fetch(model.apiUrl, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-api-key": env.AI_API_KEY as string,
-        "anthropic-version": env.AI_API_VERSION,
+        "x-api-key": model.apiKey,
+        "anthropic-version": model.apiVersion,
       },
       body: JSON.stringify({
-        model: env.AI_OPPONENT_MODEL,
+        model: model.model,
         max_tokens: effort.maxTokens,
         temperature: effort.temperature,
         system,

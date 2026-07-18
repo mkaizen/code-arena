@@ -356,6 +356,16 @@ export interface ReplayEvent {
   accepted: boolean;
 }
 
+/** An AI opponent's actual submitted program for one round — shown in replays
+ * so viewers can see how the AI solved it. Only ever populated for AI players. */
+export interface ReplayAiSolution {
+  round: number;
+  handle: string;
+  language: string;
+  source: string;
+  accepted: boolean;
+}
+
 export interface MatchReplay {
   id: string;
   mode: MatchMode;
@@ -366,6 +376,8 @@ export interface MatchReplay {
   players: ReplayPlayer[];
   rounds: ReplayRound[];
   timeline: ReplayEvent[];
+  /** AI opponents' solutions, by round — empty for all-human matches. */
+  aiSolutions: ReplayAiSolution[];
 }
 
 export interface MatchProblemView {

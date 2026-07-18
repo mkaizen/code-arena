@@ -276,6 +276,9 @@ model Match {
   // opponent's effort setting (easy/med/hard) for the whole match.
   aiDuel           Boolean     @default(false)
   aiDifficulty     String?
+  // Model-vs-model exhibition: two LLM opponents, no human. Feeds the AI-vs-AI
+  // board, kept separate from the human-vs-AI record.
+  aiVsAi           Boolean     @default(false)
   createdAt        DateTime    @default(now())
   endedAt          DateTime?
 

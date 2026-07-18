@@ -29,16 +29,24 @@ export async function leaderboardRoutes(app: FastifyInstance) {
   // plus a hall of registered players who have beaten it. Aggregated from
   // finished "Challenge the AI" duels.
   app.get("/leaderboard/ai", async () => {
-    const matches = await prisma.match.findMany({
-      where: { aiDuel: true, status: "FINISHED" },
-      orderBy: { endedAt: "desc" },
-      take: 5000,
-      select: {
-        players: {
-          select: { placement: true, user: { select: { isBot: true, guest: true, handle: true } } },
+    const [matches, vsMatches] = await Promise.all([
+      prisma.match.findMany({
+        where: { aiDuel: true, status: "FINISHED" },
+        orderBy: { endedAt: "desc" },
+        take: 5000,
+        select: {
+          players: {
+            select: { placement: true, user: { select: { isBot: true, guest: true, handle: true } } },
+          },
         },
-      },
-    });
+      }),
+      prisma.match.findMany({
+        where: { aiVsAi: true, status: "FINISHED" },
+        orderBy: { endedAt: "desc" },
+        take: 5000,
+        select: { players: { select: { placement: true, user: { select: { handle: true } } } } },
+      }),
+    ]);
 
     const models = new Map<string, { name: string; played: number; aiWins: number; humanWins: number; draws: number }>();
     const champions = new Map<string, { handle: string; wins: number; games: number }>();
@@ -66,12 +74,30 @@ export async function leaderboardRoutes(app: FastifyInstance) {
       }
     }
 
+    // Model-vs-model standings from AI-vs-AI exhibition matches.
+    const standings = new Map<string, { name: string; played: number; wins: number; losses: number; draws: number }>();
+    for (const m of vsMatches) {
+      if (m.players.length < 2) continue;
+      const draw = m.players.filter((p) => p.placement === 1).length > 1;
+      for (const p of m.players) {
+        const s = standings.get(p.user.handle) ?? { name: p.user.handle, played: 0, wins: 0, losses: 0, draws: 0 };
+        s.played++;
+        if (draw) s.draws++;
+        else if (p.placement === 1) s.wins++;
+        else s.losses++;
+        standings.set(p.user.handle, s);
+      }
+    }
+
     return {
       models: [...models.values()].sort((a, b) => b.played - a.played),
       champions: [...champions.values()]
         .filter((c) => c.wins > 0)
         .sort((a, b) => b.wins - a.wins || a.games - b.games)
         .slice(0, 100),
+      aiVsAi: [...standings.values()].sort(
+        (a, b) => b.wins / (b.played || 1) - a.wins / (a.played || 1) || b.played - a.played,
+      ),
     };
   });
 }

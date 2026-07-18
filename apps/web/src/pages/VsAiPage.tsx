@@ -26,6 +26,7 @@ export function VsAiPage() {
 
   const models = data?.models ?? [];
   const champions = data?.champions ?? [];
+  const standings = data?.aiVsAi ?? [];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "var(--ink)" }}>
@@ -77,6 +78,32 @@ export function VsAiPage() {
             </div>
           )}
         </section>
+
+        {/* Model vs model — only shown once exhibitions have been played */}
+        {standings.length > 0 && (
+          <section style={{ marginBottom: 32 }}>
+            <h2 style={{ fontFamily: "var(--disp)", fontSize: 16, fontWeight: 700, color: "var(--txt)", marginBottom: 4 }}>
+              Model vs model
+            </h2>
+            <p style={{ color: "var(--txt-3)", fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>
+              Head-to-head exhibition duels between models — same problems, same judge, both at full effort.
+            </p>
+            <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
+              {standings.map((s, i) => (
+                <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", borderTop: i === 0 ? "none" : "1px solid var(--line)" }}>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--txt-3)", width: 28 }}>#{i + 1}</span>
+                  <span style={{ flex: 1, fontFamily: "var(--disp)", fontWeight: 700, fontSize: 13, color: "var(--txt)" }}>🤖 {s.name}</span>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--txt-2)" }}>
+                    {s.wins}W–{s.losses}L{s.draws ? `–${s.draws}D` : ""}
+                  </span>
+                  <span style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 13, color: "var(--v-ac)", width: 52, textAlign: "right" }}>
+                    {pct(s.wins, s.played)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Hall of humans who beat the AI */}
         <section>
