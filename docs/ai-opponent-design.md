@@ -149,9 +149,13 @@ hard it tries, never what it can see.
 
 ## 6. Guardrails
 
-- **Per-IP daily caps** on anonymous AI duels (Redis counter, same infra as the
-  existing per-IP submission rate limit). A generous but finite budget keeps the
-  "try it now" moment open without turning the API key into a faucet.
+- **Per-IP hourly cap: 10 AI submissions/hour** (Redis sliding-window counter,
+  same infra as the existing per-IP submission rate limit). The metered event is a
+  human submission in an AI duel — i.e. each time the human hands the AI a turn to
+  respond to — which is what drives model spend. The AI's own iteration retries
+  (§5) are bounded separately by the effort budget, so a single duel has a known
+  worst-case cost regardless of the cap. Ten/hour keeps the "try it now" moment
+  open without turning the API key into a faucet.
 - **Bounded model spend per match:** the effort budget caps tokens and retries,
   so a single duel has a known worst-case cost.
 - **Latency:** model call + compile can take seconds; it all runs async off the
@@ -168,9 +172,12 @@ hard it tries, never what it can see.
 ## 7. Launch assets (what actually earns the spike)
 
 1. **Instant, no-login AI duel** via shareable link — the frictionless demo.
-2. **Per-model Elo leaderboard page**, prerendered into the existing SEO
-   pipeline (`apps/web/prerender.mjs`) — evergreen traffic
-   ("Claude vs GPT coding leaderboard").
+2. **Two Elo leaderboard pages**, prerendered into the existing SEO pipeline
+   (`apps/web/prerender.mjs`) — evergreen traffic:
+   - *Humans vs AI* — how models fare against real players.
+   - *AI vs AI* (M3) — models head-to-head ("Claude vs GPT coding leaderboard").
+   These are kept **separate** so a model's human-facing record isn't muddied by
+   bot-on-bot results.
 3. **Shareable result card / OG image**, reusing the existing `og-image`
    pipeline.
 4. **A transparency blog post** (reuse the blog system) publishing the exact
@@ -195,19 +202,19 @@ hard it tries, never what it can see.
 
 ## 9. Decisions (locked)
 
-- **Anonymous demo, per-IP daily caps.** No login for the first duel; Redis
-  per-IP budget controls cost/abuse.
+- **Anonymous demo, per-IP cap of 10 AI submissions/hour.** No login for the
+  first duel; a Redis sliding-window budget controls cost/abuse (§6).
 - **v1 model: Claude Opus 4.8**, with the adapter built model-agnostic so a
   Gemini or OpenAI key lights up a multi-model leaderboard.
-- **Fairness = effort dial.** Difficulty is the model's effort/retry/think
-  budget, not an artificial delay.
+- **Fairness = effort dial**, default **medium**. Difficulty is the model's
+  effort/retry/think budget, not an artificial delay. The anonymous demo runs the
+  medium "arena" setting; harder/easier are selectable.
+- **Separate leaderboards.** Human-vs-AI and AI-vs-AI (M3) get distinct boards so
+  bot-on-bot results never dilute a model's human-facing record.
 
 ## 10. Open questions
 
-- Exact per-IP daily cap number (starting proposal: a handful of duels/day per
-  IP, tunable via env).
-- Default difficulty for the anonymous demo — beatable enough to feel good, or
-  honest full-effort? (Leaning: a middle "arena" default, with the full-effort
-  setting available.)
-- Whether AI-vs-AI (M3) results and human-vs-AI results share one leaderboard or
-  live on separate boards.
+- The exact effort profiles behind easy/medium/hard (token/retry/think budgets)
+  will be tuned empirically once M1 is playable.
+- Cap number (10/hour) is a starting point, tunable via env after we see real
+  usage.
