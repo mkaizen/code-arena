@@ -17,6 +17,14 @@ export interface BlogPost {
 
 export const BLOG_POSTS: BlogPost[] = [
   {
+    slug: "putting-an-ai-in-the-arena",
+    title: "Putting an AI in the Arena — and Making It Play Fair",
+    date: "2026-07-18",
+    author: "Matthew",
+    description:
+      "Code Arena now lets you duel an AI that writes real code, judged on the same hidden tests you get, on the same clock. Here's exactly how it works — the prompt, the sandbox, the effort dial — and why 'can you beat the AI?' is an honest question and not a party trick.",
+  },
+  {
     slug: "playing-to-an-empty-arena",
     title: "Playing to an Empty Arena",
     date: "2026-07-15",

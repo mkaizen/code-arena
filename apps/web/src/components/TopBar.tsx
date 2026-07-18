@@ -22,6 +22,7 @@ export function TopBar() {
     { to: "/contests", label: "Contests" },
     { to: "/problems", label: "Problems" },
     { to: "/battle", label: "Battle Royale" },
+    { to: "/vs-ai", label: "vs AI" },
     { to: "/leaderboard", label: "Leaderboard" },
     { to: "/blog", label: "Blog" },
     ...(user?.role === "ADMIN" || user?.role === "SETTER" ? [{ to: "/admin", label: "Admin" }] : []),

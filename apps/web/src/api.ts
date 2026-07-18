@@ -146,6 +146,23 @@ export interface GlobalLBRow {
   rating: number;
 }
 
+export interface AiModelRecord {
+  name: string;
+  played: number;
+  aiWins: number;
+  humanWins: number;
+  draws: number;
+}
+export interface AiChampion {
+  handle: string;
+  wins: number;
+  games: number;
+}
+export interface AiLeaderboard {
+  models: AiModelRecord[];
+  champions: AiChampion[];
+}
+
 export interface LeaderboardData {
   frozen: boolean;
   rows: LeaderboardRow[];
@@ -204,6 +221,8 @@ export const api = {
     req(`/contests/${contestId}/leaderboard`),
 
   globalLeaderboard: (): Promise<GlobalLBRow[]> => req("/leaderboard/global"),
+
+  aiLeaderboard: (): Promise<AiLeaderboard> => req("/leaderboard/ai"),
 
   // Admin routes
   adminCreateProblem: (body: {

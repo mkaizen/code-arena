@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api.js";
 import { useAuth } from "../ctx/AuthContext.js";
 
@@ -109,6 +109,14 @@ export function ChallengeAi({ compact = false }: { compact?: boolean }) {
       >
         {starting ? "Starting…" : `Challenge ${name} →`}
       </button>
+
+      {!compact && (
+        <div style={{ marginTop: 14 }}>
+          <Link to="/vs-ai" style={{ color: "var(--txt-3)", fontSize: 12, textDecoration: "none", fontFamily: "var(--disp)", fontWeight: 600 }}>
+            See who's beaten it →
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
