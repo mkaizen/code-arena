@@ -5,6 +5,9 @@ import { winsToClinch, placementsByElimination, placementsByScore, humanRatingRa
 import { pickLadder } from "./ladder.js";
 import { isRecruiter } from "../referrals.js";
 import { botRoundPlan, personaFor, pickOpponents, BOT_ROSTER, botEmail } from "./bots.js";
+import { EFFORT, isAiDifficulty, type AiDifficulty, type AiFeedback, type AiProblem } from "../ai/opponent.js";
+import { generateSolution, aiConfigured, aiOpponentName, aiOpponentModel } from "../ai/provider.js";
+import { judgeQueue } from "../queue.js";
 import { sanitizeReaction } from "@arena/shared";
 import type { MatchMode, MatchPlayerView, MatchProblemView, MatchStateView, MatchReactionEmoji, LiveMatchSummary } from "@arena/shared";
 
@@ -220,7 +223,7 @@ async function _startBackfill(mode: MatchMode): Promise<void> {
     await ensureBotsProvisioned();
     const humans = await prisma.user.findMany({ where: { id: { in: humanIds } }, select: { rating: true } });
     const avg = Math.round(humans.reduce((s, h) => s + h.rating, 0) / Math.max(1, humans.length));
-    const allBots = await prisma.user.findMany({ where: { isBot: true }, select: { id: true, rating: true } });
+    const allBots = await prisma.user.findMany({ where: { isBot: true, botModel: null }, select: { id: true, rating: true } });
     botIds = pickOpponents(avg, allBots, need).map((b) => b.id);
   }
 
@@ -352,7 +355,7 @@ export async function queueStatus(userId: string): Promise<{
  * database. Idempotent and race-safe: skipDuplicates keys off the unique email.
  */
 async function ensureBotsProvisioned(): Promise<void> {
-  const have = await prisma.user.count({ where: { isBot: true } });
+  const have = await prisma.user.count({ where: { isBot: true, botModel: null } });
   if (have >= BOT_ROSTER.length) return;
   await prisma.user.createMany({
     data: BOT_ROSTER.map((b) => ({ handle: b.handle, email: botEmail(b.handle), isBot: true, rating: b.rating })),
@@ -381,7 +384,7 @@ export async function startPracticeMatch(
   if (!me) throw new Error("user not found");
 
   await ensureBotsProvisioned();
-  const allBots = await prisma.user.findMany({ where: { isBot: true }, select: { id: true, rating: true } });
+  const allBots = await prisma.user.findMany({ where: { isBot: true, botModel: null }, select: { id: true, rating: true } });
   if (allBots.length === 0) throw new Error("no practice bots are available");
   const opponents = pickOpponents(me.rating, allBots, cfg.capacity - 1);
 
@@ -720,7 +723,7 @@ async function scheduleBotsForRound(matchId: string, round: number, roundDuratio
   if (!problem) return;
   const bots = await prisma.matchPlayer.findMany({
     where: { matchId, status: "ALIVE", user: { isBot: true } },
-    include: { user: { select: { id: true, handle: true, rating: true } } },
+    include: { user: { select: { id: true, handle: true, rating: true, botModel: true } } },
   });
 
   const scheduled: ReturnType<typeof setTimeout>[] = [];
@@ -733,6 +736,14 @@ async function scheduleBotsForRound(matchId: string, round: number, roundDuratio
   };
 
   for (const bot of bots) {
+    // AI opponents don't fake a verdict — they write real code that the judge
+    // grades. After an effort-appropriate "thinking" pause, kick the first
+    // attempt; wrong verdicts drive retries via onAiSubmissionJudged.
+    if (bot.user.botModel) {
+      const difficulty = await aiDifficultyFor(matchId);
+      arm(EFFORT[difficulty].thinkMsFloor, () => kickAiOpponent(matchId, round, bot.user.id, difficulty));
+      continue;
+    }
     const persona = personaFor(bot.user.id);
     const plan = botRoundPlan(bot.user.rating, problem.ratingValue, roundDurationSec, persona);
     for (const wrongAt of plan.wrongAtMs) {
@@ -786,6 +797,174 @@ async function botSubmit(
   });
   await recordMatchSubmission(matchId, botId, verdict);
   if (verdict === "ACCEPTED") await onAccepted(matchId);
+}
+
+// ── AI opponent (real code, real judge) ─────────────────────────────────────
+
+/** The AI opponent's effort setting for a match (defaults to medium). */
+async function aiDifficultyFor(matchId: string): Promise<AiDifficulty> {
+  const m = await prisma.match.findUnique({ where: { id: matchId }, select: { aiDifficulty: true } });
+  return isAiDifficulty(m?.aiDifficulty) ? m!.aiDifficulty as AiDifficulty : "med";
+}
+
+/** Provision (once) the AI-opponent bot user for the configured model. */
+async function ensureAiOpponent(): Promise<string> {
+  const model = aiOpponentModel(); // guarded by aiConfigured() upstream
+  const existing = await prisma.user.findFirst({ where: { isBot: true, botModel: model }, select: { id: true } });
+  if (existing) return existing.id;
+  const created = await prisma.user.create({
+    data: {
+      handle: aiOpponentName(),
+      email: `bot+ai+${model}@codearena.local`,
+      isBot: true,
+      botModel: model,
+      rating: 1600,
+    },
+    select: { id: true },
+  });
+  return created.id;
+}
+
+/** Load the full problem view (statement + samples) the model needs to solve. */
+async function loadAiProblem(matchId: string, round: number): Promise<AiProblem | null> {
+  const mp = await prisma.matchProblem.findUnique({
+    where: { matchId_round: { matchId, round } },
+    include: {
+      problem: {
+        select: {
+          id: true, slug: true, title: true, statement: true,
+          samples: { orderBy: { ordinal: "asc" }, select: { input: true, output: true } },
+        },
+      },
+    },
+  });
+  if (!mp) return null;
+  return {
+    id: mp.problem.id,
+    slug: mp.problem.slug,
+    title: mp.problem.title,
+    statement: mp.problem.statement,
+    samples: mp.problem.samples.map((s) => ({ input: s.input, output: s.output })),
+  };
+}
+
+/**
+ * The AI opponent takes a turn: ask the model for a program, then submit that
+ * real code through the same judge queue a human uses. The verdict comes back
+ * asynchronously via the judge → verdict subscriber, which drives the match
+ * exactly as a human solve would (and calls onAiSubmissionJudged for retries).
+ * Re-validates the match/round/liveness both before and after the model call,
+ * since generation can take seconds during which the round may have ended.
+ */
+async function kickAiOpponent(
+  matchId: string,
+  round: number,
+  botId: string,
+  difficulty: AiDifficulty,
+  feedback?: AiFeedback,
+): Promise<void> {
+  if (!(await stillAiTurn(matchId, round, botId))) return;
+  const problem = await loadAiProblem(matchId, round);
+  if (!problem) return;
+
+  const solution = await generateSolution(problem, difficulty, feedback);
+  if (!solution) return; // couldn't get a runnable answer this attempt — sit the turn out
+  if (!(await stillAiTurn(matchId, round, botId))) return; // round moved on while thinking
+
+  const submission = await prisma.submission.create({
+    data: { userId: botId, problemId: problem.id, matchId, language: solution.language, source: solution.source, rated: false },
+  });
+  await judgeQueue.add("judge", { submissionId: submission.id }, { removeOnComplete: 1000, removeOnFail: 1000 });
+}
+
+/** True only while it's still this AI bot's live round to act on. */
+async function stillAiTurn(matchId: string, round: number, botId: string): Promise<boolean> {
+  const match = await prisma.match.findUnique({ where: { id: matchId }, select: { status: true, round: true } });
+  if (!match || match.status !== "ACTIVE" || match.round !== round) return false;
+  const player = await prisma.matchPlayer.findUnique({
+    where: { matchId_userId: { matchId, userId: botId } },
+    select: { status: true },
+  });
+  return player?.status === "ALIVE";
+}
+
+/**
+ * Called when an AI opponent's submission is judged (from the verdict
+ * subscriber). On a non-accepted verdict it spends a retry from the effort
+ * budget — feeding the failure back so the model iterates — up to the tier's
+ * cap. Stale verdicts (from a round that already ended) are ignored.
+ */
+export async function onAiSubmissionJudged(
+  matchId: string,
+  botId: string,
+  verdict: string,
+  submittedAt: Date,
+): Promise<void> {
+  if (verdict === "ACCEPTED") return; // the accept path already advanced the round
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: { status: true, round: true, roundStartedAt: true, aiDifficulty: true },
+  });
+  if (!match || match.status !== "ACTIVE") return;
+  if (submittedAt < match.roundStartedAt) return; // belongs to a round that already ended
+
+  const difficulty: AiDifficulty = isAiDifficulty(match.aiDifficulty) ? match.aiDifficulty : "med";
+  const problem = await loadAiProblem(matchId, match.round);
+  if (!problem) return;
+
+  // Attempts already spent this round = this bot's submissions since it started.
+  const attempts = await prisma.submission.count({
+    where: { matchId, userId: botId, createdAt: { gte: match.roundStartedAt } },
+  });
+  if (attempts > EFFORT[difficulty].retryBudget) return; // budget exhausted — concede the round
+
+  const sample = problem.samples[0];
+  const feedback: AiFeedback = { verdict, sample: sample ? { input: sample.input, expected: sample.output } : undefined };
+  await kickAiOpponent(matchId, match.round, botId, difficulty, feedback);
+}
+
+/**
+ * Start an unrated "Challenge the AI" duel: the human vs one LLM opponent that
+ * writes real, judged code. Unrated for the human ladder (like practice);
+ * tracked separately via the aiDuel flag.
+ */
+export async function startAiMatch(
+  userId: string,
+  difficulty: AiDifficulty,
+): Promise<{ matchId: string }> {
+  if (!aiConfigured()) throw new Error("AI opponent is not configured");
+
+  const live = await prisma.matchPlayer.findFirst({
+    where: { userId, match: { status: "ACTIVE" } },
+    select: { matchId: true },
+  });
+  if (live) return { matchId: live.matchId };
+
+  const cfg = MODE_CONFIG.DUEL;
+  const opponentId = await ensureAiOpponent();
+  const problems = await pickProblems("DUEL", [userId]);
+  if (problems.length < 2) throw new Error("not enough problems available to start a match");
+
+  const now = new Date();
+  const match = await prisma.match.create({
+    data: {
+      mode: "DUEL",
+      practice: true, // unrated for the human ladder
+      aiDuel: true,
+      aiDifficulty: difficulty,
+      roundDurationSec: cfg.roundDurationSec,
+      players: {
+        create: [
+          { userId, lastSeenAt: now },
+          { userId: opponentId, lastSeenAt: now },
+        ],
+      },
+      problems: { create: problems.map((p, i) => ({ problemId: p.id, round: i })) },
+    },
+  });
+
+  await withLock(match.id, () => _beginRound(match.id, 0));
+  return { matchId: match.id };
 }
 
 /**

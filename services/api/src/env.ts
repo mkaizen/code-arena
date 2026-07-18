@@ -26,6 +26,15 @@ const schema = z.object({
   // rather than sent, so the app runs fine with no provider configured.
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default("Code Arena <onboarding@resend.dev>"),
+  // AI opponent ("Challenge the AI") is opt-in the same way: without an API key
+  // the feature is disabled and its endpoints 404, so the app runs anywhere.
+  // The wire model id and display name are supplied at deploy — never hardcoded —
+  // so the same code can front any provider/model.
+  AI_API_KEY: z.string().optional(),
+  AI_API_URL: z.string().default("https://api.anthropic.com/v1/messages"),
+  AI_API_VERSION: z.string().default("2023-06-01"),
+  AI_OPPONENT_MODEL: z.string().optional(),
+  AI_OPPONENT_NAME: z.string().default("Arena AI"),
 });
 
 export const env = schema.parse(process.env);

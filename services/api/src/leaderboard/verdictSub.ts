@@ -5,7 +5,7 @@ import { broadcast, sendToUser } from "../ws.js";
 import { prisma } from "../db.js";
 import { recordAccepted, getLeaderboard, isFrozen, ensureFreezeSnapshot } from "./freeze.js";
 import { scoreStanding } from "./scoring.js";
-import { onAccepted as onMatchAccepted, recordMatchSubmission } from "../match/engine.js";
+import { onAccepted as onMatchAccepted, recordMatchSubmission, onAiSubmissionJudged } from "../match/engine.js";
 import { recordDailySolve } from "../daily.js";
 import type { JudgeResult, ScoringModel } from "@arena/shared";
 
@@ -65,7 +65,10 @@ export function startVerdictSubscriber(): void {
 
       const submission = await prisma.submission.findUnique({
         where: { id: submissionId },
-        select: { userId: true, contestId: true, matchId: true, rated: true, problemId: true, createdAt: true },
+        select: {
+          userId: true, contestId: true, matchId: true, rated: true, problemId: true, createdAt: true,
+          user: { select: { botModel: true } },
+        },
       });
 
       // A verdict is private to its author — never fan it out to everyone.
@@ -77,7 +80,14 @@ export function startVerdictSubscriber(): void {
         await recordMatchSubmission(submission.matchId, submission.userId, result.verdict);
       }
 
-      if (result.verdict !== "ACCEPTED") return;
+      if (result.verdict !== "ACCEPTED") {
+        // An AI opponent iterates on a wrong/TLE verdict, spending a retry from
+        // its effort budget; every other submitter simply moves on.
+        if (submission?.matchId && submission.user?.botModel) {
+          await onAiSubmissionJudged(submission.matchId, submission.userId, result.verdict, submission.createdAt);
+        }
+        return;
+      }
 
       if (submission?.matchId) {
         await onMatchAccepted(submission.matchId);
