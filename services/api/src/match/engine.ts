@@ -103,8 +103,8 @@ async function recentlySeenProblemIds(userIds: string[]): Promise<Set<string>> {
  * six solutions. Falls back to the whole bank if avoiding repeats would leave
  * too few problems to build a full ladder.
  */
-async function pickProblems(mode: MatchMode, avoidForUserIds: string[] = []): Promise<{ id: string }[]> {
-  const want = MODE_CONFIG[mode].rounds;
+async function pickProblems(mode: MatchMode, avoidForUserIds: string[] = [], count?: number): Promise<{ id: string }[]> {
+  const want = count ?? MODE_CONFIG[mode].rounds;
   const all = await prisma.problem.findMany({ select: { id: true, ratingValue: true } });
 
   const seen = await recentlySeenProblemIds(avoidForUserIds);
@@ -949,8 +949,11 @@ export async function startAiMatch(
 
   const cfg = MODE_CONFIG.DUEL;
   const opponentId = await ensureAiOpponent(model);
-  const problems = await pickProblems("DUEL", [userId]);
-  if (problems.length < 2) throw new Error("not enough problems available to start a match");
+  // A "Challenge the AI" duel is a single problem — first to solve it wins.
+  // (The clinch/finish logic keys off the actual problem count, so one problem
+  // means the first accepted solution takes the match.)
+  const problems = await pickProblems("DUEL", [userId], 1);
+  if (problems.length < 1) throw new Error("not enough problems available to start a match");
 
   const now = new Date();
   const match = await prisma.match.create({
