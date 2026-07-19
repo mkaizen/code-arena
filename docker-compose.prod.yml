@@ -118,6 +118,11 @@ services:
       AI_MODELS: ${AI_MODELS:-}
       AI_VS_AI_ENABLED: ${AI_VS_AI_ENABLED:-false}
       AI_VS_AI_INTERVAL_SEC: ${AI_VS_AI_INTERVAL_SEC:-900}
+      # OpenRouter: one key unlocks a whole roster (GPT, Gemini, DeepSeek, Qwen,
+      # Llama, …). List them in OPENROUTER_MODELS as [{ "name", "model" }].
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_API_URL: ${OPENROUTER_API_URL:-https://openrouter.ai/api/v1/chat/completions}
+      OPENROUTER_MODELS: ${OPENROUTER_MODELS:-}
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }

@@ -36,9 +36,16 @@ const schema = z.object({
   AI_OPPONENT_MODEL: z.string().optional(),
   AI_OPPONENT_NAME: z.string().default("Arena AI"),
   // Extra opponents for a multi-model roster and AI-vs-AI matches. JSON array of
-  // { name, model, apiKey, apiUrl?, apiVersion? }. The single AI_* vars above are
-  // always the first ("house") model; these are appended.
+  // { name, model, apiKey, apiUrl?, apiVersion?, api? }. The single AI_* vars
+  // above are always the first ("house") model; these are appended. `api` is
+  // "anthropic" (default) or "openai" for OpenAI-shaped endpoints.
   AI_MODELS: z.string().optional(),
+  // OpenRouter convenience: one key unlocks a roster of models (GPT, Gemini,
+  // DeepSeek, Qwen, Llama, …). OPENROUTER_MODELS is a JSON array of { name, model }
+  // — the key and endpoint are filled in automatically, all OpenAI-format.
+  OPENROUTER_API_KEY: z.string().optional(),
+  OPENROUTER_API_URL: z.string().default("https://openrouter.ai/api/v1/chat/completions"),
+  OPENROUTER_MODELS: z.string().optional(),
   // AI-vs-AI auto-matches that populate the model-vs-model board. Off by default
   // (they spend real model budget); needs >=2 configured models to do anything.
   AI_VS_AI_ENABLED: z.coerce.boolean().default(false),

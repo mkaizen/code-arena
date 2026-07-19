@@ -5,6 +5,7 @@ const BASE = {
   AI_OPPONENT_NAME: "House",
   AI_API_URL: "https://house/api",
   AI_API_VERSION: "2023-06-01",
+  OPENROUTER_API_URL: "https://openrouter/api",
 };
 
 describe("parseAiModels", () => {
@@ -62,5 +63,37 @@ describe("parseAiModels", () => {
   it("names a model by its wire id when no display name is given", () => {
     const models = parseAiModels({ ...BASE, AI_MODELS: JSON.stringify([{ model: "m9", apiKey: "k9" }]) });
     expect(models[0].name).toBe("m9");
+  });
+
+  it("defaults the api format to anthropic and honours an openai override", () => {
+    const models = parseAiModels({
+      ...BASE,
+      AI_API_KEY: "k1",
+      AI_OPPONENT_MODEL: "m1",
+      AI_MODELS: JSON.stringify([{ model: "m2", apiKey: "k2", api: "openai" }]),
+    });
+    expect(models.find((m) => m.key === "m1")!.api).toBe("anthropic");
+    expect(models.find((m) => m.key === "m2")!.api).toBe("openai");
+  });
+
+  it("expands the OpenRouter roster with one key, as openai-format entries", () => {
+    const models = parseAiModels({
+      ...BASE,
+      AI_API_KEY: "k1",
+      AI_OPPONENT_MODEL: "house-model",
+      OPENROUTER_API_KEY: "or-key",
+      OPENROUTER_MODELS: JSON.stringify([
+        { name: "GPT-5", model: "openai/gpt-5" },
+        { name: "Gemini", model: "google/gemini-3-pro" },
+      ]),
+    });
+    expect(models.map((m) => m.key)).toEqual(["house-model", "openai/gpt-5", "google/gemini-3-pro"]);
+    const gpt = models.find((m) => m.key === "openai/gpt-5")!;
+    expect(gpt).toMatchObject({ name: "GPT-5", api: "openai", apiKey: "or-key", apiUrl: "https://openrouter/api" });
+  });
+
+  it("ignores the OpenRouter roster when no key is set", () => {
+    const models = parseAiModels({ ...BASE, OPENROUTER_MODELS: JSON.stringify([{ name: "X", model: "x/y" }]) });
+    expect(models).toEqual([]);
   });
 });
