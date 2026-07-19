@@ -61,6 +61,23 @@ export function humanRatingRanks(
 }
 
 /**
+ * Rating ranks over *every* placed player (bots included) — used to rate the
+ * two models in an AI-vs-AI exhibition against each other. Ties share the lower
+ * rank, so a drawn exhibition is a rating wash.
+ */
+export function placementRanks(
+  players: { userId: string; placement: number | null }[],
+): { userId: string; rank: number }[] {
+  const placed = players.filter(
+    (p): p is { userId: string; placement: number } => p.placement != null,
+  );
+  return placed.map((p) => ({
+    userId: p.userId,
+    rank: 1 + placed.filter((q) => q.placement < p.placement).length,
+  }));
+}
+
+/**
  * DUEL final ranking by round wins (most wins first). Equal wins share a rank,
  * so two players on the same score both get placement 1 — a draw.
  */
