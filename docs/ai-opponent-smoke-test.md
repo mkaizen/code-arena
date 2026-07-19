@@ -21,9 +21,17 @@ deploying with the feature configured. ~5 minutes.
    returns 404. The rest of the app is unaffected.
 
    **Extra models (optional).** `AI_MODELS` is a JSON array of additional
-   opponents — `[{ "name": "...", "model": "...", "apiKey": "...", "apiUrl": "...",
-   "apiVersion": "..." }]` (`apiUrl`/`apiVersion` fall back to the house values).
-   The house model is always first; these are appended, de-duplicated by wire id.
+   opponents — `[{ "name", "model", "apiKey", "apiUrl"?, "apiVersion"?, "api"? }]`
+   (`apiUrl`/`apiVersion` fall back to the house values; `api` is `"anthropic"`
+   by default or `"openai"` for OpenAI-shaped endpoints). The house model is
+   always first; these are appended, de-duplicated by wire id.
+
+   **OpenRouter roster (optional, easiest multi-vendor path).** Set
+   `OPENROUTER_API_KEY` and list models in `OPENROUTER_MODELS` as
+   `[{ "name": "GPT-5", "model": "openai/gpt-5" }, …]` (ids from
+   <https://openrouter.ai/models>). Each becomes an OpenAI-format opponent
+   automatically — one key gets you GPT, Gemini, DeepSeek, Qwen, Llama, etc. for
+   the human duel roster and AI-vs-AI board.
 
    **AI-vs-AI exhibitions (optional).** `AI_VS_AI_ENABLED=true` turns on
    model-vs-model matches (needs ≥2 configured models). `AI_VS_AI_INTERVAL_SEC`
