@@ -44,7 +44,7 @@ export async function leaderboardRoutes(app: FastifyInstance) {
         where: { aiVsAi: true, status: "FINISHED" },
         orderBy: { endedAt: "desc" },
         take: 5000,
-        select: { players: { select: { placement: true, user: { select: { handle: true } } } } },
+        select: { players: { select: { placement: true, user: { select: { handle: true, rating: true } } } } },
       }),
     ]);
 
@@ -74,13 +74,15 @@ export async function leaderboardRoutes(app: FastifyInstance) {
       }
     }
 
-    // Model-vs-model standings from AI-vs-AI exhibition matches.
-    const standings = new Map<string, { name: string; played: number; wins: number; losses: number; draws: number }>();
+    // Model-vs-model standings from AI-vs-AI exhibitions, carrying each model's
+    // current Elo (its opponent-bot's live rating, updated after every match).
+    const standings = new Map<string, { name: string; rating: number; played: number; wins: number; losses: number; draws: number }>();
     for (const m of vsMatches) {
       if (m.players.length < 2) continue;
       const draw = m.players.filter((p) => p.placement === 1).length > 1;
       for (const p of m.players) {
-        const s = standings.get(p.user.handle) ?? { name: p.user.handle, played: 0, wins: 0, losses: 0, draws: 0 };
+        const s = standings.get(p.user.handle) ?? { name: p.user.handle, rating: p.user.rating, played: 0, wins: 0, losses: 0, draws: 0 };
+        s.rating = p.user.rating; // live rating is identical across the model's rows
         s.played++;
         if (draw) s.draws++;
         else if (p.placement === 1) s.wins++;
@@ -95,9 +97,7 @@ export async function leaderboardRoutes(app: FastifyInstance) {
         .filter((c) => c.wins > 0)
         .sort((a, b) => b.wins - a.wins || a.games - b.games)
         .slice(0, 100),
-      aiVsAi: [...standings.values()].sort(
-        (a, b) => b.wins / (b.played || 1) - a.wins / (a.played || 1) || b.played - a.played,
-      ),
+      aiVsAi: [...standings.values()].sort((a, b) => b.rating - a.rating || b.played - a.played),
     };
   });
 }

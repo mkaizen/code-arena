@@ -160,6 +160,7 @@ export interface AiChampion {
 }
 export interface AiVsAiStanding {
   name: string;
+  rating: number;
   played: number;
   wins: number;
   losses: number;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { winsToClinch, placementsByElimination, placementsByScore, humanRatingRanks } from "./rules.js";
+import { winsToClinch, placementsByElimination, placementsByScore, humanRatingRanks, placementRanks } from "./rules.js";
 
 describe("winsToClinch", () => {
   it("is a majority of the rounds", () => {
@@ -120,5 +120,40 @@ describe("humanRatingRanks", () => {
       { userId: "b", isBot: false, placement: null },
     ]);
     expect(ranks).toEqual([{ userId: "a", rank: 1 }]);
+  });
+});
+
+describe("placementRanks (AI-vs-AI Elo)", () => {
+  it("ranks a decisive exhibition — winner 1, loser 2 (bots included)", () => {
+    expect(
+      placementRanks([
+        { userId: "modelA", placement: 1 },
+        { userId: "modelB", placement: 2 },
+      ]),
+    ).toEqual([
+      { userId: "modelA", rank: 1 },
+      { userId: "modelB", rank: 2 },
+    ]);
+  });
+
+  it("shares the lower rank on a draw, so recomputeRatings washes it", () => {
+    expect(
+      placementRanks([
+        { userId: "modelA", placement: 1 },
+        { userId: "modelB", placement: 1 },
+      ]),
+    ).toEqual([
+      { userId: "modelA", rank: 1 },
+      { userId: "modelB", rank: 1 },
+    ]);
+  });
+
+  it("drops unplaced players", () => {
+    expect(
+      placementRanks([
+        { userId: "modelA", placement: 1 },
+        { userId: "modelB", placement: null },
+      ]),
+    ).toEqual([{ userId: "modelA", rank: 1 }]);
   });
 });

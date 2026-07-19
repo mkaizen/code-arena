@@ -1,7 +1,7 @@
 import { prisma } from "../db.js";
 import { broadcast, sendToUsers, sendToSpectators } from "../ws.js";
 import { recomputeRatings } from "../rating/elo.js";
-import { winsToClinch, placementsByElimination, placementsByScore, humanRatingRanks } from "./rules.js";
+import { winsToClinch, placementsByElimination, placementsByScore, humanRatingRanks, placementRanks } from "./rules.js";
 import { pickLadder } from "./ladder.js";
 import { isRecruiter } from "../referrals.js";
 import { botRoundPlan, personaFor, pickOpponents, BOT_ROSTER, botEmail } from "./bots.js";
@@ -1053,17 +1053,24 @@ export async function sweepAiVsAi(): Promise<void> {
  * Placement ties share a rank, so a duel draw is a no-op wash — as it should be.
  */
 async function _applyMatchRatings(matchId: string): Promise<void> {
-  const match = await prisma.match.findUnique({ where: { id: matchId }, select: { practice: true } });
-  if (match?.practice) return; // practice matches are unrated — nobody's ladder moves
+  const match = await prisma.match.findUnique({ where: { id: matchId }, select: { practice: true, aiVsAi: true } });
+  if (!match) return;
+  // AI-vs-AI exhibitions carry an Elo between the models (they contain no
+  // humans, so no player ladder is touched); every other practice match is
+  // unrated — nobody's ladder moves.
+  if (match.practice && !match.aiVsAi) return;
+
   const players = await prisma.matchPlayer.findMany({
     where: { matchId },
     include: { user: { select: { rating: true, isBot: true } } },
   });
-  // Bots (present only when a ranked queue was backfilled) are excluded and the
-  // humans are re-ranked among themselves — you can't win or lose rating to a
-  // seat-filler, and a lone human is left unrated.
   const ratingById = new Map(players.map((p) => [p.userId, p.user.rating]));
-  const ranks = humanRatingRanks(players.map((p) => ({ userId: p.userId, isBot: p.user.isBot, placement: p.placement })));
+  // Exhibitions rank the two models against each other; ranked human matches
+  // exclude bot seat-fillers and re-rank the humans among themselves (you can't
+  // win or lose rating to a seat-filler, and a lone human is left unrated).
+  const ranks = match.aiVsAi
+    ? placementRanks(players.map((p) => ({ userId: p.userId, placement: p.placement })))
+    : humanRatingRanks(players.map((p) => ({ userId: p.userId, isBot: p.user.isBot, placement: p.placement })));
   if (ranks.length < 2) return;
   const participants = ranks.map((r) => ({ userId: r.userId, rating: ratingById.get(r.userId)!, rank: r.rank }));
 

@@ -136,7 +136,7 @@ export function VsAiPage() {
               <Section
                 eyebrow="// exhibition"
                 title="Model vs model"
-                sub="Head-to-head duels between models — same problems, same judge, both at full effort."
+                sub="Head-to-head duels between models — same problems, same judge, both at full effort. Ranked by Elo (relative to this pool)."
               >
                 <div style={list}>
                   {standings.map((s, i) => (
@@ -144,10 +144,13 @@ export function VsAiPage() {
                       <span style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, fontFamily: "var(--disp)", fontWeight: 700, fontSize: 14, color: "var(--txt)" }}>
                         🤖 {s.name}
                       </span>
-                      <span style={{ fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--txt-2)" }}>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--txt-3)" }}>
                         {s.wins}<span style={{ color: "var(--txt-3)" }}>W</span> {s.losses}<span style={{ color: "var(--txt-3)" }}>L</span>{s.draws ? <> {s.draws}<span style={{ color: "var(--txt-3)" }}>D</span></> : null}
                       </span>
-                      <WinPill value={pct(s.wins, s.played)} />
+                      <span style={{ display: "flex", alignItems: "baseline", gap: 4, minWidth: 78, justifyContent: "flex-end" }}>
+                        <span style={{ fontFamily: "var(--mono)", fontWeight: 700, fontSize: 17, color: AI }}>{s.rating}</span>
+                        <span style={{ fontSize: 10, letterSpacing: "0.06em", color: "var(--txt-3)" }}>ELO</span>
+                      </span>
                     </Row>
                   ))}
                 </div>
@@ -237,14 +240,6 @@ function Row({ rank, children }: { rank: number; children: ReactNode }) {
       </span>
       {children}
     </div>
-  );
-}
-
-function WinPill({ value }: { value: number }) {
-  return (
-    <span style={{ fontFamily: "var(--disp)", fontWeight: 700, fontSize: 13, color: AI, background: AI_SOFT, borderRadius: 999, padding: "3px 10px", minWidth: 52, textAlign: "center" }}>
-      {value}%
-    </span>
   );
 }
 
