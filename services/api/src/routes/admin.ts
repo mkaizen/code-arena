@@ -9,6 +9,7 @@ import { prisma } from "../db.js";
 import { s3 } from "../storage.js";
 import { env } from "../env.js";
 import { recomputeRatings } from "../rating/elo.js";
+import { AI_BASE_RATING } from "../match/engine.js";
 import { findSimilarPairs, type CodeDoc } from "../plagiarism/detect.js";
 import type { PlagiarismProblemReport } from "@arena/shared";
 import { Difficulty } from "@prisma/client";
@@ -447,5 +448,33 @@ export async function adminRoutes(app: FastifyInstance) {
     });
 
     return { contestId: id, name: contest.name, reports };
+  });
+
+  // Reset the AI-vs-AI model board to a clean slate: wipe finished exhibition
+  // matches (and their submissions/players/problems) and set every AI-opponent
+  // model's rating back to the baseline. Idempotent, and strictly scoped to AI
+  // exhibitions and bot ratings — never touches human matches or human ratings.
+  app.post("/admin/ai/reset-board", { onRequest: [requireAdmin] }, async () => {
+    const exhibitions = await prisma.match.findMany({ where: { aiVsAi: true }, select: { id: true } });
+    const ids = exhibitions.map((m) => m.id);
+
+    const result = await prisma.$transaction(async (tx) => {
+      let clearedExhibitions = 0;
+      if (ids.length > 0) {
+        await tx.submission.deleteMany({ where: { matchId: { in: ids } } });
+        await tx.matchPlayer.deleteMany({ where: { matchId: { in: ids } } });
+        await tx.matchProblem.deleteMany({ where: { matchId: { in: ids } } });
+        clearedExhibitions = (await tx.match.deleteMany({ where: { id: { in: ids } } })).count;
+      }
+      const resetModels = (
+        await tx.user.updateMany({
+          where: { isBot: true, botModel: { not: null } },
+          data: { rating: AI_BASE_RATING },
+        })
+      ).count;
+      return { clearedExhibitions, resetModels };
+    });
+
+    return { ok: true, ...result };
   });
 }
