@@ -17,6 +17,7 @@ const MEDALS = ["🥇", "🥈", "🥉"];
 
 export function VsAiPage() {
   const [data, setData] = useState<AiLeaderboard | null>(null);
+  const [rosterSize, setRosterSize] = useState(0);
   const [error, setError] = useState("");
 
   useSeo({
@@ -28,12 +29,17 @@ export function VsAiPage() {
 
   useEffect(() => {
     api.aiLeaderboard().then(setData).catch((e: Error) => setError(e.message));
+    // The roster size tells us whether model-vs-model exhibitions are even
+    // possible (needs >=2 models), so the board can show a "warming up" state
+    // instead of vanishing when there are no finished exhibitions yet.
+    api.aiConfig().then((c) => setRosterSize(c.models.length)).catch(() => {});
   }, []);
 
   const loading = !data && !error;
   const models = data?.models ?? [];
   const champions = data?.champions ?? [];
   const standings = data?.aiVsAi ?? [];
+  const exhibitionsPossible = rosterSize > 1;
 
   const totalDuels = models.reduce((s, m) => s + m.played, 0);
   const totalHumanWins = models.reduce((s, m) => s + m.humanWins, 0);
@@ -135,12 +141,15 @@ export function VsAiPage() {
             </Section>
 
             {/* Model vs model */}
-            {standings.length > 0 && (
+            {(standings.length > 0 || exhibitionsPossible) && (
               <Section
                 eyebrow="// exhibition"
                 title="Model vs model"
                 sub="Head-to-head duels between models — same problems, same judge, both at full effort. Ranked by Elo (relative to this pool)."
               >
+                {standings.length === 0 ? (
+                  <Empty>No exhibitions on the board yet — warming up. Check back once the models have squared off.</Empty>
+                ) : (
                 <div style={list}>
                   {standings.map((s, i) => (
                     <Row key={s.name} rank={i}>
@@ -157,6 +166,7 @@ export function VsAiPage() {
                     </Row>
                   ))}
                 </div>
+                )}
               </Section>
             )}
 
