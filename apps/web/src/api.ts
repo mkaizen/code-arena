@@ -245,6 +245,9 @@ export const api = {
 
   adminProblems: (): Promise<AdminProblemRow[]> => req("/admin/problems"),
 
+  adminResetAiBoard: (): Promise<{ ok: boolean; clearedExhibitions: number; resetModels: number }> =>
+    req("/admin/ai/reset-board", { method: "POST", body: "{}" }),
+
   adminGetProblem: (id: string): Promise<AdminProblemDetail> => req(`/admin/problems/${id}`),
 
   adminUpdateProblem: (id: string, body: {
