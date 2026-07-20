@@ -1,7 +1,7 @@
 import { prisma } from "../db.js";
 import { broadcast, sendToUsers, sendToSpectators } from "../ws.js";
 import { recomputeRatings } from "../rating/elo.js";
-import { winsToClinch, placementsByElimination, placementsByScore, humanRatingRanks, placementRanks } from "./rules.js";
+import { winsToClinch, placementsByElimination, placementsByScore, humanRatingRanks, placementRanks, aiVsAiRoundWinner } from "./rules.js";
 import { pickLadder } from "./ladder.js";
 import { isRecruiter } from "../referrals.js";
 import { botRoundPlan, personaFor, pickOpponents, BOT_ROSTER, botEmail } from "./bots.js";
@@ -34,6 +34,11 @@ export const MODE_CONFIG: Record<
 // match and is forfeited. Seeded at match start, refreshed by the client while
 // the match page is open (see recordHeartbeat).
 const FORFEIT_GRACE_MS = 30_000;
+
+// AI-vs-AI exhibitions run a shorter round: both models attempt the same problem
+// and the round is scored on correctness once both finish (or this timer fires as
+// a backstop), so it doesn't need the full human duel clock.
+const AI_VS_AI_ROUND_SEC = 180;
 
 // Per-match scheduled round-timeout timer and a serialization lock so a
 // timer firing can never race a concurrent AC-driven advance (both paths
@@ -907,10 +912,10 @@ export async function onAiSubmissionJudged(
   verdict: string,
   submittedAt: Date,
 ): Promise<void> {
-  if (verdict === "ACCEPTED") return; // the accept path already advanced the round
+  if (verdict === "ACCEPTED") return; // the accept path already resolved/advanced the round
   const match = await prisma.match.findUnique({
     where: { id: matchId },
-    select: { status: true, round: true, roundStartedAt: true, aiDifficulty: true },
+    select: { status: true, round: true, roundStartedAt: true, aiDifficulty: true, aiVsAi: true },
   });
   if (!match || match.status !== "ACTIVE") return;
   if (submittedAt < match.roundStartedAt) return; // belongs to a round that already ended
@@ -923,7 +928,12 @@ export async function onAiSubmissionJudged(
   const attempts = await prisma.submission.count({
     where: { matchId, userId: botId, createdAt: { gte: match.roundStartedAt } },
   });
-  if (attempts > EFFORT[difficulty].retryBudget) return; // budget exhausted — concede the round
+  if (attempts > EFFORT[difficulty].retryBudget) {
+    // Budget exhausted — this model is done for the round. In an exhibition that
+    // may be the last model to finish, so check whether the round can resolve.
+    if (match.aiVsAi) await withLock(matchId, () => _maybeResolveAiVsAiRound(matchId, false));
+    return;
+  }
 
   const sample = problem.samples[0];
   const feedback: AiFeedback = { verdict, sample: sample ? { input: sample.input, expected: sample.output } : undefined };
@@ -998,7 +1008,7 @@ export async function startAiVsAiMatch(a: AiModel, b: AiModel): Promise<{ matchI
       practice: true,
       aiVsAi: true,
       aiDifficulty: "hard", // both models at full effort — a fair comparison
-      roundDurationSec: cfg.roundDurationSec,
+      roundDurationSec: AI_VS_AI_ROUND_SEC,
       players: {
         create: [
           { userId: idA, lastSeenAt: now },
@@ -1131,6 +1141,59 @@ async function _finishDuel(matchId: string): Promise<void> {
  * (first AC takes it) or when the timer expires (drawn round, no point).
  * The match ends early once a player has clinched a majority of the rounds.
  */
+/**
+ * Resolve an AI-vs-AI round on *correctness*, not submission speed. Both models
+ * attempt the same problem; the round is a draw if both solve (both capable) or
+ * neither does, and a win only for the sole solver — so API latency can't decide
+ * it. Waits until both models have finished (solved, or exhausted their attempt
+ * budget) unless `force` (the round timer) fires as a backstop. Caller holds the
+ * match lock.
+ */
+async function _maybeResolveAiVsAiRound(matchId: string, force: boolean): Promise<void> {
+  const match = await prisma.match.findUnique({ where: { id: matchId } });
+  if (!match || match.status !== "ACTIVE") return;
+
+  const bots = await prisma.matchPlayer.findMany({ where: { matchId, status: "ALIVE" }, select: { userId: true } });
+  const solved = await solvedCurrentRoundSet(matchId, match.round, match.roundStartedAt);
+
+  if (!force) {
+    // A model is "done" for the round once it has solved or spent its attempts.
+    const retryBudget = EFFORT[isAiDifficulty(match.aiDifficulty) ? (match.aiDifficulty as AiDifficulty) : "med"].retryBudget;
+    let allDone = true;
+    for (const b of bots) {
+      if (solved.has(b.userId)) continue;
+      const attempts = await prisma.submission.count({
+        where: { matchId, userId: b.userId, createdAt: { gte: match.roundStartedAt } },
+      });
+      if (attempts <= retryBudget) { allDone = false; break; } // still has tries left
+    }
+    if (!allDone) {
+      await broadcastMatchState(matchId); // keep spectators current while we wait
+      return;
+    }
+  }
+
+  clearMatchTimer(matchId);
+
+  const winnerId = aiVsAiRoundWinner(bots.filter((b) => solved.has(b.userId)).map((b) => b.userId));
+  let wins = 0;
+  if (winnerId) {
+    const updated = await prisma.matchPlayer.update({
+      where: { matchId_userId: { matchId, userId: winnerId } },
+      data: { roundWins: { increment: 1 } },
+    });
+    wins = updated.roundWins;
+  }
+
+  const totalRounds = await prisma.matchProblem.count({ where: { matchId } });
+  const isLastRound = match.round + 1 >= totalRounds;
+  if (wins >= winsToClinch(totalRounds) || isLastRound) {
+    await _finishDuel(matchId);
+  } else {
+    await _beginRound(matchId, match.round + 1);
+  }
+}
+
 async function _transitionDuelRound(matchId: string, opts: { force: boolean }): Promise<void> {
   const match = await prisma.match.findUnique({ where: { id: matchId } });
   if (!match || match.status !== "ACTIVE") return;
@@ -1170,6 +1233,8 @@ async function _transitionRound(matchId: string, opts: { force: boolean }): Prom
   const match = await prisma.match.findUnique({ where: { id: matchId } });
   if (!match || match.status !== "ACTIVE") return;
 
+  // AI-vs-AI is scored on correctness, not who submitted first (see below).
+  if (match.aiVsAi) return _maybeResolveAiVsAiRound(matchId, opts.force);
   if (match.mode === "DUEL") return _transitionDuelRound(matchId, opts);
 
   const alive = await prisma.matchPlayer.findMany({ where: { matchId, status: "ALIVE" } });

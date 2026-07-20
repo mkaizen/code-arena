@@ -61,6 +61,16 @@ export function humanRatingRanks(
 }
 
 /**
+ * Score an AI-vs-AI round on correctness, not submission speed: a model wins the
+ * round only when it is the *sole* solver. If both models solve (both capable)
+ * or neither does, the round is a draw — so a couple of seconds of API latency
+ * can't decide who's the better coder.
+ */
+export function aiVsAiRoundWinner(solvedBotIds: string[]): string | null {
+  return solvedBotIds.length === 1 ? solvedBotIds[0] : null;
+}
+
+/**
  * Rating ranks over *every* placed player (bots included) — used to rate the
  * two models in an AI-vs-AI exhibition against each other. Ties share the lower
  * rank, so a drawn exhibition is a rating wash.

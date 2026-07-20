@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { winsToClinch, placementsByElimination, placementsByScore, humanRatingRanks, placementRanks } from "./rules.js";
+import { winsToClinch, placementsByElimination, placementsByScore, humanRatingRanks, placementRanks, aiVsAiRoundWinner } from "./rules.js";
 
 describe("winsToClinch", () => {
   it("is a majority of the rounds", () => {
@@ -155,5 +155,17 @@ describe("placementRanks (AI-vs-AI Elo)", () => {
         { userId: "modelB", placement: null },
       ]),
     ).toEqual([{ userId: "modelA", rank: 1 }]);
+  });
+});
+
+describe("aiVsAiRoundWinner (correctness, not speed)", () => {
+  it("awards the round to the sole solver", () => {
+    expect(aiVsAiRoundWinner(["gpt5"])).toBe("gpt5");
+  });
+  it("is a draw when both models solve", () => {
+    expect(aiVsAiRoundWinner(["gpt5", "gpt3"])).toBeNull();
+  });
+  it("is a draw when neither solves", () => {
+    expect(aiVsAiRoundWinner([])).toBeNull();
   });
 });
