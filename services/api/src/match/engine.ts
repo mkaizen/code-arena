@@ -40,6 +40,9 @@ const FORFEIT_GRACE_MS = 30_000;
 // a backstop), so it doesn't need the full human duel clock.
 const AI_VS_AI_ROUND_SEC = 180;
 
+/** Rating every AI-opponent bot is seeded at (and reset to). Relative to the pool. */
+export const AI_BASE_RATING = 1600;
+
 // Per-match scheduled round-timeout timer and a serialization lock so a
 // timer firing can never race a concurrent AC-driven advance (both paths
 // funnel through the transition functions under the same lock).
@@ -820,7 +823,7 @@ async function aiDifficultyFor(matchId: string): Promise<AiDifficulty> {
 async function ensureAiOpponent(model: AiModel): Promise<string> {
   const existing = await prisma.user.findFirst({ where: { isBot: true, botModel: model.key }, select: { id: true } });
   if (existing) return existing.id;
-  const base = { email: `bot+ai+${model.key}@codearena.local`, isBot: true, botModel: model.key, rating: 1600 };
+  const base = { email: `bot+ai+${model.key}@codearena.local`, isBot: true, botModel: model.key, rating: AI_BASE_RATING };
   try {
     const created = await prisma.user.create({ data: { handle: model.name, ...base }, select: { id: true } });
     return created.id;

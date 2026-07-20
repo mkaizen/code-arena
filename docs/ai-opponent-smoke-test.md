@@ -72,8 +72,15 @@ deploying with the feature configured. ~5 minutes.
 9. **Exhibitions.** With `AI_VS_AI_ENABLED=true` and ≥2 models, watch for an
    AI-vs-AI match to appear (no human) within `AI_VS_AI_INTERVAL_SEC`. When it
    finishes, the [Humans vs AI](/vs-ai) page shows a **Model vs model** standings
-   section, and its replay has a **"How 🤖 &lt;model&gt; solved it"** disclosure
-   with the AI's actual code per round.
+   section ranked by Elo, and its replay has a **"How 🤖 &lt;model&gt; solved it"**
+   disclosure with the AI's actual code per round.
+
+10. **Reset the board (optional).** To start the model-vs-model Elo from a clean
+    slate — e.g. before a launch, or after changing the roster — call
+    `POST /api/admin/ai/reset-board` (admin/setter auth). It wipes finished
+    AI-vs-AI exhibitions and resets every model's rating to the baseline. It's
+    idempotent and only ever touches AI exhibitions and bot ratings — never human
+    matches or human ratings. Then re-warm with a low `AI_VS_AI_INTERVAL_SEC`.
 
 ## Notes
 
