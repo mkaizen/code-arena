@@ -97,7 +97,10 @@ export function VsAiPage() {
         {!loading && !error && (
           <>
             {/* Per-model record vs humans */}
-            <Section eyebrow="// the scoreboard" title="The AI's record">
+            <Section
+              eyebrow="// the scoreboard"
+              title={models.length > 1 ? "Each model's record vs humans" : "The AI's record"}
+            >
               {models.length === 0 ? (
                 <Empty>No duels played yet — be the first to challenge it.</Empty>
               ) : (

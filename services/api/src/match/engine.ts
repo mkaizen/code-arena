@@ -938,8 +938,10 @@ export async function onAiSubmissionJudged(
 export async function startAiMatch(
   userId: string,
   difficulty: AiDifficulty,
+  modelKey?: string,
 ): Promise<{ matchId: string }> {
-  const model = houseModel();
+  // Race the picked model, or the house model when none/an unknown one is asked for.
+  const model = (modelKey ? modelByKey(modelKey) : null) ?? houseModel();
   if (!model) throw new Error("AI opponent is not configured");
 
   const live = await prisma.matchPlayer.findFirst({

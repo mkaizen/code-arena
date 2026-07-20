@@ -46,6 +46,11 @@ export function aiOpponentName(): string {
   return houseModel()?.name ?? "the AI";
 }
 
+/** The public roster (key + display name) for the "pick your opponent" UI. */
+export function aiRoster(): { key: string; name: string }[] {
+  return aiModels().map((m) => ({ key: m.key, name: m.name }));
+}
+
 /** Anthropic Messages API call → assistant text, or null on any failure. */
 async function callAnthropic(model: AiModel, maxTokens: number, temperature: number, system: string, user: string): Promise<string | null> {
   const res = await fetch(model.apiUrl, {
