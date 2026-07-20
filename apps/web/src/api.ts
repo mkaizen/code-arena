@@ -290,12 +290,12 @@ export const api = {
   startPracticeMatch: (mode: MatchMode): Promise<{ matchId: string }> =>
     req("/matches/practice", { method: "POST", body: JSON.stringify({ mode }) }),
 
-  // "Challenge the AI": is it configured, and start a duel against the LLM.
-  aiConfig: (): Promise<{ enabled: boolean; opponent: string | null }> =>
+  // "Challenge the AI": is it configured, the opponent roster, and start a duel.
+  aiConfig: (): Promise<{ enabled: boolean; opponent: string | null; models: { key: string; name: string }[] }> =>
     req("/matches/ai/config"),
 
-  startAiDuel: (difficulty: "easy" | "med" | "hard"): Promise<{ matchId: string }> =>
-    req("/matches/ai", { method: "POST", body: JSON.stringify({ difficulty }) }),
+  startAiDuel: (difficulty: "easy" | "med" | "hard", model?: string): Promise<{ matchId: string }> =>
+    req("/matches/ai", { method: "POST", body: JSON.stringify({ difficulty, model }) }),
 
   matchQueueStatus: (): Promise<{
     queuedMode: MatchMode | null;

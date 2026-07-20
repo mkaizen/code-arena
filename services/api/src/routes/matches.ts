@@ -1,14 +1,17 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { joinQueue, leaveQueue, queueStatus, getMatchState, getLiveMatches, recordHeartbeat, recordMatchReaction, offerRematch, declineRematch, startPracticeMatch, startAiMatch, MODE_CONFIG } from "../match/engine.js";
-import { aiConfigured, aiOpponentName } from "../ai/provider.js";
+import { aiConfigured, aiOpponentName, aiRoster } from "../ai/provider.js";
 import { getMatchReplay } from "../match/replay.js";
 import { prisma } from "../db.js";
 import type { MatchHistoryEntry, MatchMode } from "@arena/shared";
 
 const queueBody = z.object({ mode: z.enum(["ROYALE", "QUADS", "DUEL"]).default("ROYALE") });
 const reactBody = z.object({ emoji: z.string() });
-const aiBody = z.object({ difficulty: z.enum(["easy", "med", "hard"]).default("med") });
+const aiBody = z.object({
+  difficulty: z.enum(["easy", "med", "hard"]).default("med"),
+  model: z.string().optional(),
+});
 
 export async function matchRoutes(app: FastifyInstance) {
   app.post("/matches/queue", { onRequest: [app.authenticate] }, async (req, reply) => {
@@ -47,7 +50,7 @@ export async function matchRoutes(app: FastifyInstance) {
   // app hides the entry point entirely when the feature isn't configured.
   app.get("/matches/ai/config", async () => {
     const enabled = aiConfigured();
-    return { enabled, opponent: enabled ? aiOpponentName() : null };
+    return { enabled, opponent: enabled ? aiOpponentName() : null, models: enabled ? aiRoster() : [] };
   });
 
   // Start an unrated duel against the LLM opponent. Capped per IP so the model
@@ -57,9 +60,9 @@ export async function matchRoutes(app: FastifyInstance) {
     config: { rateLimit: { max: 10, timeWindow: "1 hour" } },
   }, async (req, reply) => {
     if (!aiConfigured()) return reply.code(404).send({ error: "AI opponent is not available" });
-    const { difficulty } = aiBody.parse(req.body ?? {});
+    const { difficulty, model } = aiBody.parse(req.body ?? {});
     try {
-      const { matchId } = await startAiMatch(req.user.sub, difficulty);
+      const { matchId } = await startAiMatch(req.user.sub, difficulty, model);
       return { matchId };
     } catch (err) {
       return reply.code(503).send({ error: (err as Error).message });
