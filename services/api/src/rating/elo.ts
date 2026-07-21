@@ -21,6 +21,14 @@ export interface RatingDelta {
   delta: number;
 }
 
+/**
+ * Ratings never fall below this floor. Matches the lowest tier ("Newbie", min 0)
+ * in packages/shared/tiers.ts — a negative rating maps to no tier and is
+ * meaningless. Without this, a bot that keeps losing (plus the zero-sum
+ * correction applied to the whole field) can be dragged below zero.
+ */
+export const RATING_FLOOR = 0;
+
 function winProb(a: number, b: number): number {
   return 1 / (1 + Math.pow(10, (b - a) / 400));
 }
@@ -61,6 +69,9 @@ export function recomputeRatings(participants: Participant[]): RatingDelta[] {
 
   return deltas.map(({ p, delta }) => {
     const adjusted = delta + correction;
-    return { userId: p.userId, before: p.rating, after: p.rating + adjusted, delta: adjusted };
+    // Clamp to the floor and derive the reported delta from the applied value so
+    // `before + delta === after` always holds even when the floor bites.
+    const after = Math.max(RATING_FLOOR, p.rating + adjusted);
+    return { userId: p.userId, before: p.rating, after, delta: after - p.rating };
   });
 }
