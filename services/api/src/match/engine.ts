@@ -40,6 +40,13 @@ const FORFEIT_GRACE_MS = 30_000;
 // a backstop), so it doesn't need the full human duel clock.
 const AI_VS_AI_ROUND_SEC = 180;
 
+// "Challenge the AI" is a single-problem, first-to-solve sprint — it doesn't need
+// the full 600s human best-of-3 duel clock. A shorter round keeps the match snappy
+// (and caps how long it can sit if neither side solves) while still giving a human
+// real time to solve one problem; longer than the AI-vs-AI backstop since a person
+// isn't as fast as the models.
+const AI_DUEL_ROUND_SEC = 300;
+
 /** Rating every AI-opponent bot is seeded at (and reset to). Relative to the pool. */
 export const AI_BASE_RATING = 1600;
 
@@ -952,7 +959,6 @@ export async function startAiMatch(
   });
   if (live) return { matchId: live.matchId };
 
-  const cfg = MODE_CONFIG.DUEL;
   const opponentId = await ensureAiOpponent(model);
   // A "Challenge the AI" duel is a single problem — first to solve it wins.
   // (The clinch/finish logic keys off the actual problem count, so one problem
@@ -966,7 +972,7 @@ export async function startAiMatch(
       mode: "DUEL",
       practice: true, // unrated for the human ladder
       aiDuel: true,
-      roundDurationSec: cfg.roundDurationSec,
+      roundDurationSec: AI_DUEL_ROUND_SEC,
       players: {
         create: [
           { userId, lastSeenAt: now },
