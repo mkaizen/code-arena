@@ -2,6 +2,13 @@ import type { FastifyInstance } from "fastify";
 import type { Language, SpeedRow, BrevityRow } from "@arena/shared";
 import { relatedProblems } from "@arena/shared";
 import { prisma } from "../db.js";
+import { createTtlCache } from "../cache.js";
+
+// Public archive endpoints run heavy submission aggregations and change slowly —
+// front them with a short per-replica TTL so an anonymous read storm collapses to
+// one query per key per window. Keyed by their query/path params.
+const problemListCache = createTtlCache<unknown>(10_000);
+const problemBoardCache = createTtlCache<unknown>(10_000);
 
 interface StatRow { problemId: string; total: bigint; accepted: bigint; solvers: bigint }
 
@@ -39,20 +46,25 @@ async function oneProblemStats(id: string): Promise<{ solved: number; acceptance
 
 export async function problemRoutes(app: FastifyInstance) {
   // FR-23/FR-24: searchable archive with difficulty + tag filters, plus solve stats.
-  app.get("/problems", async (req) => {
+  app.get("/problems", async (req, reply) => {
     const q = req.query as { difficulty?: string; tag?: string };
-    const [problems, stats] = await Promise.all([
-      prisma.problem.findMany({
-        where: {
-          difficulty: q.difficulty as never,
-          tags: q.tag ? { has: q.tag } : undefined,
-        },
-        select: { id: true, slug: true, title: true, difficulty: true, ratingValue: true, tags: true },
-        orderBy: { ratingValue: "asc" },
-      }),
-      allProblemStats(),
-    ]);
-    return problems.map((p) => ({ ...p, ...(stats.get(p.id) ?? { solved: 0, acceptance: null }) }));
+    const key = `${q.difficulty ?? ""}|${q.tag ?? ""}`;
+    const result = await problemListCache.get(key, async () => {
+      const [problems, stats] = await Promise.all([
+        prisma.problem.findMany({
+          where: {
+            difficulty: q.difficulty as never,
+            tags: q.tag ? { has: q.tag } : undefined,
+          },
+          select: { id: true, slug: true, title: true, difficulty: true, ratingValue: true, tags: true },
+          orderBy: { ratingValue: "asc" },
+        }),
+        allProblemStats(),
+      ]);
+      return problems.map((p) => ({ ...p, ...(stats.get(p.id) ?? { solved: 0, acceptance: null }) }));
+    });
+    reply.header("Cache-Control", "public, max-age=10");
+    return result;
   });
 
   app.get("/problems/:slug", async (req, reply) => {
@@ -86,6 +98,7 @@ export async function problemRoutes(app: FastifyInstance) {
     const problem = await prisma.problem.findUnique({ where: { slug }, select: { id: true } });
     if (!problem) return reply.code(404).send({ error: "not found" });
 
+    const board = await problemBoardCache.get(problem.id, async () => {
     const [fastest, shortest] = await Promise.all([
       prisma.$queryRaw<{ handle: string; timeMs: number; language: string }[]>`
         SELECT u.handle, s."timeMs", s.language
@@ -115,5 +128,8 @@ export async function problemRoutes(app: FastifyInstance) {
       fastest: fastest.map((r): SpeedRow => ({ handle: r.handle, timeMs: Number(r.timeMs), language: r.language as Language })),
       shortest: shortest.map((r): BrevityRow => ({ handle: r.handle, chars: Number(r.chars), language: r.language as Language })),
     };
+    });
+    reply.header("Cache-Control", "public, max-age=10");
+    return board;
   });
 }
