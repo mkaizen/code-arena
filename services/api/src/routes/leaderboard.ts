@@ -1,6 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../db.js";
 import { getLeaderboard, isFrozen, ensureFreezeSnapshot } from "../leaderboard/freeze.js";
+import { createTtlCache } from "../cache.js";
+
+// The global board changes slowly (only on rated finalizations) but is a prime
+// anonymous-read target — shield the full-table sort behind a short TTL.
+const globalBoardCache = createTtlCache<{ handle: string; rating: number }[]>(10_000);
 
 export async function leaderboardRoutes(app: FastifyInstance) {
   // FR-19: live contest leaderboard, subject to freeze.
@@ -16,13 +21,18 @@ export async function leaderboardRoutes(app: FastifyInstance) {
   });
 
   // FR-20: global all-time leaderboard by rating.
-  app.get("/leaderboard/global", async () => {
-    return prisma.user.findMany({
-      where: { isBot: false, guest: false },
-      orderBy: { rating: "desc" },
-      take: 200,
-      select: { handle: true, rating: true },
-    });
+  app.get("/leaderboard/global", async (_req, reply) => {
+    const rows = await globalBoardCache.get("global", () =>
+      prisma.user.findMany({
+        where: { isBot: false, guest: false },
+        orderBy: { rating: "desc" },
+        take: 200,
+        select: { handle: true, rating: true },
+      }),
+    );
+    // Let a CDN/proxy absorb the crowd too; matches the server-side TTL.
+    reply.header("Cache-Control", "public, max-age=10");
+    return rows;
   });
 
   // Humans-vs-AI scoreboard: each AI opponent's record against human players,
