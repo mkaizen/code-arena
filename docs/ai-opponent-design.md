@@ -123,27 +123,18 @@ discussion-bait and its own evergreen SEO page.
 
 ---
 
-## 5. The fairness knob = an effort dial
+## 5. Full effort — a real race (difficulty tiers dropped)
 
-Rather than injecting an artificial delay, the opponent's difficulty is set by
-**how much effort the model is allowed to spend** — a single `effort` parameter
-that shapes a believable, tunable opponent:
+> **Superseded (2026-07):** the shipped v1 had an easy/med/hard effort dial
+> (retry budget, think-time floor, token cap per tier). We removed it — a
+> handicapped opponent is against the principle of the feature being a *real
+> race*. There is now a single full-effort profile: no think-time floor (the
+> model starts when you do), a fixed retry budget on wrong/TLE, and a fixed
+> token cap per attempt.
 
-| Knob | Easier opponent | Harder opponent |
-|---|---|---|
-| Reasoning / thinking budget | low | high |
-| Retry budget on wrong/TLE | 0–1 | several |
-| Think-time floor before first submit | short | (none — as fast as it is) |
-| Language | forced to a slower/verbose target | model's choice |
-
-This gives us one dial from "beatable warm-up" to "you will lose," exposed as a
-difficulty selector on the challenge screen. It also means the *same* mechanism
-that makes the AI fair also makes AI-vs-AI matches interesting (pit low-effort
-vs high-effort of the same model).
-
-Whatever the setting, the launch writeup states it plainly: the AI gets the same
-statement, the same judge, and the same clock — the effort dial only changes how
-hard it tries, never what it can see.
+The launch writeup states it plainly: the AI gets the same statement, the same
+judge, and the same clock — and it plays at full effort, so a win over it means
+exactly what it says.
 
 ---
 
@@ -195,8 +186,7 @@ hard it tries, never what it can see.
 - **M2 — the hooks.** Result card + OG image, model leaderboard page, blog
   writeup with the exact prompt.
 - **M3 — depth.** Additional models, AI-vs-AI auto-matches that populate the
-  leaderboard, "watch the AI's code" replay, difficulty/effort selector surfaced
-  in the UI.
+  leaderboard, "watch the AI's code" replay, opponent picker surfaced in the UI.
 
 ---
 
@@ -206,15 +196,14 @@ hard it tries, never what it can see.
   first duel; a Redis sliding-window budget controls cost/abuse (§6).
 - **v1 model: Claude Opus 4.8**, with the adapter built model-agnostic so a
   Gemini or OpenAI key lights up a multi-model leaderboard.
-- **Fairness = effort dial**, default **medium**. Difficulty is the model's
-  effort/retry/think budget, not an artificial delay. The anonymous demo runs the
-  medium "arena" setting; harder/easier are selectable.
+- ~~**Fairness = effort dial**, default **medium**.~~ *Revised 2026-07: the dial
+  is gone (§5) — every duel runs one full-effort profile, no handicap.*
 - **Separate leaderboards.** Human-vs-AI and AI-vs-AI (M3) get distinct boards so
   bot-on-bot results never dilute a model's human-facing record.
 
 ## 10. Open questions
 
-- The exact effort profiles behind easy/medium/hard (token/retry/think budgets)
-  will be tuned empirically once M1 is playable.
+- The full-effort profile's budgets (tokens/retries) can be tuned empirically
+  as real usage comes in.
 - Cap number (10/hour) is a starting point, tunable via env after we see real
   usage.

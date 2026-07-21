@@ -14,36 +14,18 @@
 
 import { LANGUAGES, type Language } from "@arena/shared";
 
-export type AiDifficulty = "easy" | "med" | "hard";
-
 /**
- * The "fairness knob": difficulty is how much effort the model is allowed to
- * spend, not an artificial delay. A higher tier thinks longer, retries more
- * after a wrong verdict, and starts sooner — so it wins more and faster.
+ * Every duel is a real race: the model plays at full effort, as fast as it is,
+ * with no artificial handicap or head start. One profile for everyone.
  */
-export interface EffortProfile {
+export const EFFORT = {
   /** Extra attempts after the first, spent iterating on a wrong/TLE verdict. */
-  retryBudget: number;
+  retryBudget: 4,
   /** Upper bound on the model's output tokens per attempt (caps worst-case cost). */
-  maxTokens: number;
-  /** Minimum delay before the first submission lands, so it never wins instantly. */
-  thinkMsFloor: number;
-  /** Sampling temperature — lower is steadier/stronger. */
-  temperature: number;
-}
-
-export const EFFORT: Record<AiDifficulty, EffortProfile> = {
-  // Beatable warm-up: one shot, no iteration, a long "thinking" pause.
-  easy: { retryBudget: 0, maxTokens: 1500, thinkMsFloor: 45_000, temperature: 0.8 },
-  // The default "arena" opponent: iterates a couple of times, moderate pace.
-  med: { retryBudget: 2, maxTokens: 4000, thinkMsFloor: 20_000, temperature: 0.4 },
-  // You will probably lose: full effort, as fast as it is, several retries.
-  hard: { retryBudget: 4, maxTokens: 8000, thinkMsFloor: 0, temperature: 0.2 },
-};
-
-export function isAiDifficulty(x: unknown): x is AiDifficulty {
-  return x === "easy" || x === "med" || x === "hard";
-}
+  maxTokens: 8000,
+  /** Sampling temperature — low, for its steadiest play. */
+  temperature: 0.2,
+} as const;
 
 /** The minimal problem view the model needs to solve a round. */
 export interface AiProblem {

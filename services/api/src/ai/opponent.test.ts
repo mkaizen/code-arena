@@ -5,7 +5,6 @@ import {
   buildMessages,
   stripHtml,
   EFFORT,
-  isAiDifficulty,
   type AiProblem,
 } from "./opponent.js";
 
@@ -92,19 +91,10 @@ describe("buildMessages", () => {
   });
 });
 
-describe("EFFORT profiles (the fairness knob)", () => {
-  it("monotonically raises effort from easy to hard", () => {
-    expect(EFFORT.easy.retryBudget).toBeLessThan(EFFORT.med.retryBudget);
-    expect(EFFORT.med.retryBudget).toBeLessThan(EFFORT.hard.retryBudget);
-    // Harder tiers think faster (lower floor) and sample more decisively (lower temp).
-    expect(EFFORT.easy.thinkMsFloor).toBeGreaterThan(EFFORT.hard.thinkMsFloor);
-    expect(EFFORT.easy.temperature).toBeGreaterThan(EFFORT.hard.temperature);
-    expect(EFFORT.hard.maxTokens).toBeGreaterThan(EFFORT.easy.maxTokens);
-  });
-
-  it("guards the difficulty type", () => {
-    expect(isAiDifficulty("med")).toBe(true);
-    expect(isAiDifficulty("impossible")).toBe(false);
-    expect(isAiDifficulty(null)).toBe(false);
+describe("EFFORT profile (a real race — full effort, no handicap)", () => {
+  it("allows iteration and keeps sampling steady", () => {
+    expect(EFFORT.retryBudget).toBeGreaterThan(0);
+    expect(EFFORT.maxTokens).toBeGreaterThan(0);
+    expect(EFFORT.temperature).toBeLessThanOrEqual(0.5);
   });
 });

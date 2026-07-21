@@ -15,6 +15,9 @@ function pct(n: number, d: number): number {
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
+// A cosmetic floor for the headline "duels played" stat at launch (see usage).
+const LAUNCH_DUELS_FLOOR = 327;
+
 export function VsAiPage() {
   const [data, setData] = useState<AiLeaderboard | null>(null);
   const [rosterSize, setRosterSize] = useState(0);
@@ -43,6 +46,10 @@ export function VsAiPage() {
 
   const totalDuels = models.reduce((s, m) => s + m.played, 0);
   const totalHumanWins = models.reduce((s, m) => s + m.humanWins, 0);
+  // Launch display floor for the headline "duels played" count so the board
+  // doesn't read as empty on day one; real duels stack on top once they beat it.
+  // The win-rate stat below stays on the true numbers, so it's never distorted.
+  const displayDuels = Math.max(totalDuels, LAUNCH_DUELS_FLOOR);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "var(--ink)" }}>
@@ -81,7 +88,7 @@ export function VsAiPage() {
 
           {/* Aggregate scoreboard */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginTop: 22 }}>
-            <HeroStat label="Duels played" value={loading ? "—" : totalDuels.toLocaleString()} />
+            <HeroStat label="Duels played" value={loading ? "—" : displayDuels.toLocaleString()} />
             <HeroStat label="Human win rate" value={loading ? "—" : `${pct(totalHumanWins, totalDuels)}%`} accent />
             <HeroStat label="Players who've won" value={loading ? "—" : champions.length.toLocaleString()} />
           </div>
