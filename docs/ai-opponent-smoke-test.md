@@ -7,8 +7,8 @@ deploying with the feature configured. ~5 minutes.
 ## Before you start (deploy)
 
 1. **Apply the migration.** The API container runs `prisma migrate deploy` on
-   start, so a normal redeploy applies `20260718000000_ai_opponent`
-   (adds `User.botModel`, `Match.aiDuel`, `Match.aiDifficulty`). No manual step.
+   start, so a normal redeploy applies the AI-opponent migrations (adds
+   `User.botModel`, `Match.aiDuel`). No manual step.
 
 2. **Configure the model(s).** The house model uses the single vars:
    - `AI_API_KEY` — the provider key.
@@ -41,41 +41,39 @@ deploying with the feature configured. ~5 minutes.
 
 1. **Feature flag.** `GET /matches/ai/config` → `{ enabled: true, opponent: "<name>" }`.
 
-2. **Start a duel.** As a logged-in user, `POST /matches/ai { "difficulty": "med" }`
+2. **Start a duel.** As a logged-in user, `POST /matches/ai {}`
    → `{ matchId }`. Open the match; you should see one opponent whose handle is the
    configured name, and a single-problem duel board (first to solve it wins).
 
-3. **Watch the AI actually play.** After the think-time pause (medium ≈ 20s), the
-   opponent's submission appears in the live feed with a real verdict. Confirm in
-   the DB that its `Submission.source` is real code (not `// practice bot`) and
+3. **Watch the AI actually play.** The opponent starts immediately (a real race —
+   no artificial pause); its submission appears in the live feed with a real
+   verdict as soon as the model returns code. Confirm in the DB that its
+   `Submission.source` is real code (not `// practice bot`) and
    `Submission.language` is a supported language.
 
 4. **Iteration.** If its first attempt is `WRONG_ANSWER`/`TLE`, it should submit
-   again (medium allows up to 2 retries) until it solves or the budget is spent.
+   again (up to 4 retries) until it solves or the budget is spent.
    Verify multiple `Submission` rows for the opponent within one round.
 
-5. **Fairness knob.** Start a `"hard"` duel — it should start faster (no think
-   floor) and retry more; an `"easy"` duel pauses longer and never retries.
-
-6. **Rating integrity.** After the match, confirm the human's `User.rating` is
+5. **Rating integrity.** After the match, confirm the human's `User.rating` is
    unchanged (AI duels are unrated) and the match row has `aiDuel = true`.
 
-7. **Rate limit.** Fire `POST /matches/ai` more than 10 times within an hour from
+6. **Rate limit.** Fire `POST /matches/ai` more than 10 times within an hour from
    one IP → the 11th returns 429.
 
 ## Multi-model & AI-vs-AI (M3)
 
-8. **Roster.** With `AI_MODELS` set, each model provisions its own opponent bot
+7. **Roster.** With `AI_MODELS` set, each model provisions its own opponent bot
    (handle = its display name) the first time it plays. The house model still
    backs the human "Challenge the AI" duel.
 
-9. **Exhibitions.** With `AI_VS_AI_ENABLED=true` and ≥2 models, watch for an
+8. **Exhibitions.** With `AI_VS_AI_ENABLED=true` and ≥2 models, watch for an
    AI-vs-AI match to appear (no human) within `AI_VS_AI_INTERVAL_SEC`. When it
    finishes, the [Humans vs AI](/vs-ai) page shows a **Model vs model** standings
    section ranked by Elo, and its replay has a **"How 🤖 &lt;model&gt; solved it"**
    disclosure with the AI's actual code per round.
 
-10. **Reset the board (optional).** To start the model-vs-model Elo from a clean
+9. **Reset the board (optional).** To start the model-vs-model Elo from a clean
     slate — e.g. before a launch, or after changing the roster — call
     `POST /api/admin/ai/reset-board` (admin/setter auth). It wipes finished
     AI-vs-AI exhibitions and resets every model's rating to the baseline. It's

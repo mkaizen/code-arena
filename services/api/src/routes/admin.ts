@@ -407,6 +407,27 @@ export async function adminRoutes(app: FastifyInstance) {
     return { finalized: deltas.length, changes: deltas };
   });
 
+  // Remove a contest entirely — for clearing out old/test contests. Contest
+  // submissions are kept (they stay in each user's history) but detached from
+  // the contest; the contest's rating-change rows go with it. Already-applied
+  // rating deltas on User.rating are NOT rewound — deleting a finalized rated
+  // contest erases its history, not its effect.
+  app.delete("/admin/contests/:id", { onRequest: [requireAdmin] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const contest = await prisma.contest.findUnique({ where: { id }, select: { id: true, name: true } });
+    if (!contest) return reply.code(404).send({ error: "not found" });
+
+    const [, , , subs] = await prisma.$transaction([
+      prisma.ratingChange.deleteMany({ where: { contestId: id } }),
+      prisma.registration.deleteMany({ where: { contestId: id } }),
+      prisma.contestProblem.deleteMany({ where: { contestId: id } }),
+      prisma.submission.updateMany({ where: { contestId: id }, data: { contestId: null } }),
+      prisma.contest.delete({ where: { id } }),
+    ]);
+
+    return { deleted: contest.name, detachedSubmissions: subs.count };
+  });
+
   // Plagiarism/duplicate-detection signals for a contest (NFR-4). For each
   // problem, compare one representative submission per user (their latest) and
   // surface structurally-similar pairs for a human to review. This is a signal,

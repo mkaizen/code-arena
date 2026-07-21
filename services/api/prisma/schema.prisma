@@ -272,10 +272,9 @@ model Match {
   // Practice matches pit one human against seeded bots; they are unrated.
   practice         Boolean     @default(false)
   // "Challenge the AI" duels: one human vs one LLM opponent. Unrated for the
-  // human ladder; tracked separately on the AI leaderboard. aiDifficulty is the
-  // opponent's effort setting (easy/med/hard) for the whole match.
+  // human ladder; tracked separately on the AI leaderboard. The model always
+  // plays at full effort — a real race, no difficulty tiers.
   aiDuel           Boolean     @default(false)
-  aiDifficulty     String?
   // Model-vs-model exhibition: two LLM opponents, no human. Feeds the AI-vs-AI
   // board, kept separate from the human-vs-AI record.
   aiVsAi           Boolean     @default(false)

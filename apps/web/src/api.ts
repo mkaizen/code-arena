@@ -280,6 +280,9 @@ export const api = {
   adminFinalizeContest: (id: string): Promise<{ finalized: number; changes: { userId: string; before: number; after: number }[] }> =>
     req(`/admin/contests/${id}/finalize`, { method: "POST" }),
 
+  adminDeleteContest: (id: string): Promise<{ deleted: string; detachedSubmissions: number }> =>
+    req(`/admin/contests/${id}`, { method: "DELETE" }),
+
   adminContestPlagiarism: (id: string, threshold?: number): Promise<PlagiarismReport> =>
     req(`/admin/contests/${id}/plagiarism${threshold !== undefined ? `?threshold=${threshold}` : ""}`),
 
@@ -297,8 +300,8 @@ export const api = {
   aiConfig: (): Promise<{ enabled: boolean; opponent: string | null; models: { key: string; name: string }[] }> =>
     req("/matches/ai/config"),
 
-  startAiDuel: (difficulty: "easy" | "med" | "hard", model?: string): Promise<{ matchId: string }> =>
-    req("/matches/ai", { method: "POST", body: JSON.stringify({ difficulty, model }) }),
+  startAiDuel: (model?: string): Promise<{ matchId: string }> =>
+    req("/matches/ai", { method: "POST", body: JSON.stringify({ model }) }),
 
   matchQueueStatus: (): Promise<{
     queuedMode: MatchMode | null;

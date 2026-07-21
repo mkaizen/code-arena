@@ -3,22 +3,15 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api.js";
 import { useAuth } from "../ctx/AuthContext.js";
 
-type Difficulty = "easy" | "med" | "hard";
 type Model = { key: string; name: string };
-
-const DIFFS: { key: Difficulty; label: string; blurb: string }[] = [
-  { key: "easy", label: "Easy", blurb: "Thinks a while, one shot — a beatable warm-up." },
-  { key: "med", label: "Medium", blurb: "The arena default: iterates a couple of times." },
-  { key: "hard", label: "Hard", blurb: "Full effort, no head start. You'll probably lose." },
-];
 
 const VIOLET = "rgba(126,90,255,";
 
 /**
- * "Challenge the AI" entry point: pick an opponent from the model roster and a
- * difficulty, then start a live duel — no signup required (a throwaway guest
- * session is minted on the fly for logged-out visitors). Renders nothing when
- * the feature isn't configured on the server.
+ * "Challenge the AI" entry point: pick an opponent from the model roster and
+ * start a live duel — a real race, both sides at full effort. No signup
+ * required (a throwaway guest session is minted on the fly for logged-out
+ * visitors). Renders nothing when the feature isn't configured on the server.
  */
 export function ChallengeAi({ compact = false }: { compact?: boolean }) {
   const { user, ensureGuest } = useAuth();
@@ -26,7 +19,6 @@ export function ChallengeAi({ compact = false }: { compact?: boolean }) {
   const [models, setModels] = useState<Model[]>([]);
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [modelKey, setModelKey] = useState<string | null>(null);
-  const [difficulty, setDifficulty] = useState<Difficulty>("med");
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
 
@@ -54,7 +46,7 @@ export function ChallengeAi({ compact = false }: { compact?: boolean }) {
     setStarting(true);
     try {
       if (!user) await ensureGuest();
-      const { matchId } = await api.startAiDuel(difficulty, modelKey || undefined);
+      const { matchId } = await api.startAiDuel(modelKey || undefined);
       navigate(`/battle/${matchId}`);
     } catch (e) {
       setError((e as Error).message);
@@ -76,8 +68,8 @@ export function ChallengeAi({ compact = false }: { compact?: boolean }) {
         🤖 Challenge {name}
       </h2>
       <p style={{ color: "var(--txt-3)", fontSize: 13, lineHeight: 1.6, marginBottom: 16, maxWidth: 500, marginLeft: "auto", marginRight: "auto" }}>
-        A live 1v1 duel against an AI that writes <strong>real code</strong>, judged on the same hidden
-        tests you get. Pick your opponent. No signup — jump straight in.
+        A live 1v1 race against an AI that writes <strong>real code</strong>, judged on the same hidden
+        tests you get — both of you at full speed. No signup — jump straight in.
       </p>
 
       {/* Opponent roster — only worth showing when there's a choice. */}
@@ -93,18 +85,6 @@ export function ChallengeAi({ compact = false }: { compact?: boolean }) {
           </div>
         </>
       )}
-
-      <Label>Difficulty</Label>
-      <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 10 }}>
-        {DIFFS.map((d) => (
-          <Chip key={d.key} on={difficulty === d.key} onClick={() => setDifficulty(d.key)} title={d.blurb}>
-            {d.label}
-          </Chip>
-        ))}
-      </div>
-      <div style={{ color: "var(--txt-3)", fontSize: 11, marginBottom: 16, minHeight: 14 }}>
-        {DIFFS.find((d) => d.key === difficulty)?.blurb}
-      </div>
 
       {error && <div style={{ color: "var(--v-wa)", fontSize: 12, marginBottom: 12 }}>{error}</div>}
 

@@ -217,15 +217,14 @@ export function BattleMatchPage() {
     }
   }
 
-  // Start a fresh AI duel at the same difficulty. (Plain "Play Again" would send
-  // an AI-duel player into a practice-vs-bots match, since AI duels are practice.)
+  // Start a fresh AI duel. (Plain "Play Again" would send an AI-duel player
+  // into a practice-vs-bots match, since AI duels are practice.)
   async function handleChallengeAgain() {
     if (!match || playAgainBusy) return;
     setPlayAgainBusy(true);
     setPlayAgainError("");
     try {
-      const diff = match.aiDifficulty === "easy" || match.aiDifficulty === "hard" ? match.aiDifficulty : "med";
-      const { matchId } = await api.startAiDuel(diff);
+      const { matchId } = await api.startAiDuel();
       navigate(`/battle/${matchId}`);
     } catch (e) {
       setPlayAgainError((e as Error).message);
@@ -774,8 +773,7 @@ export function BattleMatchPage() {
 }
 
 // The end-of-duel panel for a "Challenge the AI" match — violet-themed, with a
-// same-difficulty rematch, the replay (which reveals the AI's actual code), and
-// a share link.
+// rematch, the replay (which reveals the AI's actual code), and a share link.
 function AiDuelResult({ won, draw, opponentName, matchId, onChallengeAgain, busy, error }: {
   won: boolean;
   draw: boolean;

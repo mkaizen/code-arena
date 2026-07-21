@@ -2,7 +2,7 @@
 title: "Putting an AI in the Arena — and Making It Play Fair"
 date: "2026-07-18"
 author: "Matthew"
-description: "Code Arena now lets you duel an AI that writes real code, judged on the same hidden tests you get, on the same clock. Here's exactly how it works — the prompt, the sandbox, the effort dial — and why 'can you beat the AI?' is an honest question and not a party trick."
+description: "Code Arena now lets you duel an AI that writes real code, judged on the same hidden tests you get, on the same clock. Here's exactly how it works — the prompt, the sandbox, the full-effort race — and why 'can you beat the AI?' is an honest question and not a party trick."
 ---
 
 # Putting an AI in the Arena — and Making It Play Fair
@@ -31,23 +31,17 @@ Then it gets the problem title, the statement as plain text, and the public exam
 
 The response is parsed for a single fenced code block, the language tag is mapped onto one the judge supports, and that becomes the submission. If the model rambles or returns nothing runnable, the opponent simply sits the attempt out — no crash, it just concedes the tempo, the way a human loses time when they're stuck.
 
-## The fairness dial
+## A real race
 
-Here's the part I went back and forth on. A frontier model, given a typical duel problem, will often solve it faster than any human alive. That's dramatic exactly once. After that it's just demoralizing, and nobody clicks "rematch" against an opponent who wins in four seconds every time.
+Here's the part I went back and forth on. An early version had a difficulty dial — an "easy" mode where the model got a long artificial thinking pause and no retries, so you could warm up against a throttled opponent. I cut it. A handicapped race isn't a race, and the whole premise of this feature is that the question "can you beat the AI?" is asked honestly.
 
-So difficulty in this feature is not a fake delay bolted onto a machine that already knows the answer. It's a **dial on how much effort the model is allowed to spend**:
-
-- **Easy** — one shot, no retries, and a long "thinking" pause before it submits. A beatable warm-up.
-- **Medium** — the default. It iterates a couple of times on a wrong answer, at a human-ish pace.
-- **Hard** — full effort, no head start, several retries. You will probably lose, and that's the point.
-
-The dial changes *how hard it tries*, never *what it can see*. On every setting it gets the same statement, the same judge, the same clock. I think that's the honest way to make an AI opponent tunable: throttle the effort, not the information.
+So now there's one mode: **full effort**. The model starts the moment you do, iterates when it's wrong (up to a bounded retry budget), and submits as fast as it genuinely runs. It gets the same statement, the same judge, the same clock as you — no head start in either direction. If it beats you in forty seconds, that's what actually happened. If you beat it, you *actually beat it*, and nobody can say the bot was sandbagging.
 
 ## No signup, and no faucet
 
-The whole thing is meant to be a ten-second demo: land on the homepage, pick a difficulty, play. Requiring an account before you've even seen it defeats the purpose, so a logged-out visitor gets a throwaway guest session minted on the fly and drops straight into a duel. Win or lose, there's a nudge at the end to make a real account and keep the record.
+The whole thing is meant to be a ten-second demo: land on the homepage, pick your opponent, play. Requiring an account before you've even seen it defeats the purpose, so a logged-out visitor gets a throwaway guest session minted on the fly and drops straight into a duel. Win or lose, there's a nudge at the end to make a real account and keep the record.
 
-"No signup" and "calls a paid model" are in tension, though — an open endpoint that spends money is a bad idea. So AI duels are capped per IP per hour, and each duel has a bounded worst case: the effort dial caps how many times the model can be called in a single match. Generous enough to be fun, finite enough that it can't be turned into a bill.
+"No signup" and "calls a paid model" are in tension, though — an open endpoint that spends money is a bad idea. So AI duels are capped per IP per hour, and each duel has a bounded worst case: a fixed retry budget caps how many times the model can be called in a single match. Generous enough to be fun, finite enough that it can't be turned into a bill.
 
 ## Keeping score
 

@@ -15,7 +15,6 @@ import {
   EFFORT,
   buildMessages,
   extractSolution,
-  type AiDifficulty,
   type AiFeedback,
   type AiProblem,
   type AiSolution,
@@ -116,16 +115,14 @@ async function callOpenai(model: AiModel, maxTokens: number, temperature: number
 export async function generateSolution(
   model: AiModel,
   problem: AiProblem,
-  difficulty: AiDifficulty,
   feedback?: AiFeedback,
 ): Promise<AiSolution | null> {
-  const effort = EFFORT[difficulty];
   const { system, user } = buildMessages(problem, feedback);
 
   try {
     const text = model.api === "openai"
-      ? await callOpenai(model, effort.maxTokens, effort.temperature, system, user)
-      : await callAnthropic(model, effort.maxTokens, effort.temperature, system, user);
+      ? await callOpenai(model, EFFORT.maxTokens, EFFORT.temperature, system, user)
+      : await callAnthropic(model, EFFORT.maxTokens, EFFORT.temperature, system, user);
     return text ? extractSolution(text) : null;
   } catch (err) {
     console.error("ai opponent call failed", err);

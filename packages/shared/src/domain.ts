@@ -414,6 +414,4 @@ export interface MatchStateView {
   practice: boolean;
   /** A "Challenge the AI" duel: the opponent is an LLM writing real, judged code. */
   aiDuel: boolean;
-  /** The AI opponent's effort setting (easy/med/hard) — for a same-difficulty rematch. */
-  aiDifficulty: string | null;
 }

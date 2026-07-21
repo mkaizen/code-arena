@@ -5,7 +5,7 @@ import { winsToClinch, placementsByElimination, placementsByScore, humanRatingRa
 import { pickLadder } from "./ladder.js";
 import { isRecruiter } from "../referrals.js";
 import { botRoundPlan, personaFor, pickOpponents, BOT_ROSTER, botEmail } from "./bots.js";
-import { EFFORT, isAiDifficulty, type AiDifficulty, type AiFeedback, type AiProblem } from "../ai/opponent.js";
+import { EFFORT, type AiFeedback, type AiProblem } from "../ai/opponent.js";
 import { generateSolution, houseModel, modelByKey, aiModels } from "../ai/provider.js";
 import type { AiModel } from "../ai/models.js";
 import { env } from "../env.js";
@@ -615,7 +615,6 @@ export async function getMatchState(matchId: string): Promise<MatchStateView | n
     players,
     practice: match.practice,
     aiDuel: match.aiDuel,
-    aiDifficulty: match.aiDifficulty,
   };
 }
 
@@ -749,11 +748,10 @@ async function scheduleBotsForRound(matchId: string, round: number, roundDuratio
 
   for (const bot of bots) {
     // AI opponents don't fake a verdict — they write real code that the judge
-    // grades. After an effort-appropriate "thinking" pause, kick the first
-    // attempt; wrong verdicts drive retries via onAiSubmissionJudged.
+    // grades. Kicked immediately — a real race, no artificial head start; wrong
+    // verdicts drive retries via onAiSubmissionJudged.
     if (bot.user.botModel) {
-      const difficulty = await aiDifficultyFor(matchId);
-      arm(EFFORT[difficulty].thinkMsFloor, () => kickAiOpponent(matchId, round, bot.user.id, difficulty));
+      arm(0, () => kickAiOpponent(matchId, round, bot.user.id));
       continue;
     }
     const persona = personaFor(bot.user.id);
@@ -813,12 +811,6 @@ async function botSubmit(
 
 // ── AI opponent (real code, real judge) ─────────────────────────────────────
 
-/** The AI opponent's effort setting for a match (defaults to medium). */
-async function aiDifficultyFor(matchId: string): Promise<AiDifficulty> {
-  const m = await prisma.match.findUnique({ where: { id: matchId }, select: { aiDifficulty: true } });
-  return isAiDifficulty(m?.aiDifficulty) ? m!.aiDifficulty as AiDifficulty : "med";
-}
-
 /** Provision (once) the AI-opponent bot user for a given model. */
 async function ensureAiOpponent(model: AiModel): Promise<string> {
   const existing = await prisma.user.findFirst({ where: { isBot: true, botModel: model.key }, select: { id: true } });
@@ -872,7 +864,6 @@ async function kickAiOpponent(
   matchId: string,
   round: number,
   botId: string,
-  difficulty: AiDifficulty,
   feedback?: AiFeedback,
 ): Promise<void> {
   if (!(await stillAiTurn(matchId, round, botId))) return;
@@ -882,7 +873,7 @@ async function kickAiOpponent(
   const problem = await loadAiProblem(matchId, round);
   if (!problem) return;
 
-  const solution = await generateSolution(model, problem, difficulty, feedback);
+  const solution = await generateSolution(model, problem, feedback);
   if (!solution) return; // couldn't get a runnable answer this attempt — sit the turn out
   if (!(await stillAiTurn(matchId, round, botId))) return; // round moved on while thinking
 
@@ -918,12 +909,11 @@ export async function onAiSubmissionJudged(
   if (verdict === "ACCEPTED") return; // the accept path already resolved/advanced the round
   const match = await prisma.match.findUnique({
     where: { id: matchId },
-    select: { status: true, round: true, roundStartedAt: true, aiDifficulty: true, aiVsAi: true },
+    select: { status: true, round: true, roundStartedAt: true, aiVsAi: true },
   });
   if (!match || match.status !== "ACTIVE") return;
   if (submittedAt < match.roundStartedAt) return; // belongs to a round that already ended
 
-  const difficulty: AiDifficulty = isAiDifficulty(match.aiDifficulty) ? match.aiDifficulty : "med";
   const problem = await loadAiProblem(matchId, match.round);
   if (!problem) return;
 
@@ -931,7 +921,7 @@ export async function onAiSubmissionJudged(
   const attempts = await prisma.submission.count({
     where: { matchId, userId: botId, createdAt: { gte: match.roundStartedAt } },
   });
-  if (attempts > EFFORT[difficulty].retryBudget) {
+  if (attempts > EFFORT.retryBudget) {
     // Budget exhausted — this model is done for the round. In an exhibition that
     // may be the last model to finish, so check whether the round can resolve.
     if (match.aiVsAi) await withLock(matchId, () => _maybeResolveAiVsAiRound(matchId, false));
@@ -940,7 +930,7 @@ export async function onAiSubmissionJudged(
 
   const sample = problem.samples[0];
   const feedback: AiFeedback = { verdict, sample: sample ? { input: sample.input, expected: sample.output } : undefined };
-  await kickAiOpponent(matchId, match.round, botId, difficulty, feedback);
+  await kickAiOpponent(matchId, match.round, botId, feedback);
 }
 
 /**
@@ -950,7 +940,6 @@ export async function onAiSubmissionJudged(
  */
 export async function startAiMatch(
   userId: string,
-  difficulty: AiDifficulty,
   modelKey?: string,
 ): Promise<{ matchId: string }> {
   // Race the picked model, or the house model when none/an unknown one is asked for.
@@ -977,7 +966,6 @@ export async function startAiMatch(
       mode: "DUEL",
       practice: true, // unrated for the human ladder
       aiDuel: true,
-      aiDifficulty: difficulty,
       roundDurationSec: cfg.roundDurationSec,
       players: {
         create: [
@@ -1010,7 +998,6 @@ export async function startAiVsAiMatch(a: AiModel, b: AiModel): Promise<{ matchI
       mode: "DUEL",
       practice: true,
       aiVsAi: true,
-      aiDifficulty: "hard", // both models at full effort — a fair comparison
       roundDurationSec: AI_VS_AI_ROUND_SEC,
       players: {
         create: [
@@ -1161,7 +1148,7 @@ async function _maybeResolveAiVsAiRound(matchId: string, force: boolean): Promis
 
   if (!force) {
     // A model is "done" for the round once it has solved or spent its attempts.
-    const retryBudget = EFFORT[isAiDifficulty(match.aiDifficulty) ? (match.aiDifficulty as AiDifficulty) : "med"].retryBudget;
+    const retryBudget = EFFORT.retryBudget;
     let allDone = true;
     for (const b of bots) {
       if (solved.has(b.userId)) continue;
